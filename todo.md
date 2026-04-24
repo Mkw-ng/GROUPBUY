@@ -73,3 +73,12 @@
 - [x] Update Admin.tsx CATEGORIES list, CATEGORY_EMOJI map, and product form select
 - [x] Update DealsSection.tsx category filter tabs and emoji map
 - [x] Update seed script with new categories
+
+## Cart Order Details Form
+- [x] Add WhatsApp phone number input below cart items (labelled "Your WhatsApp Number")
+- [x] Add pickup date picker — calendar popover, future dates only (today and past disabled)
+- [x] Add pickup location selector: Cranbourne / Clayton / Delivery radio group
+- [x] When Delivery is selected, show address text input
+- [x] Add special instructions textarea with placeholder "e.g., Please trim fat, cut into steaks, etc."
+- [x] Include all order details fields in the WhatsApp checkout message
+- [x] Validate required fields (phone, date, location/address) before allowing checkout

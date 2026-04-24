@@ -1,11 +1,16 @@
 /*
  * GROUPBUY Cart Drawer
  * Design: Ink background slide-in panel, items list with JetBrains Mono prices
+ * Order details form below items: phone, pickup date, location/delivery, special instructions
  * Checkout CTA in red, close button top-right
  * Power Drop: indicator in header + note in WhatsApp checkout message
  */
+import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Trash2, MessageCircle, Zap } from "lucide-react";
+import { X, Trash2, MessageCircle, Zap, CalendarIcon, ChevronDown } from "lucide-react";
+import { format, isToday, isBefore, startOfDay } from "date-fns";
+import { DayPicker } from "react-day-picker";
+import "react-day-picker/style.css";
 
 export interface CartItem {
   id: number;
@@ -25,6 +30,14 @@ interface CartDrawerProps {
   powerDropActive?: boolean;
 }
 
+type PickupLocation = "cranbourne" | "clayton" | "delivery";
+
+const LOCATION_LABELS: Record<PickupLocation, string> = {
+  cranbourne: "Cranbourne",
+  clayton: "Clayton",
+  delivery: "Delivery",
+};
+
 export default function CartDrawer({
   open,
   onClose,
@@ -34,6 +47,86 @@ export default function CartDrawer({
   powerDropActive = false,
 }: CartDrawerProps) {
   const total = items.reduce((sum, item) => sum + item.price * item.qty, 0);
+
+  // ─── Order details state ────────────────────────────────────────────────────
+  const [phone, setPhone] = useState("");
+  const [pickupDate, setPickupDate] = useState<Date | undefined>(undefined);
+  const [calendarOpen, setCalendarOpen] = useState(false);
+  const [location, setLocation] = useState<PickupLocation>("cranbourne");
+  const [deliveryAddress, setDeliveryAddress] = useState("");
+  const [instructions, setInstructions] = useState("");
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const calendarRef = useRef<HTMLDivElement>(null);
+
+  // Close calendar on outside click
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (calendarRef.current && !calendarRef.current.contains(e.target as Node)) {
+        setCalendarOpen(false);
+      }
+    }
+    if (calendarOpen) document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [calendarOpen]);
+
+  // Disable today and past dates
+  const disabledDays = (date: Date) =>
+    isBefore(date, startOfDay(new Date())) || isToday(date);
+
+  // ─── Validation + WhatsApp message ─────────────────────────────────────────
+  function validate(): boolean {
+    const errs: Record<string, string> = {};
+    if (!phone.trim()) errs.phone = "WhatsApp number is required";
+    if (!pickupDate) errs.date = "Please select a pickup / delivery date";
+    if (location === "delivery" && !deliveryAddress.trim())
+      errs.address = "Delivery address is required";
+    setErrors(errs);
+    return Object.keys(errs).length === 0;
+  }
+
+  function buildWhatsAppUrl(): string {
+    const lines = items.map(
+      (i) => `• ${i.name} (${i.cut}) x${i.qty} — $${(i.price * i.qty).toFixed(2)}`
+    );
+    const powerDropNote = powerDropActive ? "\n⚡ *POWER DROP PRICING APPLIED*\n" : "";
+    const dateStr = pickupDate ? format(pickupDate, "EEEE, d MMMM yyyy") : "";
+    const locationStr =
+      location === "delivery"
+        ? `Delivery to: ${deliveryAddress}`
+        : `Pickup: ${LOCATION_LABELS[location]}`;
+    const instructionsStr = instructions.trim()
+      ? `\nSpecial instructions: ${instructions.trim()}`
+      : "";
+
+    const msg = [
+      `Hi! I'd like to place an order:${powerDropNote}`,
+      "",
+      ...lines,
+      "",
+      `Total: $${total.toFixed(2)}`,
+      "",
+      `📱 WhatsApp: ${phone}`,
+      `📅 Date: ${dateStr}`,
+      `📍 ${locationStr}`,
+      instructionsStr,
+    ]
+      .join("\n")
+      .trim();
+
+    return `https://wa.me/61407249272?text=${encodeURIComponent(msg)}`;
+  }
+
+  function handleCheckout(e: React.MouseEvent<HTMLAnchorElement>) {
+    if (!validate()) {
+      e.preventDefault();
+    }
+  }
+
+  // ─── Shared input styles ────────────────────────────────────────────────────
+  const inputBase =
+    "w-full bg-transparent border border-white/15 text-[#f5f2ec] font-mono-brand text-[12px] px-3 py-2.5 placeholder-[#8a857c] focus:outline-none focus:border-[#c73e3a]/60 transition-colors";
+  const labelBase = "block font-display text-[10px] tracking-widest text-[#8a857c] mb-1.5";
+  const errorBase = "font-mono-brand text-[10px] text-[#c73e3a] mt-1";
 
   return (
     <AnimatePresence>
@@ -58,7 +151,7 @@ export default function CartDrawer({
             className="fixed right-0 top-0 bottom-0 z-50 w-full max-w-sm section-ink border-l border-white/10 flex flex-col"
           >
             {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 shrink-0">
               <div>
                 <div className="flex items-center gap-2">
                   <p className="font-display text-[11px] tracking-widest text-[#f5f2ec]">
@@ -84,76 +177,238 @@ export default function CartDrawer({
               </button>
             </div>
 
-            {/* Items */}
-            <div className="flex-1 overflow-y-auto px-6 py-4">
-              {items.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-full gap-3">
-                  <div className="w-16 h-16 opacity-10">
-                    <img
-                      src="/manus-storage/groupbuy-gmark-dark_d5ad0418.svg"
-                      alt=""
-                      className="w-full h-full"
+            {/* Scrollable body */}
+            <div className="flex-1 overflow-y-auto">
+              {/* Items */}
+              <div className="px-6 py-4">
+                {items.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-16 gap-3">
+                    <div className="w-16 h-16 opacity-10">
+                      <img
+                        src="/manus-storage/groupbuy-gmark-dark_d5ad0418.svg"
+                        alt=""
+                        className="w-full h-full"
+                      />
+                    </div>
+                    <p className="font-mono-brand text-[12px] text-[#8a857c]">
+                      Your cart is empty.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-4">
+                    {items.map((item) => (
+                      <div key={item.id} className="flex gap-3 border-b border-white/8 pb-4">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-body text-[13px] font-bold text-[#f5f2ec] leading-snug">
+                            {item.name}
+                          </p>
+                          <p className="font-mono-brand text-[10px] text-[#8a857c] mt-0.5">
+                            {item.cut}
+                          </p>
+                          <div className="flex items-center gap-3 mt-2">
+                            <div className="flex items-center border border-white/15">
+                              <button
+                                onClick={() =>
+                                  item.qty > 1
+                                    ? onQtyChange(item.id, item.qty - 1)
+                                    : onRemove(item.id)
+                                }
+                                className="w-7 h-7 flex items-center justify-center text-[#f5f2ec]/50 hover:text-[#f5f2ec] transition-colors font-mono-brand text-[14px]"
+                              >
+                                −
+                              </button>
+                              <span className="w-7 text-center font-mono-brand text-[12px] text-[#f5f2ec]">
+                                {item.qty}
+                              </span>
+                              <button
+                                onClick={() => onQtyChange(item.id, item.qty + 1)}
+                                className="w-7 h-7 flex items-center justify-center text-[#f5f2ec]/50 hover:text-[#f5f2ec] transition-colors font-mono-brand text-[14px]"
+                              >
+                                +
+                              </button>
+                            </div>
+                            <span className="font-mono-brand text-[14px] font-bold text-[#c73e3a]">
+                              ${(item.price * item.qty).toFixed(2)}
+                            </span>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => onRemove(item.id)}
+                          className="text-[#8a857c] hover:text-[#c73e3a] transition-colors self-start mt-1"
+                          aria-label="Remove item"
+                        >
+                          <Trash2 size={14} strokeWidth={1.5} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Order details form — only shown when cart has items */}
+              {items.length > 0 && (
+                <div className="px-6 pb-4 border-t border-white/10 pt-5 space-y-5">
+                  <p className="font-display text-[11px] tracking-widest text-[#f5f2ec]">
+                    Order Details
+                  </p>
+
+                  {/* 1. WhatsApp phone number */}
+                  <div>
+                    <label className={labelBase}>Your WhatsApp Number *</label>
+                    <input
+                      type="tel"
+                      value={phone}
+                      onChange={(e) => {
+                        setPhone(e.target.value);
+                        if (errors.phone) setErrors((prev) => ({ ...prev, phone: "" }));
+                      }}
+                      placeholder="e.g. 0412 345 678"
+                      className={inputBase}
+                    />
+                    {errors.phone && <p className={errorBase}>{errors.phone}</p>}
+                  </div>
+
+                  {/* 2. Pickup / delivery date */}
+                  <div ref={calendarRef}>
+                    <label className={labelBase}>Pick-up / Delivery Date *</label>
+                    <button
+                      type="button"
+                      onClick={() => setCalendarOpen((v) => !v)}
+                      className={`${inputBase} flex items-center justify-between text-left ${
+                        pickupDate ? "text-[#f5f2ec]" : "text-[#8a857c]"
+                      }`}
+                    >
+                      <span className="flex items-center gap-2">
+                        <CalendarIcon size={13} className="text-[#8a857c]" />
+                        {pickupDate
+                          ? format(pickupDate, "EEEE, d MMMM yyyy")
+                          : "Select a date"}
+                      </span>
+                      <ChevronDown
+                        size={13}
+                        className={`text-[#8a857c] transition-transform ${calendarOpen ? "rotate-180" : ""}`}
+                      />
+                    </button>
+                    {errors.date && <p className={errorBase}>{errors.date}</p>}
+
+                    {/* Calendar popover */}
+                    <AnimatePresence>
+                      {calendarOpen && (
+                        <motion.div
+                          initial={{ opacity: 0, y: -4 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -4 }}
+                          transition={{ duration: 0.15 }}
+                          className="mt-1 border border-white/15 bg-[#1a1714] z-10 relative"
+                          style={{ colorScheme: "dark" }}
+                        >
+                          <DayPicker
+                            mode="single"
+                            selected={pickupDate}
+                            onSelect={(date) => {
+                              setPickupDate(date);
+                              setCalendarOpen(false);
+                              if (errors.date) setErrors((prev) => ({ ...prev, date: "" }));
+                            }}
+                            disabled={disabledDays}
+                            classNames={{
+                              root: "p-3 text-[#f5f2ec] font-mono-brand text-[12px]",
+                              month_caption: "font-display text-[11px] tracking-widest text-[#f5f2ec] mb-2",
+                              weekday: "text-[#8a857c] text-[10px]",
+                              day_button: "w-8 h-8 hover:bg-[#c73e3a]/20 rounded transition-colors",
+                              selected: "bg-[#c73e3a] text-[#f5f2ec] rounded",
+                              disabled: "opacity-25 cursor-not-allowed",
+                              today: "font-bold text-[#c73e3a]",
+                              nav: "text-[#8a857c]",
+                            }}
+                          />
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+
+                  {/* 3. Pickup location */}
+                  <div>
+                    <label className={labelBase}>Pick-up Location / Delivery *</label>
+                    <div className="flex flex-col gap-1.5">
+                      {(["cranbourne", "clayton", "delivery"] as PickupLocation[]).map((opt) => (
+                        <label
+                          key={opt}
+                          className={`flex items-center gap-3 px-3 py-2.5 border cursor-pointer transition-colors ${
+                            location === opt
+                              ? "border-[#c73e3a]/60 bg-[#c73e3a]/8"
+                              : "border-white/15 hover:border-white/30"
+                          }`}
+                        >
+                          <span
+                            className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
+                              location === opt ? "border-[#c73e3a]" : "border-white/30"
+                            }`}
+                          >
+                            {location === opt && (
+                              <span className="w-1.5 h-1.5 rounded-full bg-[#c73e3a]" />
+                            )}
+                          </span>
+                          <input
+                            type="radio"
+                            name="location"
+                            value={opt}
+                            checked={location === opt}
+                            onChange={() => setLocation(opt)}
+                            className="sr-only"
+                          />
+                          <span className="font-mono-brand text-[12px] text-[#f5f2ec]">
+                            {LOCATION_LABELS[opt]}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+
+                    {/* Delivery address — shown only when delivery is selected */}
+                    <AnimatePresence>
+                      {location === "delivery" && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: "auto" }}
+                          exit={{ opacity: 0, height: 0 }}
+                          transition={{ duration: 0.2 }}
+                          className="overflow-hidden mt-2"
+                        >
+                          <input
+                            type="text"
+                            value={deliveryAddress}
+                            onChange={(e) => {
+                              setDeliveryAddress(e.target.value);
+                              if (errors.address)
+                                setErrors((prev) => ({ ...prev, address: "" }));
+                            }}
+                            placeholder="Enter your delivery address"
+                            className={inputBase}
+                          />
+                          {errors.address && <p className={errorBase}>{errors.address}</p>}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+
+                  {/* 4. Special instructions */}
+                  <div>
+                    <label className={labelBase}>Special Instructions</label>
+                    <textarea
+                      value={instructions}
+                      onChange={(e) => setInstructions(e.target.value)}
+                      placeholder="e.g., Please trim fat, cut into steaks, etc."
+                      rows={3}
+                      className={`${inputBase} resize-none`}
                     />
                   </div>
-                  <p className="font-mono-brand text-[12px] text-[#8a857c]">
-                    Your cart is empty.
-                  </p>
-                </div>
-              ) : (
-                <div className="flex flex-col gap-4">
-                  {items.map((item) => (
-                    <div key={item.id} className="flex gap-3 border-b border-white/8 pb-4">
-                      <div className="flex-1 min-w-0">
-                        <p className="font-body text-[13px] font-bold text-[#f5f2ec] leading-snug">
-                          {item.name}
-                        </p>
-                        <p className="font-mono-brand text-[10px] text-[#8a857c] mt-0.5">
-                          {item.cut}
-                        </p>
-                        <div className="flex items-center gap-3 mt-2">
-                          {/* Qty control */}
-                          <div className="flex items-center border border-white/15">
-                            <button
-                              onClick={() =>
-                                item.qty > 1
-                                  ? onQtyChange(item.id, item.qty - 1)
-                                  : onRemove(item.id)
-                              }
-                              className="w-7 h-7 flex items-center justify-center text-[#f5f2ec]/50 hover:text-[#f5f2ec] transition-colors font-mono-brand text-[14px]"
-                            >
-                              −
-                            </button>
-                            <span className="w-7 text-center font-mono-brand text-[12px] text-[#f5f2ec]">
-                              {item.qty}
-                            </span>
-                            <button
-                              onClick={() => onQtyChange(item.id, item.qty + 1)}
-                              className="w-7 h-7 flex items-center justify-center text-[#f5f2ec]/50 hover:text-[#f5f2ec] transition-colors font-mono-brand text-[14px]"
-                            >
-                              +
-                            </button>
-                          </div>
-                          <span className="font-mono-brand text-[14px] font-bold text-[#c73e3a]">
-                            ${(item.price * item.qty).toFixed(2)}
-                          </span>
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => onRemove(item.id)}
-                        className="text-[#8a857c] hover:text-[#c73e3a] transition-colors self-start mt-1"
-                        aria-label="Remove item"
-                      >
-                        <Trash2 size={14} strokeWidth={1.5} />
-                      </button>
-                    </div>
-                  ))}
                 </div>
               )}
             </div>
 
             {/* Footer */}
             {items.length > 0 && (
-              <div className="px-6 py-5 border-t border-white/10">
+              <div className="px-6 py-5 border-t border-white/10 shrink-0">
                 <div className="flex items-center justify-between mb-4">
                   <span className="font-display text-[11px] tracking-widest text-[#8a857c]">
                     Total
@@ -163,21 +418,10 @@ export default function CartDrawer({
                   </span>
                 </div>
                 <a
-                  href={(() => {
-                    const lines = items.map(
-                      (i) =>
-                        `• ${i.name} (${i.cut}) x${i.qty} — $${(i.price * i.qty).toFixed(2)}`
-                    );
-                    const powerDropNote = powerDropActive
-                      ? "\n⚡ *POWER DROP PRICING APPLIED*\n"
-                      : "";
-                    const msg = `Hi! I'd like to place an order:${powerDropNote}\n\n${lines.join(
-                      "\n"
-                    )}\n\nTotal: $${total.toFixed(2)}`;
-                    return `https://wa.me/61407249272?text=${encodeURIComponent(msg)}`;
-                  })()}
+                  href={buildWhatsAppUrl()}
                   target="_blank"
                   rel="noopener noreferrer"
+                  onClick={handleCheckout}
                   className="w-full flex items-center justify-center gap-2 font-display text-[11px] tracking-widest bg-[#c73e3a] text-[#f5f2ec] py-4 hover:bg-[#a83330] transition-colors mb-2"
                 >
                   <MessageCircle size={14} strokeWidth={1.5} />
