@@ -2,15 +2,26 @@
  * GROUPBUY Cart Drawer
  * Design: Ink background slide-in panel, items list with JetBrains Mono prices
  * Order details form below items: phone, pickup date, location/delivery, special instructions
+ * Saved details: phone + location persisted to localStorage, auto-filled on next visit
  * Checkout CTA in red, close button top-right
  * Power Drop: indicator in header + note in WhatsApp checkout message
  */
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Trash2, MessageCircle, Zap, CalendarIcon, ChevronDown } from "lucide-react";
+import {
+  X,
+  Trash2,
+  MessageCircle,
+  Zap,
+  CalendarIcon,
+  ChevronDown,
+  BookmarkCheck,
+  Bookmark,
+} from "lucide-react";
 import { format, isToday, isBefore, startOfDay } from "date-fns";
 import { DayPicker } from "react-day-picker";
 import "react-day-picker/style.css";
+import { useSavedOrderDetails } from "@/hooks/useSavedOrderDetails";
 
 export interface CartItem {
   id: number;
@@ -47,6 +58,7 @@ export default function CartDrawer({
   powerDropActive = false,
 }: CartDrawerProps) {
   const total = items.reduce((sum, item) => sum + item.price * item.qty, 0);
+  const { saved, save, clear } = useSavedOrderDetails();
 
   // ─── Order details state ────────────────────────────────────────────────────
   const [phone, setPhone] = useState("");
@@ -55,8 +67,18 @@ export default function CartDrawer({
   const [location, setLocation] = useState<PickupLocation>("cranbourne");
   const [deliveryAddress, setDeliveryAddress] = useState("");
   const [instructions, setInstructions] = useState("");
+  const [saveDetails, setSaveDetails] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const calendarRef = useRef<HTMLDivElement>(null);
+
+  // Auto-fill from saved details when drawer opens or saved details load
+  useEffect(() => {
+    if (saved) {
+      setPhone((prev) => prev || saved.phone);
+      setLocation((prev) => prev || saved.location);
+      setSaveDetails(true);
+    }
+  }, [saved]);
 
   // Close calendar on outside click
   useEffect(() => {
@@ -88,17 +110,17 @@ export default function CartDrawer({
     const lines = items.map(
       (i) => `• ${i.name} (${i.cut}) x${i.qty} — $${(i.price * i.qty).toFixed(2)}`
     );
-    const powerDropNote = powerDropActive ? "\n⚡ *POWER DROP PRICING APPLIED*\n" : "";
+    const powerDropNote = powerDropActive ? "\n⚡ *POWER DROP PRICING APPLIED*" : "";
     const dateStr = pickupDate ? format(pickupDate, "EEEE, d MMMM yyyy") : "";
     const locationStr =
       location === "delivery"
         ? `Delivery to: ${deliveryAddress}`
         : `Pickup: ${LOCATION_LABELS[location]}`;
     const instructionsStr = instructions.trim()
-      ? `\nSpecial instructions: ${instructions.trim()}`
+      ? `Special instructions: ${instructions.trim()}`
       : "";
 
-    const msg = [
+    const parts = [
       `Hi! I'd like to place an order:${powerDropNote}`,
       "",
       ...lines,
@@ -108,17 +130,22 @@ export default function CartDrawer({
       `📱 WhatsApp: ${phone}`,
       `📅 Date: ${dateStr}`,
       `📍 ${locationStr}`,
-      instructionsStr,
-    ]
-      .join("\n")
-      .trim();
+    ];
+    if (instructionsStr) parts.push(`📝 ${instructionsStr}`);
 
-    return `https://wa.me/61407249272?text=${encodeURIComponent(msg)}`;
+    return `https://wa.me/61407249272?text=${encodeURIComponent(parts.join("\n"))}`;
   }
 
   function handleCheckout(e: React.MouseEvent<HTMLAnchorElement>) {
     if (!validate()) {
       e.preventDefault();
+      return;
+    }
+    // Persist details if checkbox is ticked
+    if (saveDetails && phone.trim()) {
+      save({ phone: phone.trim(), location });
+    } else if (!saveDetails) {
+      clear();
     }
   }
 
@@ -127,6 +154,9 @@ export default function CartDrawer({
     "w-full bg-transparent border border-white/15 text-[#f5f2ec] font-mono-brand text-[12px] px-3 py-2.5 placeholder-[#8a857c] focus:outline-none focus:border-[#c73e3a]/60 transition-colors";
   const labelBase = "block font-display text-[10px] tracking-widest text-[#8a857c] mb-1.5";
   const errorBase = "font-mono-brand text-[10px] text-[#c73e3a] mt-1";
+
+  const detailsAreSaved =
+    saved && saved.phone === phone.trim() && saved.location === location;
 
   return (
     <AnimatePresence>
@@ -248,9 +278,18 @@ export default function CartDrawer({
               {/* Order details form — only shown when cart has items */}
               {items.length > 0 && (
                 <div className="px-6 pb-4 border-t border-white/10 pt-5 space-y-5">
-                  <p className="font-display text-[11px] tracking-widest text-[#f5f2ec]">
-                    Order Details
-                  </p>
+                  <div className="flex items-center justify-between">
+                    <p className="font-display text-[11px] tracking-widest text-[#f5f2ec]">
+                      Order Details
+                    </p>
+                    {/* Saved indicator */}
+                    {detailsAreSaved && (
+                      <span className="flex items-center gap-1 font-mono-brand text-[10px] text-[#4ade80]">
+                        <BookmarkCheck size={11} />
+                        Details saved
+                      </span>
+                    )}
+                  </div>
 
                   {/* 1. WhatsApp phone number */}
                   <div>
@@ -313,9 +352,11 @@ export default function CartDrawer({
                             disabled={disabledDays}
                             classNames={{
                               root: "p-3 text-[#f5f2ec] font-mono-brand text-[12px]",
-                              month_caption: "font-display text-[11px] tracking-widest text-[#f5f2ec] mb-2",
+                              month_caption:
+                                "font-display text-[11px] tracking-widest text-[#f5f2ec] mb-2",
                               weekday: "text-[#8a857c] text-[10px]",
-                              day_button: "w-8 h-8 hover:bg-[#c73e3a]/20 rounded transition-colors",
+                              day_button:
+                                "w-8 h-8 hover:bg-[#c73e3a]/20 rounded transition-colors",
                               selected: "bg-[#c73e3a] text-[#f5f2ec] rounded",
                               disabled: "opacity-25 cursor-not-allowed",
                               today: "font-bold text-[#c73e3a]",
@@ -364,7 +405,7 @@ export default function CartDrawer({
                       ))}
                     </div>
 
-                    {/* Delivery address — shown only when delivery is selected */}
+                    {/* Delivery address */}
                     <AnimatePresence>
                       {location === "delivery" && (
                         <motion.div
@@ -401,6 +442,56 @@ export default function CartDrawer({
                       rows={3}
                       className={`${inputBase} resize-none`}
                     />
+                  </div>
+
+                  {/* 5. Save / clear details */}
+                  <div className="border border-white/10 px-3 py-3 space-y-2">
+                    <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                      <span
+                        className={`w-4 h-4 border flex items-center justify-center shrink-0 transition-colors ${
+                          saveDetails
+                            ? "border-[#c73e3a] bg-[#c73e3a]"
+                            : "border-white/30 bg-transparent"
+                        }`}
+                        onClick={() => setSaveDetails((v) => !v)}
+                      >
+                        {saveDetails && (
+                          <svg
+                            viewBox="0 0 10 8"
+                            fill="none"
+                            className="w-2.5 h-2.5"
+                            stroke="#f5f2ec"
+                            strokeWidth="1.5"
+                          >
+                            <path d="M1 4l2.5 2.5L9 1" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        )}
+                      </span>
+                      <input
+                        type="checkbox"
+                        checked={saveDetails}
+                        onChange={(e) => setSaveDetails(e.target.checked)}
+                        className="sr-only"
+                      />
+                      <span className="font-mono-brand text-[11px] text-[#f5f2ec]/70 flex items-center gap-1.5">
+                        <Bookmark size={11} className="text-[#8a857c]" />
+                        Save my number &amp; pickup location for next time
+                      </span>
+                    </label>
+
+                    {/* Clear saved details */}
+                    {saved && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          clear();
+                          setSaveDetails(false);
+                        }}
+                        className="font-mono-brand text-[10px] text-[#8a857c] hover:text-[#c73e3a] transition-colors underline underline-offset-2 ml-6"
+                      >
+                        Clear saved details
+                      </button>
+                    )}
                   </div>
                 </div>
               )}

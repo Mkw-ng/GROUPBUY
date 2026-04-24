@@ -82,3 +82,10 @@
 - [x] Add special instructions textarea with placeholder "e.g., Please trim fat, cut into steaks, etc."
 - [x] Include all order details fields in the WhatsApp checkout message
 - [x] Validate required fields (phone, date, location/address) before allowing checkout
+
+## Saved Customer Details
+- [x] Create useSavedOrderDetails hook that reads/writes phone + location to localStorage
+- [x] Auto-fill phone and location fields from saved details when cart opens
+- [x] Show "Save my details" checkbox below the phone/location fields (checked by default when details are already saved)
+- [x] Show "Saved ✓" indicator and "Update" / "Clear saved details" controls when details are already saved
+- [x] Save details to localStorage on successful checkout
