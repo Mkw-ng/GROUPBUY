@@ -105,3 +105,10 @@
 - [x] Standard mode: earliest selectable date = today + 2 days; no upper limit
 - [x] Power Drop mode: only dates 10–14 days from activation timestamp are selectable; all other dates disabled
 - [x] Show helper text under date picker explaining the constraint to the customer
+
+## Power Drop Countdown Timer
+- [x] Create PowerDropCountdown component: counts down to end of 14-day pickup window (activatedAt + 14 days), shows days/hours/minutes/seconds
+- [x] Show timer only when Power Drop is active; hide otherwise
+- [x] Place timer prominently in the hero section below the Power Drop overlay text
+- [x] Style with red/ink theme matching Power Drop aesthetic (pulsing border, monospace digits)
+- [x] When countdown reaches zero, show "Order window closed" message

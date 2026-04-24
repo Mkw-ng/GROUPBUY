@@ -7,6 +7,7 @@
  */
 import { motion } from "framer-motion";
 import { ArrowRight, MessageCircle, Zap } from "lucide-react";
+import PowerDropCountdown from "@/components/PowerDropCountdown";
 
 const STATS = [
   { value: "12,600+", label: "Members" },
@@ -17,9 +18,10 @@ const STATS = [
 
 interface HeroProps {
   powerDropActive?: boolean;
+  powerDropActivatedAt?: string;
 }
 
-export default function HeroSection({ powerDropActive = false }: HeroProps) {
+export default function HeroSection({ powerDropActive = false, powerDropActivatedAt = "" }: HeroProps) {
   return (
     <section className="section-ink relative overflow-hidden min-h-[88vh] flex flex-col justify-center">
       {/* Hero background image */}
@@ -126,6 +128,13 @@ export default function HeroSection({ powerDropActive = false }: HeroProps) {
             ? "Our monthly Power Drop event is live. Every product is showing its lowest price of the month — for a limited time only."
             : "Brought to you anyway."}
         </motion.p>
+
+        {/* Power Drop countdown timer */}
+        {powerDropActive && powerDropActivatedAt && (
+          <div className="mb-8">
+            <PowerDropCountdown activatedAt={powerDropActivatedAt} />
+          </div>
+        )}
 
         {/* CTAs */}
         <motion.div
