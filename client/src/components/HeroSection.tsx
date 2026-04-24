@@ -3,9 +3,10 @@
  * Design: Full-bleed Ink, hero background meat photography, left-aligned Orbitron headline
  * G-mark watermark at low opacity, stat row in JetBrains Mono
  * CTA: "View Current Deals" (red fill) + "Join WhatsApp" (outline)
+ * Power Drop: red overlay banner with pulsing indicator when active
  */
 import { motion } from "framer-motion";
-import { ArrowRight, MessageCircle } from "lucide-react";
+import { ArrowRight, MessageCircle, Zap } from "lucide-react";
 
 const STATS = [
   { value: "12,600+", label: "Members" },
@@ -14,7 +15,11 @@ const STATS = [
   { value: "Sat", label: "Pickup Day" },
 ];
 
-export default function HeroSection() {
+interface HeroProps {
+  powerDropActive?: boolean;
+}
+
+export default function HeroSection({ powerDropActive = false }: HeroProps) {
   return (
     <section className="section-ink relative overflow-hidden min-h-[88vh] flex flex-col justify-center">
       {/* Hero background image */}
@@ -33,6 +38,15 @@ export default function HeroSection() {
         <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0a]/60 via-transparent to-transparent" />
       </div>
 
+      {/* Power Drop overlay — red tint when active */}
+      {powerDropActive && (
+        <div
+          className="absolute inset-0 pointer-events-none select-none"
+          aria-hidden="true"
+          style={{ background: "rgba(199,62,58,0.08)" }}
+        />
+      )}
+
       {/* G-mark watermark — right side */}
       <div
         className="absolute right-[-6%] top-1/2 -translate-y-1/2 w-[55vw] max-w-[600px] opacity-[0.05] pointer-events-none select-none"
@@ -48,7 +62,27 @@ export default function HeroSection() {
       {/* Thin top rule */}
       <div className="absolute top-0 left-0 right-0 h-px bg-white/10" />
 
-      <div className="container relative z-10 py-20 md:py-28">
+      {/* Power Drop top strip */}
+      {powerDropActive && (
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4 }}
+          className="absolute top-0 left-0 right-0 z-10 flex items-center justify-center gap-3 bg-[#c73e3a] py-2.5"
+        >
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#f5f2ec] opacity-75" />
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-[#f5f2ec]" />
+          </span>
+          <Zap size={13} className="text-[#f5f2ec] fill-current" />
+          <span className="font-display text-[11px] tracking-[0.3em] text-[#f5f2ec]">
+            POWER DROP — LIVE NOW
+          </span>
+          <Zap size={13} className="text-[#f5f2ec] fill-current" />
+        </motion.div>
+      )}
+
+      <div className="container relative z-10 py-20 md:py-28" style={powerDropActive ? { paddingTop: "4rem" } : {}}>
         {/* Eyebrow */}
         <motion.p
           initial={{ opacity: 0, y: 6 }}
@@ -56,7 +90,7 @@ export default function HeroSection() {
           transition={{ duration: 0.4, delay: 0.1 }}
           className="font-display text-[11px] tracking-[0.3em] text-[#c73e3a] mb-6"
         >
-          Melbourne South East
+          {powerDropActive ? "⚡ Power Drop Event — Special Pricing Live" : "Melbourne South East"}
         </motion.p>
 
         {/* Headline */}
@@ -66,9 +100,19 @@ export default function HeroSection() {
           transition={{ duration: 0.5, delay: 0.2 }}
           className="font-display text-[clamp(2.5rem,7vw,6rem)] leading-[1.05] text-[#f5f2ec] max-w-3xl mb-4"
         >
-          Deals you<br />
-          shouldn't be<br />
-          <span className="text-[#c73e3a]">getting.</span>
+          {powerDropActive ? (
+            <>
+              Power Drop<br />
+              prices are<br />
+              <span className="text-[#c73e3a]">live now.</span>
+            </>
+          ) : (
+            <>
+              Deals you<br />
+              shouldn't be<br />
+              <span className="text-[#c73e3a]">getting.</span>
+            </>
+          )}
         </motion.h1>
 
         {/* Subhead */}
@@ -78,7 +122,9 @@ export default function HeroSection() {
           transition={{ duration: 0.4, delay: 0.35 }}
           className="font-body text-[16px] text-[#f5f2ec]/60 max-w-md mb-10 leading-relaxed"
         >
-          Premium beef, pork, lamb, poultry and seafood — direct from the butcher, split across the group. Brought to you anyway.
+          {powerDropActive
+            ? "Our monthly Power Drop event is live. Every product is showing its lowest price of the month — for a limited time only."
+            : "Premium beef, pork, lamb, poultry and seafood — direct from the butcher, split across the group. Brought to you anyway."}
         </motion.p>
 
         {/* CTAs */}
@@ -92,8 +138,17 @@ export default function HeroSection() {
             href="#deals"
             className="inline-flex items-center gap-2 font-display text-[11px] tracking-widest bg-[#c73e3a] text-[#f5f2ec] px-6 py-3.5 hover:bg-[#a83330] transition-colors"
           >
-            View Current Deals
-            <ArrowRight size={14} strokeWidth={2} />
+            {powerDropActive ? (
+              <>
+                <Zap size={14} className="fill-current" />
+                View Power Drop Deals
+              </>
+            ) : (
+              <>
+                View Current Deals
+                <ArrowRight size={14} strokeWidth={2} />
+              </>
+            )}
           </a>
           <a
             href="https://wa.me/61407249272"

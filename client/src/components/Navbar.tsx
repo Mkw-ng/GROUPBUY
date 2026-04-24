@@ -2,9 +2,10 @@
  * GROUPBUY Navbar
  * Design: Ink background, lockup-dark-red SVG logo, Inter Tight nav links
  * Behaviour: Sticky, slim (56px), red underline hover on links
+ * Power Drop: pulsing red "POWER DROP LIVE" badge in right actions area
  */
 import { useState } from "react";
-import { ShoppingCart, Menu, X } from "lucide-react";
+import { ShoppingCart, Menu, X, Zap } from "lucide-react";
 
 const NAV_LINKS = [
   { label: "How It Works", href: "#how-it-works" },
@@ -17,9 +18,10 @@ const NAV_LINKS = [
 interface NavbarProps {
   cartCount?: number;
   onCartClick?: () => void;
+  powerDropActive?: boolean;
 }
 
-export default function Navbar({ cartCount = 0, onCartClick }: NavbarProps) {
+export default function Navbar({ cartCount = 0, onCartClick, powerDropActive = false }: NavbarProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
@@ -50,6 +52,20 @@ export default function Navbar({ cartCount = 0, onCartClick }: NavbarProps) {
 
         {/* Right actions */}
         <div className="flex items-center gap-3">
+          {/* Power Drop live indicator */}
+          {powerDropActive && (
+            <a
+              href="#deals"
+              className="hidden md:flex items-center gap-1.5 font-display text-[10px] tracking-widest text-[#c73e3a] border border-[#c73e3a]/40 px-2.5 py-1 hover:bg-[#c73e3a]/10 transition-colors"
+            >
+              <span className="relative flex h-1.5 w-1.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#c73e3a] opacity-75" />
+                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-[#c73e3a]" />
+              </span>
+              <Zap size={10} className="fill-current" />
+              POWER DROP
+            </a>
+          )}
           <a
             href="#deals"
             className="hidden md:inline-flex items-center gap-2 font-display text-[11px] tracking-widest bg-[#c73e3a] text-[#f5f2ec] px-4 py-2 hover:bg-[#a83330] transition-colors"
@@ -82,6 +98,16 @@ export default function Navbar({ cartCount = 0, onCartClick }: NavbarProps) {
       {mobileOpen && (
         <div className="md:hidden section-ink border-t border-white/10">
           <nav className="container py-4 flex flex-col gap-1">
+            {powerDropActive && (
+              <div className="flex items-center gap-2 font-display text-[10px] tracking-widest text-[#c73e3a] py-2 border-b border-white/5 mb-1">
+                <span className="relative flex h-1.5 w-1.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#c73e3a] opacity-75" />
+                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-[#c73e3a]" />
+                </span>
+                <Zap size={10} className="fill-current" />
+                POWER DROP LIVE
+              </div>
+            )}
             {NAV_LINKS.map((link) => (
               <a
                 key={link.href}

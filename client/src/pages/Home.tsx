@@ -4,6 +4,7 @@
  * Sections: Announcement → Navbar → Hero → HowItWorks → Deals → Pickup → FAQ → Join → Footer
  */
 import { useState } from "react";
+import { trpc } from "@/lib/trpc";
 import AnnouncementBanner from "@/components/AnnouncementBanner";
 import Navbar from "@/components/Navbar";
 import HeroSection from "@/components/HeroSection";
@@ -19,13 +20,46 @@ export default function Home() {
   const [cartOpen, setCartOpen] = useState(false);
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
 
-  const handleAddToCart = (product: { id: number; name: string; cut: string; price: number; unit: string }) => {
+  // Fetch site-wide settings (announcement, power drop state)
+  const { data: settings } = trpc.settings.getAll.useQuery(undefined, {
+    staleTime: 30_000,
+  });
+
+  const powerDropActive = settings?.powerDropActive === "true";
+  const announcementActive = settings?.announcementActive !== "false";
+  const announcementMessage =
+    settings?.announcementMessage ??
+    "New drop open now — Wagyu Ribeye MS7+ & Lamb Shoulder. Closes Thursday midnight.";
+
+  const handleAddToCart = (product: {
+    id: number;
+    name: string;
+    cut: string;
+    price: number;
+    powerDropPrice?: number | null;
+    unit: string;
+  }) => {
     setCartItems((prev) => {
       const existing = prev.find((i) => i.id === product.id);
       if (existing) {
-        return prev.map((i) => i.id === product.id ? { ...i, qty: i.qty + 1 } : i);
+        return prev.map((i) => (i.id === product.id ? { ...i, qty: i.qty + 1 } : i));
       }
-      return [...prev, { ...product, qty: 1 }];
+      // Use Power Drop price when active and available
+      const effectivePrice =
+        powerDropActive && product.powerDropPrice != null
+          ? product.powerDropPrice
+          : product.price;
+      return [
+        ...prev,
+        {
+          id: product.id,
+          name: product.name,
+          cut: product.cut,
+          price: effectivePrice,
+          unit: product.unit,
+          qty: 1,
+        },
+      ];
     });
   };
 
@@ -34,23 +68,29 @@ export default function Home() {
   };
 
   const handleQtyChange = (id: number, qty: number) => {
-    setCartItems((prev) => prev.map((i) => i.id === id ? { ...i, qty } : i));
+    setCartItems((prev) => prev.map((i) => (i.id === id ? { ...i, qty } : i)));
   };
 
   const cartCount = cartItems.reduce((sum, i) => sum + i.qty, 0);
 
   return (
     <div className="min-h-screen flex flex-col">
-      <AnnouncementBanner
-        message="New drop open now — Wagyu Ribeye MS7+ & Lamb Shoulder. Closes Thursday midnight."
-        link={{ href: "#deals", label: "View Drop" }}
+      {announcementActive && (
+        <AnnouncementBanner
+          message={announcementMessage}
+          link={{ href: "#deals", label: "View Drop" }}
+        />
+      )}
+      <Navbar
+        cartCount={cartCount}
+        onCartClick={() => setCartOpen(true)}
+        powerDropActive={powerDropActive}
       />
-      <Navbar cartCount={cartCount} onCartClick={() => setCartOpen(true)} />
 
       <main className="flex-1">
-        <HeroSection />
+        <HeroSection powerDropActive={powerDropActive} />
         <HowItWorksSection />
-        <DealsSection onAddToCart={handleAddToCart} />
+        <DealsSection onAddToCart={handleAddToCart} powerDropActive={powerDropActive} />
         <PickupSection />
         <FAQSection />
         <JoinSection />
@@ -64,6 +104,7 @@ export default function Home() {
         items={cartItems}
         onRemove={handleRemove}
         onQtyChange={handleQtyChange}
+        powerDropActive={powerDropActive}
       />
     </div>
   );

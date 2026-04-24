@@ -2,9 +2,10 @@
  * GROUPBUY Cart Drawer
  * Design: Ink background slide-in panel, items list with JetBrains Mono prices
  * Checkout CTA in red, close button top-right
+ * Power Drop: indicator in header + note in WhatsApp checkout message
  */
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Trash2, MessageCircle } from "lucide-react";
+import { X, Trash2, MessageCircle, Zap } from "lucide-react";
 
 export interface CartItem {
   id: number;
@@ -21,9 +22,17 @@ interface CartDrawerProps {
   items: CartItem[];
   onRemove: (id: number) => void;
   onQtyChange: (id: number, qty: number) => void;
+  powerDropActive?: boolean;
 }
 
-export default function CartDrawer({ open, onClose, items, onRemove, onQtyChange }: CartDrawerProps) {
+export default function CartDrawer({
+  open,
+  onClose,
+  items,
+  onRemove,
+  onQtyChange,
+  powerDropActive = false,
+}: CartDrawerProps) {
   const total = items.reduce((sum, item) => sum + item.price * item.qty, 0);
 
   return (
@@ -51,9 +60,17 @@ export default function CartDrawer({ open, onClose, items, onRemove, onQtyChange
             {/* Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
               <div>
-                <p className="font-display text-[11px] tracking-widest text-[#f5f2ec]">
-                  Your Order
-                </p>
+                <div className="flex items-center gap-2">
+                  <p className="font-display text-[11px] tracking-widest text-[#f5f2ec]">
+                    Your Order
+                  </p>
+                  {powerDropActive && (
+                    <span className="flex items-center gap-1 font-mono-brand text-[9px] tracking-wider text-[#c73e3a] border border-[#c73e3a]/40 px-1.5 py-0.5">
+                      <Zap size={8} className="fill-current" />
+                      POWER DROP
+                    </span>
+                  )}
+                </div>
                 <p className="font-mono-brand text-[11px] text-[#8a857c] mt-0.5">
                   {items.length} item{items.length !== 1 ? "s" : ""}
                 </p>
@@ -97,7 +114,11 @@ export default function CartDrawer({ open, onClose, items, onRemove, onQtyChange
                           {/* Qty control */}
                           <div className="flex items-center border border-white/15">
                             <button
-                              onClick={() => item.qty > 1 ? onQtyChange(item.id, item.qty - 1) : onRemove(item.id)}
+                              onClick={() =>
+                                item.qty > 1
+                                  ? onQtyChange(item.id, item.qty - 1)
+                                  : onRemove(item.id)
+                              }
                               className="w-7 h-7 flex items-center justify-center text-[#f5f2ec]/50 hover:text-[#f5f2ec] transition-colors font-mono-brand text-[14px]"
                             >
                               −
@@ -143,8 +164,16 @@ export default function CartDrawer({ open, onClose, items, onRemove, onQtyChange
                 </div>
                 <a
                   href={(() => {
-                    const lines = items.map(i => `• ${i.name} (${i.cut}) x${i.qty} — $${(i.price * i.qty).toFixed(2)}`);
-                    const msg = `Hi! I'd like to place an order:\n\n${lines.join('\n')}\n\nTotal: $${total.toFixed(2)}`;
+                    const lines = items.map(
+                      (i) =>
+                        `• ${i.name} (${i.cut}) x${i.qty} — $${(i.price * i.qty).toFixed(2)}`
+                    );
+                    const powerDropNote = powerDropActive
+                      ? "\n⚡ *POWER DROP PRICING APPLIED*\n"
+                      : "";
+                    const msg = `Hi! I'd like to place an order:${powerDropNote}\n\n${lines.join(
+                      "\n"
+                    )}\n\nTotal: $${total.toFixed(2)}`;
                     return `https://wa.me/61407249272?text=${encodeURIComponent(msg)}`;
                   })()}
                   target="_blank"
