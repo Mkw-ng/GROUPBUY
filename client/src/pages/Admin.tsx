@@ -95,17 +95,43 @@ function sortKey(field: SortField, dir: SortDir): string {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-type Category = "beef" | "pork" | "lamb" | "poultry" | "seafood" | "other";
+type Category =
+  | "limited-offer"
+  | "featured-deals"
+  | "beef"
+  | "pork"
+  | "lamb"
+  | "poultry"
+  | "seafood"
+  | "whole-slabs"
+  | "whole-animal"
+  | "box-deals"
+  | "mince"
+  | "offal-tallow"
+  | "value-added"
+  | "korean-bbq-hotpot"
+  | "freezer"
+  | "other";
 type BadgeType = "LIMITED" | "POPULAR" | "NEW" | "SOLD OUT" | null;
 
 const CATEGORIES: { value: Category | "all"; label: string }[] = [
-  { value: "all", label: "All" },
-  { value: "beef", label: "Beef" },
-  { value: "pork", label: "Pork" },
-  { value: "lamb", label: "Lamb" },
-  { value: "poultry", label: "Poultry" },
-  { value: "seafood", label: "Seafood" },
-  { value: "other", label: "Other" },
+  { value: "all",               label: "All" },
+  { value: "limited-offer",     label: "Limited Offer" },
+  { value: "featured-deals",    label: "Featured Deals" },
+  { value: "beef",              label: "Beef" },
+  { value: "pork",              label: "Pork" },
+  { value: "lamb",              label: "Lamb" },
+  { value: "poultry",           label: "Poultry" },
+  { value: "seafood",           label: "Seafood" },
+  { value: "whole-slabs",       label: "Whole Slabs" },
+  { value: "whole-animal",      label: "Whole Animal & Sides" },
+  { value: "box-deals",         label: "Box Deals" },
+  { value: "mince",             label: "Mince" },
+  { value: "offal-tallow",      label: "Offal & Tallow" },
+  { value: "value-added",       label: "Value Added" },
+  { value: "korean-bbq-hotpot", label: "Korean BBQ / Hotpot" },
+  { value: "freezer",           label: "Freezer" },
+  { value: "other",             label: "Other" },
 ];
 
 const BADGE_STYLES: Record<string, string> = {
@@ -116,12 +142,22 @@ const BADGE_STYLES: Record<string, string> = {
 };
 
 const CATEGORY_EMOJI: Record<string, string> = {
-  beef: "🥩",
-  pork: "🐷",
-  lamb: "🐑",
-  poultry: "🍗",
-  seafood: "🦐",
-  other: "📦",
+  "limited-offer":     "⭐",
+  "featured-deals":    "🔥",
+  beef:                "🥩",
+  pork:                "🐷",
+  lamb:                "🐑",
+  poultry:             "🍗",
+  seafood:             "🦐",
+  "whole-slabs":       "🍖",
+  "whole-animal":      "🐄",
+  "box-deals":         "📦",
+  mince:               "🫙",
+  "offal-tallow":      "🫀",
+  "value-added":       "✨",
+  "korean-bbq-hotpot": "🍲",
+  freezer:             "🧊",
+  other:               "🛒",
 };
 
 interface ProductForm {
@@ -957,13 +993,11 @@ function AdminContent() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {(["beef", "pork", "lamb", "poultry", "seafood", "other"] as Category[]).map(
-                        (c) => (
-                          <SelectItem key={c} value={c}>
-                            {CATEGORY_EMOJI[c]} {c.charAt(0).toUpperCase() + c.slice(1)}
-                          </SelectItem>
-                        )
-                      )}
+                      {CATEGORIES.filter((cat) => cat.value !== "all").map((cat) => (
+                        <SelectItem key={cat.value} value={cat.value}>
+                          {CATEGORY_EMOJI[cat.value]} {cat.label}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>

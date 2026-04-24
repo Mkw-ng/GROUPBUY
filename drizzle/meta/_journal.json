@@ -15,6 +15,13 @@
       "when": 1777025620561,
       "tag": "0001_chief_slapstick",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1777029442483,
+      "tag": "0002_silent_the_hunter",
+      "breakpoints": true
     }
   ]
 }

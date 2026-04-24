@@ -65,3 +65,11 @@
 
 ## Admin Products Sort — Availability
 - [x] Add "Availability (unavailable first)" and "Availability (available first)" sort options
+
+## Category Update
+- [x] Update drizzle schema category enum to include all 16 categories in correct order
+- [x] Run pnpm db:push to migrate the schema
+- [x] Update routers.ts productInput schema to match new enum
+- [x] Update Admin.tsx CATEGORIES list, CATEGORY_EMOJI map, and product form select
+- [x] Update DealsSection.tsx category filter tabs and emoji map
+- [x] Update seed script with new categories

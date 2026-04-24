@@ -12,13 +12,23 @@ import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 
 const CATEGORIES = [
-  { id: "all", label: "All Drops" },
-  { id: "beef", label: "Beef" },
-  { id: "pork", label: "Pork" },
-  { id: "lamb", label: "Lamb" },
-  { id: "poultry", label: "Poultry" },
-  { id: "seafood", label: "Seafood" },
-  { id: "other", label: "Other" },
+  { id: "all",               label: "All Drops" },
+  { id: "limited-offer",     label: "Limited Offer" },
+  { id: "featured-deals",    label: "Featured Deals" },
+  { id: "beef",              label: "Beef" },
+  { id: "pork",              label: "Pork" },
+  { id: "lamb",              label: "Lamb" },
+  { id: "poultry",           label: "Poultry" },
+  { id: "seafood",           label: "Seafood" },
+  { id: "whole-slabs",       label: "Whole Slabs" },
+  { id: "whole-animal",      label: "Whole Animal & Sides" },
+  { id: "box-deals",         label: "Box Deals" },
+  { id: "mince",             label: "Mince" },
+  { id: "offal-tallow",      label: "Offal & Tallow" },
+  { id: "value-added",       label: "Value Added" },
+  { id: "korean-bbq-hotpot", label: "Korean BBQ / Hotpot" },
+  { id: "freezer",           label: "Freezer" },
+  { id: "other",             label: "Other" },
 ];
 
 const BADGE_STYLES: Record<string, string> = {

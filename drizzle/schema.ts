@@ -42,7 +42,24 @@ export const products = mysqlTable("products", {
   id: int("id").autoincrement().primaryKey(),
   name: varchar("name", { length: 255 }).notNull(),
   cut: varchar("cut", { length: 255 }).notNull().default(""),
-  category: mysqlEnum("category", ["beef", "pork", "lamb", "poultry", "seafood", "other"])
+  category: mysqlEnum("category", [
+    "limited-offer",
+    "featured-deals",
+    "beef",
+    "pork",
+    "lamb",
+    "poultry",
+    "seafood",
+    "whole-slabs",
+    "whole-animal",
+    "box-deals",
+    "mince",
+    "offal-tallow",
+    "value-added",
+    "korean-bbq-hotpot",
+    "freezer",
+    "other",
+  ])
     .notNull()
     .default("beef"),
   description: text("description"),
