@@ -99,9 +99,24 @@ export default function CartDrawer({
     isBefore(date, startOfDay(new Date())) || isToday(date);
 
   // ─── Validation + WhatsApp message ─────────────────────────────────────────
+  function normalisePhone(raw: string): string {
+    // Strip spaces, hyphens, parentheses, dots
+    return raw.replace(/[\s\-().]/g, "");
+  }
+
+  function validatePhone(raw: string): string | null {
+    if (!raw.trim()) return "WhatsApp number is required";
+    const digits = normalisePhone(raw);
+    if (!/^\d+$/.test(digits)) return "Enter numbers only — no letters or symbols";
+    if (digits.length !== 10) return "Must be a 10-digit Australian number (e.g. 0412 345 678)";
+    if (!/^0[2-9]/.test(digits)) return "Must start with 0 followed by 2–9 (e.g. 04xx or 02xx)";
+    return null;
+  }
+
   function validate(): boolean {
     const errs: Record<string, string> = {};
-    if (!phone.trim()) errs.phone = "WhatsApp number is required";
+    const phoneErr = validatePhone(phone);
+    if (phoneErr) errs.phone = phoneErr;
     if (!pickupDate) errs.date = "Please select a pickup / delivery date";
     if (location === "delivery" && !deliveryAddress.trim())
       errs.address = "Delivery address is required";
@@ -130,7 +145,7 @@ export default function CartDrawer({
       "",
       `Total: $${total.toFixed(2)}`,
       "",
-      `📱 WhatsApp: ${phone}`,
+      `📱 WhatsApp: ${normalisePhone(phone)}`,
       `📅 Date: ${dateStr}`,
       `📍 ${locationStr}`,
     ];
@@ -310,8 +325,13 @@ export default function CartDrawer({
                         setPhone(e.target.value);
                         if (errors.phone) setErrors((prev) => ({ ...prev, phone: "" }));
                       }}
+                      onBlur={() => {
+                        const err = validatePhone(phone);
+                        setErrors((prev) => ({ ...prev, phone: err ?? "" }));
+                      }}
                       placeholder="e.g. 0412 345 678"
-                      className={inputBase}
+                      className={`${inputBase} ${errors.phone ? "border-[#c73e3a]/60" : ""}`}
+                      maxLength={14}
                     />
                     {errors.phone && <p className={errorBase}>{errors.phone}</p>}
                   </div>

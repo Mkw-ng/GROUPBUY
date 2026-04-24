@@ -94,3 +94,6 @@
 - [x] Add deliveryAddress field to SavedOrderDetails type and localStorage schema
 - [x] Auto-fill delivery address from saved details when Delivery is selected
 - [x] Save delivery address to localStorage on checkout (alongside phone and location)
+
+## Phone Number Validation
+- [x] Validate phone is a 10-digit Australian number (mobile 04xx or landline 0[2-9]xx), strip spaces/hyphens before checking, reject non-numeric input with a clear error message
