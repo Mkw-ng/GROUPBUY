@@ -43,6 +43,7 @@ vi.mock("./db", () => ({
   upsertProduct: vi.fn().mockResolvedValue(1),
   deleteProduct: vi.fn().mockResolvedValue(undefined),
   setProductAvailability: vi.fn().mockResolvedValue(undefined),
+  batchReorderProducts: vi.fn().mockResolvedValue(undefined),
   upsertUser: vi.fn().mockResolvedValue(undefined),
   getUserByOpenId: vi.fn().mockResolvedValue(undefined),
 }));
@@ -55,6 +56,7 @@ import {
   upsertProduct,
   deleteProduct,
   setProductAvailability,
+  batchReorderProducts,
 } from "./db";
 
 // ─── Settings tests ───────────────────────────────────────────────────────────
@@ -128,6 +130,16 @@ describe("Products helpers", () => {
   it("setProductAvailability calls db with id and boolean", async () => {
     await setProductAvailability(1, false);
     expect(setProductAvailability).toHaveBeenCalledWith(1, false);
+  });
+
+  it("batchReorderProducts calls db with array of id/sortOrder pairs", async () => {
+    const updates = [
+      { id: 1, sortOrder: 3 },
+      { id: 2, sortOrder: 1 },
+      { id: 3, sortOrder: 2 },
+    ];
+    await batchReorderProducts(updates);
+    expect(batchReorderProducts).toHaveBeenCalledWith(updates);
   });
 });
 

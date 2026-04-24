@@ -155,6 +155,16 @@ export async function getAllSettings(): Promise<Record<string, string>> {
   return map;
 }
 
+export async function batchReorderProducts(updates: { id: number; sortOrder: number }[]): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await Promise.all(
+    updates.map(({ id, sortOrder }) =>
+      db.update(products).set({ sortOrder }).where(eq(products.id, id))
+    )
+  );
+}
+
 export async function setSetting(key: string, value: string): Promise<void> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");

@@ -47,3 +47,14 @@
 - [ ] Replace placeholder product data with real product names, cuts, prices, Power Drop prices
 - [ ] Replace placeholder product images with real photography
 - [ ] Confirm WhatsApp number (currently 61407249272)
+
+## Admin Products Panel Improvements
+- [x] Switch products table to a card grid (image thumbnail, name, cut, price, PD price, badge chip, availability toggle, edit/delete)
+- [x] Category filter tabs (All / Beef / Pork / Lamb / Poultry / Seafood / Other) with count badges
+- [x] Search/filter bar to find products by name or cut
+- [x] Image preview thumbnail in the add/edit form (live preview from URL input)
+- [x] Coloured badge chips in card and form (LIMITED=amber, POPULAR=green, NEW=blue, SOLD OUT=red)
+- [x] Drag-to-reorder sort order (dnd-kit) with auto-save on drop
+- [x] "Missing PD price" warning chip on cards when no Power Drop price is set
+- [x] Improved empty state with illustration and clear CTA
+- [x] Skeleton loading cards while products are fetching

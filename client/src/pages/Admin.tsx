@@ -1,12 +1,9 @@
 /*
  * GROUPBUY Admin Dashboard
- * Design: DashboardLayout (sidebar + main), brand tokens for key actions
- * Sections:
- *   1. Power Drop toggle — live on/off with visual feedback
- *   2. Announcement banner editor — message text + active toggle
- *   3. Product management — table with add/edit/delete/availability
+ * Products panel: card grid, category filter tabs, search, drag-to-reorder,
+ * coloured badge chips, image preview, skeleton loading, missing-PD-price warning
  */
-import { useState } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import DashboardLayout from "@/components/DashboardLayout";
@@ -14,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
@@ -28,23 +26,69 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
-import { Zap, Plus, Pencil, Trash2, Eye, EyeOff, AlertTriangle } from "lucide-react";
+import {
+  Zap,
+  Plus,
+  Pencil,
+  Trash2,
+  AlertTriangle,
+  Search,
+  GripVertical,
+  ImageOff,
+  AlertCircle,
+} from "lucide-react";
 import { useLocation } from "wouter";
 import { getLoginUrl } from "@/const";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+// dnd-kit
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  useSortable,
+  rectSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+
+// ─── Constants ────────────────────────────────────────────────────────────────
 
 type Category = "beef" | "pork" | "lamb" | "poultry" | "seafood" | "other";
-type Badge = "LIMITED" | "POPULAR" | "NEW" | "SOLD OUT" | null;
+type BadgeType = "LIMITED" | "POPULAR" | "NEW" | "SOLD OUT" | null;
+
+const CATEGORIES: { value: Category | "all"; label: string }[] = [
+  { value: "all", label: "All" },
+  { value: "beef", label: "Beef" },
+  { value: "pork", label: "Pork" },
+  { value: "lamb", label: "Lamb" },
+  { value: "poultry", label: "Poultry" },
+  { value: "seafood", label: "Seafood" },
+  { value: "other", label: "Other" },
+];
+
+const BADGE_STYLES: Record<string, string> = {
+  LIMITED: "bg-amber-100 text-amber-800 border-amber-200",
+  POPULAR: "bg-green-100 text-green-800 border-green-200",
+  NEW: "bg-blue-100 text-blue-800 border-blue-200",
+  "SOLD OUT": "bg-red-100 text-red-800 border-red-200",
+};
+
+const CATEGORY_EMOJI: Record<string, string> = {
+  beef: "🥩",
+  pork: "🐷",
+  lamb: "🐑",
+  poultry: "🍗",
+  seafood: "🦐",
+  other: "📦",
+};
 
 interface ProductForm {
   id?: number;
@@ -55,7 +99,7 @@ interface ProductForm {
   price: string;
   powerDropPrice: string;
   unit: string;
-  badge: Badge;
+  badge: BadgeType;
   available: boolean;
   img: string;
   sortOrder: number;
@@ -87,8 +131,12 @@ function AdminGuard({ children }: { children: React.ReactNode }) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
-          <p className="text-sm text-muted-foreground mb-4">Please sign in to access the admin panel.</p>
-          <Button onClick={() => { window.location.href = getLoginUrl(); }}>Sign In</Button>
+          <p className="text-sm text-muted-foreground mb-4">
+            Please sign in to access the admin panel.
+          </p>
+          <Button onClick={() => { window.location.href = getLoginUrl(); }}>
+            Sign In
+          </Button>
         </div>
       </div>
     );
@@ -126,6 +174,195 @@ export default function Admin() {
   );
 }
 
+// ─── Sortable Product Card ────────────────────────────────────────────────────
+
+interface ProductCardProps {
+  product: {
+    id: number;
+    name: string;
+    cut: string;
+    category: string;
+    price: string;
+    powerDropPrice?: string | null;
+    unit: string;
+    badge?: string | null;
+    available: boolean;
+    img?: string | null;
+    sortOrder: number;
+    description?: string | null;
+  };
+  onEdit: () => void;
+  onDelete: () => void;
+  onToggleAvailability: (available: boolean) => void;
+  isUpdatingAvailability: boolean;
+}
+
+function SortableProductCard({
+  product,
+  onEdit,
+  onDelete,
+  onToggleAvailability,
+  isUpdatingAvailability,
+}: ProductCardProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: product.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 50 : undefined,
+  };
+
+  const hasMissingPdPrice = !product.powerDropPrice;
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`group relative rounded-xl border bg-card flex flex-col overflow-hidden transition-shadow hover:shadow-md ${
+        !product.available ? "opacity-60" : ""
+      }`}
+    >
+      {/* Drag handle */}
+      <button
+        {...attributes}
+        {...listeners}
+        className="absolute top-2 left-2 z-10 p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground bg-background/80 backdrop-blur-sm"
+        aria-label="Drag to reorder"
+      >
+        <GripVertical className="h-3.5 w-3.5" />
+      </button>
+
+      {/* Image */}
+      <div className="relative h-36 bg-muted flex items-center justify-center overflow-hidden">
+        {product.img ? (
+          <img
+            src={product.img}
+            alt={product.name}
+            className="w-full h-full object-cover"
+            onError={(e) => {
+              (e.target as HTMLImageElement).style.display = "none";
+              (e.target as HTMLImageElement).nextElementSibling?.classList.remove("hidden");
+            }}
+          />
+        ) : null}
+        <div className={`flex flex-col items-center gap-1 text-muted-foreground ${product.img ? "hidden" : ""}`}>
+          <ImageOff className="h-8 w-8 opacity-30" />
+          <span className="text-xs opacity-50">No image</span>
+        </div>
+
+        {/* Category emoji pill */}
+        <div className="absolute bottom-2 left-2 bg-background/90 backdrop-blur-sm rounded-full px-2 py-0.5 text-xs font-medium capitalize flex items-center gap-1">
+          <span>{CATEGORY_EMOJI[product.category] ?? "📦"}</span>
+          <span>{product.category}</span>
+        </div>
+
+        {/* Badge chip */}
+        {product.badge && (
+          <div
+            className={`absolute top-2 right-2 text-[10px] font-semibold px-2 py-0.5 rounded border ${
+              BADGE_STYLES[product.badge] ?? "bg-muted text-muted-foreground border-border"
+            }`}
+          >
+            {product.badge}
+          </div>
+        )}
+      </div>
+
+      {/* Body */}
+      <div className="flex flex-col flex-1 p-3 gap-2">
+        <div>
+          <p className="font-semibold text-sm leading-snug line-clamp-1">{product.name}</p>
+          {product.cut && (
+            <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{product.cut}</p>
+          )}
+        </div>
+
+        {/* Pricing */}
+        <div className="flex items-baseline gap-2">
+          <span className="font-mono text-base font-bold">${product.price}</span>
+          <span className="text-xs text-muted-foreground">{product.unit}</span>
+          {product.powerDropPrice ? (
+            <span className="ml-auto font-mono text-xs font-semibold text-red-600 flex items-center gap-0.5">
+              <Zap className="h-3 w-3 fill-current" />
+              ${product.powerDropPrice}
+            </span>
+          ) : (
+            <span
+              className="ml-auto flex items-center gap-1 text-[10px] text-amber-600 font-medium"
+              title="No Power Drop price set"
+            >
+              <AlertCircle className="h-3 w-3" />
+              No PD price
+            </span>
+          )}
+        </div>
+
+        {/* Footer: availability + actions */}
+        <div className="flex items-center justify-between pt-1 border-t border-border/50 mt-auto">
+          <div className="flex items-center gap-1.5">
+            <Switch
+              checked={product.available}
+              disabled={isUpdatingAvailability}
+              onCheckedChange={onToggleAvailability}
+              className="scale-75 origin-left"
+            />
+            <span className="text-xs text-muted-foreground">
+              {product.available ? "Available" : "Unavailable"}
+            </span>
+          </div>
+          <div className="flex items-center gap-0.5">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              onClick={onEdit}
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 text-destructive hover:text-destructive"
+              onClick={onDelete}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Skeleton Card ────────────────────────────────────────────────────────────
+
+function ProductCardSkeleton() {
+  return (
+    <div className="rounded-xl border bg-card overflow-hidden">
+      <Skeleton className="h-36 w-full rounded-none" />
+      <div className="p-3 space-y-2">
+        <Skeleton className="h-4 w-3/4" />
+        <Skeleton className="h-3 w-1/2" />
+        <Skeleton className="h-5 w-1/3" />
+        <div className="flex justify-between pt-1">
+          <Skeleton className="h-5 w-16" />
+          <Skeleton className="h-5 w-12" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Admin Content ────────────────────────────────────────────────────────────
+
 function AdminContent() {
   const utils = trpc.useUtils();
 
@@ -154,6 +391,18 @@ function AdminContent() {
     staleTime: 10_000,
   });
 
+  // Local order state for drag-to-reorder
+  const [localOrder, setLocalOrder] = useState<number[] | null>(null);
+
+  // Derive display order: use localOrder if set, else use DB order
+  const orderedProducts = useMemo(() => {
+    if (!products) return [];
+    if (!localOrder) return [...products].sort((a, b) => a.sortOrder - b.sortOrder);
+    return localOrder
+      .map((id) => products.find((p) => p.id === id))
+      .filter(Boolean) as typeof products;
+  }, [products, localOrder]);
+
   const upsertProduct = trpc.admin.products.upsert.useMutation({
     onSuccess: () => {
       utils.products.list.invalidate();
@@ -176,34 +425,71 @@ function AdminContent() {
     onError: (err) => toast.error(err.message),
   });
 
+  // Batch reorder — save new sortOrder values after drag
+  const batchReorder = trpc.admin.products.batchReorder.useMutation({
+    onSuccess: () => utils.products.list.invalidate(),
+    onError: (err) => {
+      toast.error("Failed to save order: " + err.message);
+      setLocalOrder(null);
+    },
+  });
+
+  // ─── Filter state ────────────────────────────────────────────────────────────
+  const [activeCategory, setActiveCategory] = useState<Category | "all">("all");
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const filteredProducts = useMemo(() => {
+    return orderedProducts.filter((p) => {
+      const matchCat = activeCategory === "all" || p.category === activeCategory;
+      const q = searchQuery.toLowerCase();
+      const matchSearch =
+        !q ||
+        p.name.toLowerCase().includes(q) ||
+        p.cut.toLowerCase().includes(q) ||
+        (p.description ?? "").toLowerCase().includes(q);
+      return matchCat && matchSearch;
+    });
+  }, [orderedProducts, activeCategory, searchQuery]);
+
+  // Category counts
+  const categoryCounts = useMemo(() => {
+    const counts: Record<string, number> = { all: products?.length ?? 0 };
+    for (const p of products ?? []) {
+      counts[p.category] = (counts[p.category] ?? 0) + 1;
+    }
+    return counts;
+  }, [products]);
+
   // ─── Product modal state ─────────────────────────────────────────────────────
   const [productModalOpen, setProductModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<ProductForm>(EMPTY_FORM);
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
 
   const openAddModal = () => {
-    setEditingProduct(EMPTY_FORM);
+    setEditingProduct({ ...EMPTY_FORM, sortOrder: (products?.length ?? 0) + 1 });
     setProductModalOpen(true);
   };
 
-  const openEditModal = (p: typeof products extends (infer T)[] | undefined ? T : never) => {
-    if (!p) return;
-    setEditingProduct({
-      id: p.id,
-      name: p.name,
-      cut: p.cut,
-      category: p.category as Category,
-      description: p.description ?? "",
-      price: p.price,
-      powerDropPrice: p.powerDropPrice ?? "",
-      unit: p.unit,
-      badge: p.badge as Badge,
-      available: p.available,
-      img: p.img ?? "",
-      sortOrder: p.sortOrder,
-    });
-    setProductModalOpen(true);
-  };
+  const openEditModal = useCallback(
+    (p: (typeof orderedProducts)[number]) => {
+      setEditingProduct({
+        id: p.id,
+        name: p.name,
+        cut: p.cut,
+        category: p.category as Category,
+        description: p.description ?? "",
+        price: p.price,
+        powerDropPrice: p.powerDropPrice ?? "",
+        unit: p.unit,
+        badge: p.badge as BadgeType,
+        available: p.available,
+        img: p.img ?? "",
+        sortOrder: p.sortOrder,
+      });
+      setProductModalOpen(true);
+    },
+    []
+  );
 
   const handleProductSubmit = () => {
     if (!editingProduct.name || !editingProduct.price) {
@@ -226,8 +512,31 @@ function AdminContent() {
     });
   };
 
+  // ─── Drag-to-reorder ─────────────────────────────────────────────────────────
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
+  );
+
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      const { active, over } = event;
+      if (!over || active.id === over.id) return;
+
+      const currentIds = orderedProducts.map((p) => p.id);
+      const oldIndex = currentIds.indexOf(active.id as number);
+      const newIndex = currentIds.indexOf(over.id as number);
+      const newOrder = arrayMove(currentIds, oldIndex, newIndex);
+      setLocalOrder(newOrder);
+
+      // Persist new sortOrder values
+      const updates = newOrder.map((id, idx) => ({ id, sortOrder: idx + 1 }));
+      batchReorder.mutate({ updates });
+    },
+    [orderedProducts, batchReorder]
+  );
+
   return (
-    <div className="max-w-5xl mx-auto space-y-10 pb-16">
+    <div className="max-w-6xl mx-auto space-y-10 pb-16">
       {/* Page header */}
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Admin Dashboard</h1>
@@ -240,13 +549,20 @@ function AdminContent() {
       <section className="rounded-lg border bg-card p-6">
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-start gap-3">
-            <div className={`mt-0.5 p-2 rounded-md ${powerDropActive ? "bg-red-100 text-red-600" : "bg-muted text-muted-foreground"}`}>
+            <div
+              className={`mt-0.5 p-2 rounded-md ${
+                powerDropActive
+                  ? "bg-red-100 text-red-600"
+                  : "bg-muted text-muted-foreground"
+              }`}
+            >
               <Zap className={`h-5 w-5 ${powerDropActive ? "fill-current" : ""}`} />
             </div>
             <div>
               <h2 className="font-semibold text-base">Power Drop Event</h2>
               <p className="text-sm text-muted-foreground mt-0.5">
-                When active, all products show their Power Drop price and the site shows a live indicator.
+                When active, all products show their Power Drop price and the site shows a live
+                indicator.
               </p>
               {powerDropActive && (
                 <div className="flex items-center gap-1.5 mt-2">
@@ -325,12 +641,13 @@ function AdminContent() {
       </section>
 
       {/* ─── Products ────────────────────────────────────────────────────────── */}
-      <section className="rounded-lg border bg-card p-6 space-y-4">
-        <div className="flex items-center justify-between">
+      <section className="rounded-lg border bg-card p-6 space-y-5">
+        {/* Header row */}
+        <div className="flex items-center justify-between gap-3 flex-wrap">
           <div>
             <h2 className="font-semibold text-base">Products</h2>
             <p className="text-sm text-muted-foreground mt-0.5">
-              {products?.length ?? 0} product{products?.length !== 1 ? "s" : ""} in the database
+              {products?.length ?? 0} product{products?.length !== 1 ? "s" : ""} · drag cards to reorder
             </p>
           </div>
           <Button size="sm" onClick={openAddModal}>
@@ -339,93 +656,164 @@ function AdminContent() {
           </Button>
         </div>
 
+        {/* Search */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+          <Input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search by name or cut…"
+            className="pl-9"
+          />
+        </div>
+
+        {/* Category filter tabs */}
+        <div className="flex flex-wrap gap-1.5">
+          {CATEGORIES.map((cat) => {
+            const count = categoryCounts[cat.value] ?? 0;
+            const isActive = activeCategory === cat.value;
+            return (
+              <button
+                key={cat.value}
+                onClick={() => setActiveCategory(cat.value as Category | "all")}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors border ${
+                  isActive
+                    ? "bg-foreground text-background border-foreground"
+                    : "bg-transparent text-muted-foreground border-border hover:border-foreground/40 hover:text-foreground"
+                }`}
+              >
+                {cat.value !== "all" && (
+                  <span>{CATEGORY_EMOJI[cat.value]}</span>
+                )}
+                {cat.label}
+                <span
+                  className={`rounded-full px-1.5 py-0 text-[10px] font-semibold ${
+                    isActive ? "bg-background/20" : "bg-muted"
+                  }`}
+                >
+                  {count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Product grid */}
         {productsLoading ? (
-          <div className="py-8 text-center text-sm text-muted-foreground">Loading products…</div>
-        ) : !products || products.length === 0 ? (
-          <div className="py-8 text-center text-sm text-muted-foreground">
-            No products yet. Click "Add Product" to get started.
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <ProductCardSkeleton key={i} />
+            ))}
+          </div>
+        ) : filteredProducts.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
+            <div className="text-5xl opacity-30">
+              {activeCategory !== "all" ? CATEGORY_EMOJI[activeCategory] : "📦"}
+            </div>
+            <p className="font-medium text-sm">
+              {searchQuery
+                ? `No products match "${searchQuery}"`
+                : activeCategory !== "all"
+                ? `No ${activeCategory} products yet`
+                : "No products yet"}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {searchQuery ? "Try a different search term" : 'Click "Add Product" to get started'}
+            </p>
+            {!searchQuery && (
+              <Button size="sm" variant="outline" onClick={openAddModal} className="mt-1">
+                <Plus className="h-4 w-4 mr-1.5" />
+                Add Product
+              </Button>
+            )}
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead>Price</TableHead>
-                  <TableHead>PD Price</TableHead>
-                  <TableHead>Available</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {products.map((p) => (
-                  <TableRow key={p.id}>
-                    <TableCell>
-                      <div>
-                        <p className="font-medium text-sm">{p.name}</p>
-                        {p.cut && (
-                          <p className="text-xs text-muted-foreground">{p.cut}</p>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="capitalize text-sm">{p.category}</TableCell>
-                    <TableCell className="font-mono text-sm">${p.price}</TableCell>
-                    <TableCell className="font-mono text-sm">
-                      {p.powerDropPrice ? (
-                        <span className="text-red-600">${p.powerDropPrice}</span>
-                      ) : (
-                        <span className="text-muted-foreground">—</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Switch
-                        checked={p.available}
-                        onCheckedChange={(checked) => {
-                          setAvailability.mutate({ id: p.id, available: checked });
-                        }}
-                      />
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={() => openEditModal(p)}
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-destructive hover:text-destructive"
-                          onClick={() => setDeleteConfirmId(p.id)}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext
+              items={filteredProducts.map((p) => p.id)}
+              strategy={rectSortingStrategy}
+            >
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                {filteredProducts.map((p) => (
+                  <SortableProductCard
+                    key={p.id}
+                    product={p}
+                    onEdit={() => openEditModal(p)}
+                    onDelete={() => setDeleteConfirmId(p.id)}
+                    onToggleAvailability={(available) =>
+                      setAvailability.mutate({ id: p.id, available })
+                    }
+                    isUpdatingAvailability={setAvailability.isPending}
+                  />
                 ))}
-              </TableBody>
-            </Table>
-          </div>
+              </div>
+            </SortableContext>
+          </DndContext>
         )}
       </section>
 
       {/* ─── Product Add/Edit Modal ───────────────────────────────────────────── */}
       <Dialog open={productModalOpen} onOpenChange={setProductModalOpen}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {editingProduct.id ? "Edit Product" : "Add Product"}
             </DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-4 py-2">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="col-span-2 space-y-1.5">
+          <div className="grid grid-cols-5 gap-6 py-2">
+            {/* Left: image preview */}
+            <div className="col-span-2 flex flex-col gap-3">
+              <div className="aspect-square rounded-lg border bg-muted flex items-center justify-center overflow-hidden">
+                {editingProduct.img ? (
+                  <img
+                    src={editingProduct.img}
+                    alt="Preview"
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = "none";
+                    }}
+                  />
+                ) : (
+                  <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                    <ImageOff className="h-10 w-10 opacity-30" />
+                    <span className="text-xs opacity-50 text-center px-2">
+                      Enter an image URL to preview
+                    </span>
+                  </div>
+                )}
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Image URL</label>
+                <Input
+                  value={editingProduct.img}
+                  onChange={(e) => setEditingProduct((p) => ({ ...p, img: e.target.value }))}
+                  placeholder="/manus-storage/product-xxx.jpg"
+                  className="text-xs"
+                />
+              </div>
+              {/* Badge preview */}
+              {editingProduct.badge && (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground">Badge preview:</span>
+                  <span
+                    className={`text-[10px] font-semibold px-2 py-0.5 rounded border ${
+                      BADGE_STYLES[editingProduct.badge] ?? "bg-muted"
+                    }`}
+                  >
+                    {editingProduct.badge}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Right: form fields */}
+            <div className="col-span-3 space-y-3">
+              <div className="space-y-1.5">
                 <label className="text-sm font-medium">Name *</label>
                 <Input
                   value={editingProduct.name}
@@ -433,113 +821,158 @@ function AdminContent() {
                   placeholder="e.g. Wagyu Ribeye MS7+"
                 />
               </div>
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium">Cut / Description</label>
-                <Input
-                  value={editingProduct.cut}
-                  onChange={(e) => setEditingProduct((p) => ({ ...p, cut: e.target.value }))}
-                  placeholder="e.g. 300g avg"
-                />
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Cut / Spec</label>
+                  <Input
+                    value={editingProduct.cut}
+                    onChange={(e) => setEditingProduct((p) => ({ ...p, cut: e.target.value }))}
+                    placeholder="e.g. 300g avg"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Category *</label>
+                  <Select
+                    value={editingProduct.category}
+                    onValueChange={(v) =>
+                      setEditingProduct((p) => ({ ...p, category: v as Category }))
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(["beef", "pork", "lamb", "poultry", "seafood", "other"] as Category[]).map(
+                        (c) => (
+                          <SelectItem key={c} value={c}>
+                            {CATEGORY_EMOJI[c]} {c.charAt(0).toUpperCase() + c.slice(1)}
+                          </SelectItem>
+                        )
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium">Category *</label>
-                <Select
-                  value={editingProduct.category}
-                  onValueChange={(v) => setEditingProduct((p) => ({ ...p, category: v as Category }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {["beef", "pork", "lamb", "poultry", "seafood", "other"].map((c) => (
-                      <SelectItem key={c} value={c}>
-                        {c.charAt(0).toUpperCase() + c.slice(1)}
+
+              <div className="grid grid-cols-3 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Price *</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
+                    <Input
+                      value={editingProduct.price}
+                      onChange={(e) => setEditingProduct((p) => ({ ...p, price: e.target.value }))}
+                      placeholder="42.00"
+                      className="pl-6"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium flex items-center gap-1">
+                    <Zap className="h-3 w-3 text-red-500 fill-current" />
+                    PD Price
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
+                    <Input
+                      value={editingProduct.powerDropPrice}
+                      onChange={(e) =>
+                        setEditingProduct((p) => ({ ...p, powerDropPrice: e.target.value }))
+                      }
+                      placeholder="34.00"
+                      className="pl-6"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Unit</label>
+                  <Input
+                    value={editingProduct.unit}
+                    onChange={(e) => setEditingProduct((p) => ({ ...p, unit: e.target.value }))}
+                    placeholder="/ kg"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Badge</label>
+                  <Select
+                    value={editingProduct.badge ?? "__none__"}
+                    onValueChange={(v) =>
+                      setEditingProduct((p) => ({
+                        ...p,
+                        badge: v === "__none__" ? null : (v as BadgeType),
+                      }))
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="None" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">None</SelectItem>
+                      <SelectItem value="LIMITED">
+                        <span className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-amber-500 inline-block" />
+                          LIMITED
+                        </span>
                       </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                      <SelectItem value="POPULAR">
+                        <span className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-green-500 inline-block" />
+                          POPULAR
+                        </span>
+                      </SelectItem>
+                      <SelectItem value="NEW">
+                        <span className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-blue-500 inline-block" />
+                          NEW
+                        </span>
+                      </SelectItem>
+                      <SelectItem value="SOLD OUT">
+                        <span className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-red-500 inline-block" />
+                          SOLD OUT
+                        </span>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Sort Order</label>
+                  <Input
+                    type="number"
+                    value={editingProduct.sortOrder}
+                    onChange={(e) =>
+                      setEditingProduct((p) => ({
+                        ...p,
+                        sortOrder: parseInt(e.target.value) || 0,
+                      }))
+                    }
+                  />
+                </div>
               </div>
+
               <div className="space-y-1.5">
-                <label className="text-sm font-medium">Price * (e.g. 42.00)</label>
-                <Input
-                  value={editingProduct.price}
-                  onChange={(e) => setEditingProduct((p) => ({ ...p, price: e.target.value }))}
-                  placeholder="42.00"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium">Power Drop Price</label>
-                <Input
-                  value={editingProduct.powerDropPrice}
-                  onChange={(e) => setEditingProduct((p) => ({ ...p, powerDropPrice: e.target.value }))}
-                  placeholder="34.00"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium">Unit</label>
-                <Input
-                  value={editingProduct.unit}
-                  onChange={(e) => setEditingProduct((p) => ({ ...p, unit: e.target.value }))}
-                  placeholder="/ kg"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium">Badge</label>
-                <Select
-                  value={editingProduct.badge ?? "__none__"}
-                  onValueChange={(v) =>
-                    setEditingProduct((p) => ({
-                      ...p,
-                      badge: v === "__none__" ? null : (v as Badge),
-                    }))
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="None" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">None</SelectItem>
-                    <SelectItem value="LIMITED">LIMITED</SelectItem>
-                    <SelectItem value="POPULAR">POPULAR</SelectItem>
-                    <SelectItem value="NEW">NEW</SelectItem>
-                    <SelectItem value="SOLD OUT">SOLD OUT</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="col-span-2 space-y-1.5">
-                <label className="text-sm font-medium">Image URL</label>
-                <Input
-                  value={editingProduct.img}
-                  onChange={(e) => setEditingProduct((p) => ({ ...p, img: e.target.value }))}
-                  placeholder="/manus-storage/product-xxx.jpg"
-                />
-              </div>
-              <div className="col-span-2 space-y-1.5">
                 <label className="text-sm font-medium">Description</label>
                 <Textarea
                   value={editingProduct.description}
-                  onChange={(e) => setEditingProduct((p) => ({ ...p, description: e.target.value }))}
+                  onChange={(e) =>
+                    setEditingProduct((p) => ({ ...p, description: e.target.value }))
+                  }
                   rows={2}
                   placeholder="Optional product description…"
                   className="resize-none"
                 />
               </div>
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium">Sort Order</label>
-                <Input
-                  type="number"
-                  value={editingProduct.sortOrder}
-                  onChange={(e) =>
-                    setEditingProduct((p) => ({ ...p, sortOrder: parseInt(e.target.value) || 0 }))
-                  }
-                />
-              </div>
-              <div className="flex items-center gap-3 pt-5">
+
+              <div className="flex items-center gap-3 pt-1">
                 <Switch
                   checked={editingProduct.available}
                   onCheckedChange={(v) => setEditingProduct((p) => ({ ...p, available: v }))}
                 />
-                <label className="text-sm font-medium">Available</label>
+                <label className="text-sm font-medium">Available for ordering</label>
               </div>
             </div>
           </div>
@@ -548,10 +981,7 @@ function AdminContent() {
             <Button variant="outline" onClick={() => setProductModalOpen(false)}>
               Cancel
             </Button>
-            <Button
-              onClick={handleProductSubmit}
-              disabled={upsertProduct.isPending}
-            >
+            <Button onClick={handleProductSubmit} disabled={upsertProduct.isPending}>
               {upsertProduct.isPending ? "Saving…" : "Save Product"}
             </Button>
           </DialogFooter>

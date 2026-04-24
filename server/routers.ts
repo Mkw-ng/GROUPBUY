@@ -11,6 +11,7 @@ import {
   setSetting,
   setProductAvailability,
   upsertProduct,
+  batchReorderProducts,
 } from "./db";
 
 // ─── Admin guard middleware ─────────────────────────────────────────────────────────────────
@@ -95,6 +96,17 @@ export const appRouter = router({
         .input(z.object({ id: z.number(), available: z.boolean() }))
         .mutation(async ({ input }) => {
           await setProductAvailability(input.id, input.available);
+          return { success: true };
+        }),
+
+      batchReorder: adminProcedure
+        .input(
+          z.object({
+            updates: z.array(z.object({ id: z.number(), sortOrder: z.number() })),
+          })
+        )
+        .mutation(async ({ input }) => {
+          await batchReorderProducts(input.updates);
           return { success: true };
         }),
     }),
