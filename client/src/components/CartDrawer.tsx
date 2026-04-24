@@ -133,8 +133,8 @@ export default function CartDrawer({
     const powerDropNote = powerDropActive ? "\n⚡ *POWER DROP PRICING APPLIED*" : "";
 
     const itemLines = items.map(
-      (i, idx) =>
-        `${idx + 1}. ${i.qty}x ${i.name}${i.cut ? ` (${i.cut})` : ""} — $${(i.price * i.qty).toFixed(2)}`
+      (i) =>
+        `${i.qty}x ${i.name}${i.cut ? ` (${i.cut})` : ""} — $${(i.price * i.qty).toFixed(2)}`
     );
 
     const parts: string[] = [
@@ -143,8 +143,6 @@ export default function CartDrawer({
       `*Pick up Location:* ${locationStr}`,
       "",
       ...itemLines,
-      "",
-      `*Total: $${total.toFixed(2)}*`,
     ];
 
     if (instructions.trim()) {
