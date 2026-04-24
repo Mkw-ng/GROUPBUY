@@ -74,17 +74,19 @@ import { CSS } from "@dnd-kit/utilities";
 
 // ─── Sort types ──────────────────────────────────────────────────────────────
 
-type SortField = "custom" | "name" | "price" | "date";
+type SortField = "custom" | "name" | "price" | "date" | "availability";
 type SortDir = "asc" | "desc";
 
 const SORT_OPTIONS: { field: SortField; dir: SortDir; label: string }[] = [
-  { field: "custom",  dir: "asc",  label: "Custom (drag order)" },
-  { field: "name",   dir: "asc",  label: "Name A → Z" },
-  { field: "name",   dir: "desc", label: "Name Z → A" },
-  { field: "price",  dir: "asc",  label: "Price low → high" },
-  { field: "price",  dir: "desc", label: "Price high → low" },
-  { field: "date",   dir: "desc", label: "Date added (newest)" },
-  { field: "date",   dir: "asc",  label: "Date added (oldest)" },
+  { field: "custom",       dir: "asc",  label: "Custom (drag order)" },
+  { field: "name",         dir: "asc",  label: "Name A → Z" },
+  { field: "name",         dir: "desc", label: "Name Z → A" },
+  { field: "price",        dir: "asc",  label: "Price low → high" },
+  { field: "price",        dir: "desc", label: "Price high → low" },
+  { field: "date",         dir: "desc", label: "Date added (newest)" },
+  { field: "date",         dir: "asc",  label: "Date added (oldest)" },
+  { field: "availability", dir: "asc",  label: "Unavailable first" },
+  { field: "availability", dir: "desc", label: "Available first" },
 ];
 
 function sortKey(field: SortField, dir: SortDir): string {
@@ -510,6 +512,9 @@ function AdminContent() {
         const aTime = a.createdAt instanceof Date ? a.createdAt.getTime() : new Date(a.createdAt ?? 0).getTime();
         const bTime = b.createdAt instanceof Date ? b.createdAt.getTime() : new Date(b.createdAt ?? 0).getTime();
         cmp = aTime - bTime;
+      } else if (sortField === "availability") {
+        // false (unavailable=0) sorts before true (available=1) in asc → unavailable first
+        cmp = (a.available ? 1 : 0) - (b.available ? 1 : 0);
       }
       return sortDir === "asc" ? cmp : -cmp;
     });

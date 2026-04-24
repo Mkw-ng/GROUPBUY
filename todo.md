@@ -62,3 +62,6 @@
 ## Admin Products Sort
 - [x] Sort button/dropdown: sort by Name (A→Z / Z→A), Price (low→high / high→low), Date Added (newest / oldest)
 - [x] Sort state is independent of drag-to-reorder (drag order is the manual "custom" sort)
+
+## Admin Products Sort — Availability
+- [x] Add "Availability (unavailable first)" and "Availability (available first)" sort options
