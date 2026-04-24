@@ -76,6 +76,9 @@ export default function CartDrawer({
     if (saved) {
       setPhone((prev) => prev || saved.phone);
       setLocation((prev) => prev || saved.location);
+      if (saved.deliveryAddress) {
+        setDeliveryAddress((prev) => prev || saved.deliveryAddress!);
+      }
       setSaveDetails(true);
     }
   }, [saved]);
@@ -143,7 +146,13 @@ export default function CartDrawer({
     }
     // Persist details if checkbox is ticked
     if (saveDetails && phone.trim()) {
-      save({ phone: phone.trim(), location });
+      save({
+        phone: phone.trim(),
+        location,
+        deliveryAddress: location === "delivery" && deliveryAddress.trim()
+          ? deliveryAddress.trim()
+          : undefined,
+      });
     } else if (!saveDetails) {
       clear();
     }

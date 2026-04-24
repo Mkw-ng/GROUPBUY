@@ -89,3 +89,8 @@
 - [x] Show "Save my details" checkbox below the phone/location fields (checked by default when details are already saved)
 - [x] Show "Saved ✓" indicator and "Update" / "Clear saved details" controls when details are already saved
 - [x] Save details to localStorage on successful checkout
+
+## Saved Delivery Address
+- [x] Add deliveryAddress field to SavedOrderDetails type and localStorage schema
+- [x] Auto-fill delivery address from saved details when Delivery is selected
+- [x] Save delivery address to localStorage on checkout (alongside phone and location)

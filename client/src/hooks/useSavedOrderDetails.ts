@@ -12,6 +12,7 @@ export type SavedPickupLocation = "cranbourne" | "clayton" | "delivery";
 export interface SavedOrderDetails {
   phone: string;
   location: SavedPickupLocation;
+  deliveryAddress?: string;
 }
 
 function readStorage(): SavedOrderDetails | null {
@@ -25,7 +26,11 @@ function readStorage(): SavedOrderDetails | null {
         parsed.location === "clayton" ||
         parsed.location === "delivery")
     ) {
-      return { phone: parsed.phone, location: parsed.location };
+      return {
+        phone: parsed.phone,
+        location: parsed.location,
+        deliveryAddress: typeof parsed.deliveryAddress === "string" ? parsed.deliveryAddress : undefined,
+      };
     }
     return null;
   } catch {
