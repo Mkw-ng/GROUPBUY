@@ -124,7 +124,7 @@ export default function HeroSection({ powerDropActive = false }: HeroProps) {
         >
           {powerDropActive
             ? "Our monthly Power Drop event is live. Every product is showing its lowest price of the month — for a limited time only."
-            : "Premium beef, pork, lamb, poultry and seafood — direct from the butcher, split across the group. Brought to you anyway."}
+            : "Brought to you anyway."}
         </motion.p>
 
         {/* CTAs */}
