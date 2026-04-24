@@ -39,6 +39,7 @@ interface CartDrawerProps {
   onRemove: (id: number) => void;
   onQtyChange: (id: number, qty: number) => void;
   powerDropActive?: boolean;
+  powerDropActivatedAt?: string; // ISO timestamp of when Power Drop was activated
 }
 
 type PickupLocation = "cranbourne" | "clayton" | "delivery";
@@ -56,6 +57,7 @@ export default function CartDrawer({
   onRemove,
   onQtyChange,
   powerDropActive = false,
+  powerDropActivatedAt = "",
 }: CartDrawerProps) {
   const total = items.reduce((sum, item) => sum + item.price * item.qty, 0);
   const { saved, save, clear } = useSavedOrderDetails();
@@ -94,9 +96,31 @@ export default function CartDrawer({
     return () => document.removeEventListener("mousedown", handleClick);
   }, [calendarOpen]);
 
-  // Disable today and past dates
-  const disabledDays = (date: Date) =>
-    isBefore(date, startOfDay(new Date())) || isToday(date);
+  // ─── Date picker constraints ────────────────────────────────────────────────
+  // Power Drop mode: only 10–14 days from activation are selectable
+  // Standard mode: earliest = today + 2 days, no upper limit
+  const { disabledDays, dateHint, pdWindowStart, pdWindowEnd } = (() => {
+    const today = startOfDay(new Date());
+    if (powerDropActive && powerDropActivatedAt) {
+      const activatedAt = startOfDay(new Date(powerDropActivatedAt));
+      const windowStart = new Date(activatedAt);
+      windowStart.setDate(windowStart.getDate() + 10);
+      const windowEnd = new Date(activatedAt);
+      windowEnd.setDate(windowEnd.getDate() + 14);
+      const disabled = (date: Date) => {
+        const d = startOfDay(date);
+        return d < windowStart || d > windowEnd;
+      };
+      const hint = `⚡ Power Drop orders: pick-up between ${format(windowStart, "d MMM")} – ${format(windowEnd, "d MMM yyyy")}`;
+      return { disabledDays: disabled, dateHint: hint, pdWindowStart: windowStart, pdWindowEnd: windowEnd };
+    }
+    // Standard: minimum 2 days from today
+    const earliest = new Date(today);
+    earliest.setDate(earliest.getDate() + 2);
+    const disabled = (date: Date) => startOfDay(date) < earliest;
+    const hint = `Earliest available date: ${format(earliest, "d MMMM yyyy")}`;
+    return { disabledDays: disabled, dateHint: hint, pdWindowStart: null, pdWindowEnd: null };
+  })();
 
   // ─── Validation + WhatsApp message ─────────────────────────────────────────
   function normalisePhone(raw: string): string {
@@ -370,6 +394,9 @@ export default function CartDrawer({
                       />
                     </button>
                     {errors.date && <p className={errorBase}>{errors.date}</p>}
+                    {!errors.date && (
+                      <p className="font-mono-brand text-[10px] text-[#8a857c] mt-1">{dateHint}</p>
+                    )}
 
                     {/* Calendar popover */}
                     <AnimatePresence>

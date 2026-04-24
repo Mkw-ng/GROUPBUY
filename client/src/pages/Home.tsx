@@ -105,6 +105,7 @@ export default function Home() {
         onRemove={handleRemove}
         onQtyChange={handleQtyChange}
         powerDropActive={powerDropActive}
+        powerDropActivatedAt={settings?.powerDropActivatedAt ?? ""}
       />
     </div>
   );

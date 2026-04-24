@@ -97,3 +97,11 @@
 
 ## Phone Number Validation
 - [x] Validate phone is a 10-digit Australian number (mobile 04xx or landline 0[2-9]xx), strip spaces/hyphens before checking, reject non-numeric input with a clear error message
+
+## Two-Mode Date Picker
+- [x] Store Power Drop activation timestamp in DB settings (key: power_drop_activated_at)
+- [x] Record activation timestamp when admin toggles Power Drop ON; clear it when toggled OFF
+- [x] Expose activatedAt via tRPC settings.getAll so CartDrawer can compute the allowed window
+- [x] Standard mode: earliest selectable date = today + 2 days; no upper limit
+- [x] Power Drop mode: only dates 10–14 days from activation timestamp are selectable; all other dates disabled
+- [x] Show helper text under date picker explaining the constraint to the customer

@@ -684,8 +684,12 @@ function AdminContent() {
             checked={powerDropActive}
             disabled={settingsLoading || setSetting.isPending}
             onCheckedChange={(checked) => {
-              setSetting.mutate(
-                { key: "powerDropActive", value: checked ? "true" : "false" },
+              const now = new Date().toISOString();
+              setMultipleSettings.mutate(
+                [
+                  { key: "powerDropActive", value: checked ? "true" : "false" },
+                  { key: "powerDropActivatedAt", value: checked ? now : "" },
+                ],
                 {
                   onSuccess: () =>
                     toast.success(checked ? "⚡ Power Drop is now LIVE" : "Power Drop ended"),

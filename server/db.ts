@@ -134,6 +134,7 @@ export async function setProductAvailability(id: number, available: boolean) {
 
 const DEFAULT_SETTINGS: Record<string, string> = {
   powerDropActive: "false",
+  powerDropActivatedAt: "",   // ISO timestamp set when Power Drop is toggled ON, cleared when OFF
   announcementActive: "true",
   announcementMessage: "New drop open now — Wagyu Ribeye MS7+ & Lamb Shoulder. Closes Thursday midnight.",
   powerDropLabel: "POWER DROP — LIVE NOW",
