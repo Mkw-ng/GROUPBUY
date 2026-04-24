@@ -142,8 +142,8 @@ const BADGE_STYLES: Record<string, string> = {
 };
 
 const CATEGORY_EMOJI: Record<string, string> = {
-  "limited-offer":     "⭐",
-  "featured-deals":    "🔥",
+  "limited-offer":     "🔥",
+  "featured-deals":    "⭐",
   beef:                "🥩",
   pork:                "🐷",
   lamb:                "🐑",
