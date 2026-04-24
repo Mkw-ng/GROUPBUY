@@ -334,6 +334,14 @@ export default function CartDrawer({
                       maxLength={14}
                     />
                     {errors.phone && <p className={errorBase}>{errors.phone}</p>}
+                    {!errors.phone && validatePhone(phone) === null && (
+                      <p className="font-mono-brand text-[10px] text-[#4ade80] mt-1 flex items-center gap-1">
+                        <svg viewBox="0 0 12 12" fill="none" className="w-3 h-3 shrink-0" stroke="currentColor" strokeWidth="1.5">
+                          <path d="M2 6l2.5 2.5L10 3" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                        We will send order updates to this number.
+                      </p>
+                    )}
                   </div>
 
                   {/* 2. Pickup / delivery date */}
