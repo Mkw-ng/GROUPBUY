@@ -58,3 +58,7 @@
 - [x] "Missing PD price" warning chip on cards when no Power Drop price is set
 - [x] Improved empty state with illustration and clear CTA
 - [x] Skeleton loading cards while products are fetching
+
+## Admin Products Sort
+- [x] Sort button/dropdown: sort by Name (A→Z / Z→A), Price (low→high / high→low), Date Added (newest / oldest)
+- [x] Sort state is independent of drag-to-reorder (drag order is the manual "custom" sort)

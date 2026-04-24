@@ -38,7 +38,20 @@ import {
   GripVertical,
   ImageOff,
   AlertCircle,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  Check,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useLocation } from "wouter";
 import { getLoginUrl } from "@/const";
 
@@ -58,6 +71,25 @@ import {
   rectSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+
+// ─── Sort types ──────────────────────────────────────────────────────────────
+
+type SortField = "custom" | "name" | "price" | "date";
+type SortDir = "asc" | "desc";
+
+const SORT_OPTIONS: { field: SortField; dir: SortDir; label: string }[] = [
+  { field: "custom",  dir: "asc",  label: "Custom (drag order)" },
+  { field: "name",   dir: "asc",  label: "Name A → Z" },
+  { field: "name",   dir: "desc", label: "Name Z → A" },
+  { field: "price",  dir: "asc",  label: "Price low → high" },
+  { field: "price",  dir: "desc", label: "Price high → low" },
+  { field: "date",   dir: "desc", label: "Date added (newest)" },
+  { field: "date",   dir: "asc",  label: "Date added (oldest)" },
+];
+
+function sortKey(field: SortField, dir: SortDir): string {
+  return `${field}:${dir}`;
+}
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -434,12 +466,28 @@ function AdminContent() {
     },
   });
 
-  // ─── Filter state ────────────────────────────────────────────────────────────
+  // ─── Filter & sort state ─────────────────────────────────────────────────────
   const [activeCategory, setActiveCategory] = useState<Category | "all">("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [sortField, setSortField] = useState<SortField>("custom");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
+
+  const handleSortChange = (value: string) => {
+    const opt = SORT_OPTIONS.find((o) => sortKey(o.field, o.dir) === value);
+    if (opt) {
+      setSortField(opt.field);
+      setSortDir(opt.dir);
+    }
+  };
+
+  const activeSortLabel = useMemo(() => {
+    if (sortField === "custom") return "Sort";
+    const opt = SORT_OPTIONS.find((o) => o.field === sortField && o.dir === sortDir);
+    return opt?.label ?? "Sort";
+  }, [sortField, sortDir]);
 
   const filteredProducts = useMemo(() => {
-    return orderedProducts.filter((p) => {
+    const filtered = orderedProducts.filter((p) => {
       const matchCat = activeCategory === "all" || p.category === activeCategory;
       const q = searchQuery.toLowerCase();
       const matchSearch =
@@ -449,7 +497,23 @@ function AdminContent() {
         (p.description ?? "").toLowerCase().includes(q);
       return matchCat && matchSearch;
     });
-  }, [orderedProducts, activeCategory, searchQuery]);
+
+    if (sortField === "custom") return filtered;
+
+    return [...filtered].sort((a, b) => {
+      let cmp = 0;
+      if (sortField === "name") {
+        cmp = a.name.localeCompare(b.name);
+      } else if (sortField === "price") {
+        cmp = parseFloat(a.price) - parseFloat(b.price);
+      } else if (sortField === "date") {
+        const aTime = a.createdAt instanceof Date ? a.createdAt.getTime() : new Date(a.createdAt ?? 0).getTime();
+        const bTime = b.createdAt instanceof Date ? b.createdAt.getTime() : new Date(b.createdAt ?? 0).getTime();
+        cmp = aTime - bTime;
+      }
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+  }, [orderedProducts, activeCategory, searchQuery, sortField, sortDir]);
 
   // Category counts
   const categoryCounts = useMemo(() => {
@@ -656,15 +720,60 @@ function AdminContent() {
           </Button>
         </div>
 
-        {/* Search */}
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-          <Input
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search by name or cut…"
-            className="pl-9"
-          />
+        {/* Search + Sort row */}
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+            <Input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search by name or cut…"
+              className="pl-9"
+            />
+          </div>
+
+          {/* Sort dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className={`shrink-0 gap-1.5 ${
+                  sortField !== "custom" ? "border-foreground/60 text-foreground" : ""
+                }`}
+              >
+                {sortField === "custom" ? (
+                  <ArrowUpDown className="h-3.5 w-3.5" />
+                ) : sortDir === "asc" ? (
+                  <ArrowUp className="h-3.5 w-3.5" />
+                ) : (
+                  <ArrowDown className="h-3.5 w-3.5" />
+                )}
+                <span className="hidden sm:inline max-w-[120px] truncate">
+                  {activeSortLabel}
+                </span>
+                <span className="sm:hidden">Sort</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-52">
+              <DropdownMenuLabel>Sort products by</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuRadioGroup
+                value={sortKey(sortField, sortDir)}
+                onValueChange={handleSortChange}
+              >
+                {SORT_OPTIONS.map((opt) => (
+                  <DropdownMenuRadioItem
+                    key={sortKey(opt.field, opt.dir)}
+                    value={sortKey(opt.field, opt.dir)}
+                    className="gap-2"
+                  >
+                    {opt.label}
+                  </DropdownMenuRadioItem>
+                ))}
+              </DropdownMenuRadioGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
         {/* Category filter tabs */}
