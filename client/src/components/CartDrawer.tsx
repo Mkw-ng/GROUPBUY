@@ -125,31 +125,37 @@ export default function CartDrawer({
   }
 
   function buildWhatsAppUrl(): string {
-    const lines = items.map(
-      (i) => `• ${i.name} (${i.cut}) x${i.qty} — $${(i.price * i.qty).toFixed(2)}`
-    );
-    const powerDropNote = powerDropActive ? "\n⚡ *POWER DROP PRICING APPLIED*" : "";
     const dateStr = pickupDate ? format(pickupDate, "EEEE, d MMMM yyyy") : "";
     const locationStr =
       location === "delivery"
-        ? `Delivery to: ${deliveryAddress}`
-        : `Pickup: ${LOCATION_LABELS[location]}`;
-    const instructionsStr = instructions.trim()
-      ? `Special instructions: ${instructions.trim()}`
-      : "";
+        ? `Delivery — ${deliveryAddress}`
+        : LOCATION_LABELS[location];
+    const powerDropNote = powerDropActive ? "\n⚡ *POWER DROP PRICING APPLIED*" : "";
 
-    const parts = [
-      `Hi! I'd like to place an order:${powerDropNote}`,
+    const itemLines = items.map(
+      (i, idx) =>
+        `${idx + 1}. ${i.qty}x ${i.name}${i.cut ? ` (${i.cut})` : ""} — $${(i.price * i.qty).toFixed(2)}`
+    );
+
+    const parts: string[] = [
+      `*Order Number:* ${normalisePhone(phone)}`,
+      `*Pick up Date:* ${dateStr}`,
+      `*Pick up Location:* ${locationStr}`,
       "",
-      ...lines,
+      ...itemLines,
       "",
-      `Total: $${total.toFixed(2)}`,
-      "",
-      `📱 WhatsApp: ${normalisePhone(phone)}`,
-      `📅 Date: ${dateStr}`,
-      `📍 ${locationStr}`,
+      `*Total: $${total.toFixed(2)}*`,
     ];
-    if (instructionsStr) parts.push(`📝 ${instructionsStr}`);
+
+    if (instructions.trim()) {
+      parts.push("");
+      parts.push(`*Special Instructions:* ${instructions.trim()}`);
+    }
+
+    if (powerDropNote) {
+      parts.push("");
+      parts.push("⚡ POWER DROP PRICING APPLIED");
+    }
 
     return `https://wa.me/61407249272?text=${encodeURIComponent(parts.join("\n"))}`;
   }
