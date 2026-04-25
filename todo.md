@@ -186,3 +186,6 @@
 ## M3ATFR3AK Category
 - [x] Add "m3atfr3ak" to schema mysqlEnum, routers z.enum, DealsSection CATEGORIES, Admin CATEGORIES, Admin CATEGORY_EMOJI
 - [x] Run pnpm db:push to migrate the schema
+
+## Mobile Jump-to-Top Button
+- [x] Add mobile-only "Back to top" button after product grid in DealsSection, scrolls to top of deals section

@@ -429,6 +429,32 @@ export default function DealsSection({ onAddToCart, powerDropActive = false }: D
                 )}
               </motion.div>
             </AnimatePresence>
+
+            {/* Mobile-only: jump back to top of deals section */}
+            {filtered.length > 0 && !isLoading && (
+              <div className="lg:hidden flex justify-center mt-8">
+                <button
+                  onClick={() => {
+                    const dealsSection = document.getElementById("deals");
+                    if (dealsSection) {
+                      dealsSection.scrollIntoView({ behavior: "smooth", block: "start" });
+                    }
+                  }}
+                  className="inline-flex items-center gap-2 font-display text-[11px] tracking-widest border border-[#0a0a0a]/20 text-[#8a857c] px-5 py-3 hover:border-[#c73e3a] hover:text-[#c73e3a] transition-colors active:scale-95"
+                >
+                  <svg
+                    className="w-3.5 h-3.5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
+                  </svg>
+                  Back to Top
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
