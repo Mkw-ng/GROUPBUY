@@ -150,3 +150,6 @@
 ## Invoice Personalized Opening
 - [x] Add editable opening sentence input in OrderCard (pre-filled with default, editable per order before sending invoice)
 - [x] Pass opening sentence into buildInvoiceMessage and use it as the first line of the WhatsApp message
+
+## Delivery Charge — All Orders
+- [x] Show delivery charge input for ALL orders (remove delivery-only conditional) so a charge can be applied to any order

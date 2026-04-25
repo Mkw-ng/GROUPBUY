@@ -404,11 +404,10 @@ function OrderCard({
           )}
 
           {/* Delivery charge */}
-          {order.location === "delivery" && (
-            <div>
-              <p className="font-display text-[10px] tracking-widest text-[#8a857c] mb-2">
-                DELIVERY CHARGE
-              </p>
+          <div>
+            <p className="font-display text-[10px] tracking-widest text-[#8a857c] mb-2">
+              DELIVERY CHARGE
+            </p>
               <div className="flex items-center gap-2">
                 <span className="font-mono-brand text-[12px] text-[#8a857c]">$</span>
                 <input
@@ -450,8 +449,6 @@ function OrderCard({
                 </AlertDialog>
               </div>
             </div>
-          )}
-
           {/* Totals summary */}
           <div className="border-t border-white/10 pt-4 space-y-1">
             <div className="flex justify-between font-mono-brand text-[12px]">
