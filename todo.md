@@ -171,3 +171,10 @@
 - [x] Navbar registers the cart button element into FlyToCart context via useFlyToCart().setCartIconEl (callback ref)
 - [x] Wire FlyToCart into DealsSection: on add, get the product image rect via data-product-id + .product-img selector and call triggerFly
 - [x] Wire FlyToCart into Home.tsx: wrap page in FlyToCartProvider so context is available to all children
+
+## Cart Quantity 0.5 Increments
+- [x] Change − / + buttons to step by 0.5 instead of 1
+- [x] Minimum qty is 0.5 (remove item when going below 0.5)
+- [x] Display qty with one decimal place only when fractional (e.g. 1 → "1", 1.5 → "1.5")
+- [x] Update WhatsApp message item lines to show fractional quantities correctly
+- [x] Update order total calculation (already uses price × qty, no change needed)

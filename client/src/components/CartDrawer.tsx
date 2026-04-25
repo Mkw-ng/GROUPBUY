@@ -159,10 +159,10 @@ export default function CartDrawer({
         : LOCATION_LABELS[location];
     const powerDropNote = powerDropActive ? "\n⚡ *POWER DROP PRICING APPLIED*" : "";
 
-    const itemLines = items.map(
-      (i) =>
-        `${i.qty}x ${i.name}${i.cut ? ` (${i.cut})` : ""} — $${(i.price * i.qty).toFixed(2)}`
-    );
+    const itemLines = items.map((i) => {
+      const qtyStr = i.qty % 1 === 0 ? String(i.qty) : i.qty.toFixed(1);
+      return `${qtyStr}x ${i.name}${i.cut ? ` (${i.cut})` : ""} — $${(i.price * i.qty).toFixed(2)}`;
+    });
 
     const parts: string[] = [
       `*Order Number:* ${normalisePhone(phone)}`,
@@ -313,20 +313,22 @@ export default function CartDrawer({
                           <div className="flex items-center gap-3 mt-2">
                             <div className="flex items-center border border-white/15">
                               <button
-                                onClick={() =>
-                                  item.qty > 1
-                                    ? onQtyChange(item.id, item.qty - 1)
-                                    : onRemove(item.id)
-                                }
+                                onClick={() => {
+                                  const next = Math.round((item.qty - 0.5) * 10) / 10;
+                                  next >= 0.5 ? onQtyChange(item.id, next) : onRemove(item.id);
+                                }}
                                 className="w-7 h-7 flex items-center justify-center text-[#f5f2ec]/50 hover:text-[#f5f2ec] transition-colors font-mono-brand text-[14px]"
                               >
                                 −
                               </button>
-                              <span className="w-7 text-center font-mono-brand text-[12px] text-[#f5f2ec]">
-                                {item.qty}
+                              <span className="w-8 text-center font-mono-brand text-[12px] text-[#f5f2ec]">
+                                {item.qty % 1 === 0 ? item.qty : item.qty.toFixed(1)}
                               </span>
                               <button
-                                onClick={() => onQtyChange(item.id, item.qty + 1)}
+                                onClick={() => {
+                                  const next = Math.round((item.qty + 0.5) * 10) / 10;
+                                  onQtyChange(item.id, next);
+                                }}
                                 className="w-7 h-7 flex items-center justify-center text-[#f5f2ec]/50 hover:text-[#f5f2ec] transition-colors font-mono-brand text-[14px]"
                               >
                                 +
