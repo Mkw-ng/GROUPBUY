@@ -178,3 +178,7 @@
 - [x] Display qty with one decimal place only when fractional (e.g. 1 → "1", 1.5 → "1.5")
 - [x] Update WhatsApp message item lines to show fractional quantities correctly
 - [x] Update order total calculation (already uses price × qty, no change needed)
+
+## Pickup Map Integration
+- [x] Build PickupMap component using MapView with geocoded pickup pins and 5km delivery radius circles
+- [x] Integrate PickupMap into PickupSection

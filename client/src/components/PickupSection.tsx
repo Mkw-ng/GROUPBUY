@@ -5,6 +5,7 @@
  */
 import { motion } from "framer-motion";
 import { MapPin, Clock, Calendar, Truck } from "lucide-react";
+import PickupMap from "@/components/PickupMap";
 
 const PICKUP_LOCATIONS = [
   {
@@ -160,7 +161,7 @@ export default function PickupSection() {
             </motion.div>
           </div>
 
-          {/* Right — delivery zones */}
+          {/* Right — interactive map */}
           <motion.div
             initial={{ opacity: 0 }}
             whileInView={{ opacity: 1 }}
@@ -168,27 +169,11 @@ export default function PickupSection() {
             transition={{ duration: 0.5 }}
           >
             <p className="font-display text-[10px] tracking-[0.25em] text-[#8a857c] mb-5">
-              Delivery Zones &amp; Pricing
+              Pickup &amp; Delivery Zones
             </p>
-            <div className="grid grid-cols-2 gap-0 border border-white/10">
-              {DELIVERY_ZONES.map((zone, i) => (
-                <div
-                  key={zone.suburb}
-                  className={`flex items-center justify-between px-4 py-3 border-b border-white/8 ${
-                    i % 2 === 0 ? "border-r border-r-white/8" : ""
-                  }`}
-                >
-                  <span className="font-body text-[13px] text-[#f5f2ec]/80">
-                    {zone.suburb}
-                  </span>
-                  <span className="font-mono-brand text-[13px] font-bold text-[#c73e3a]">
-                    ${zone.price}
-                  </span>
-                </div>
-              ))}
-            </div>
+            <PickupMap />
             <p className="font-mono-brand text-[10px] text-[#8a857c] mt-3">
-              * Prices are flat delivery fees per order within the 5 km radius bubble.
+              * Circles show 5 km delivery radius per zone. Flat fee per order.
             </p>
           </motion.div>
         </div>

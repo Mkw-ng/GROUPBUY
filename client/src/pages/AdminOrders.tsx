@@ -332,7 +332,7 @@ function OrderCard({
 
                     {/* Price per unit */}
                     <span className="font-mono-brand text-[#8a857c] text-right">
-                      ${parseFloat(item.price).toFixed(2)}{item.unit}
+                      {"$"}{parseFloat(item.price).toFixed(2)}{item.unit}
                     </span>
 
                     {/* Final weight / qty override — shown for all items */}
@@ -353,7 +353,7 @@ function OrderCard({
 
                     {/* Line total */}
                     <span className="font-mono-brand text-[#f5f2ec] text-right font-bold">
-                      ${lineTotal.toFixed(2)}
+                      {"$"}{lineTotal.toFixed(2)}
                     </span>
                   </div>
                 );
