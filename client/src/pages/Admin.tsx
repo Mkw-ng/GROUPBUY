@@ -52,7 +52,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { getLoginUrl } from "@/const";
 
 // dnd-kit
@@ -643,11 +643,19 @@ function AdminContent() {
   return (
     <div className="max-w-6xl mx-auto space-y-10 pb-16">
       {/* Page header */}
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Admin Dashboard</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Manage Power Drop events, announcements, and products.
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Admin Dashboard</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Manage Power Drop events, announcements, and products.
+          </p>
+        </div>
+        <Link href="/admin/orders">
+          <Button variant="outline" size="sm" className="gap-1.5 shrink-0">
+            <span>📦</span>
+            Order Management
+          </Button>
+        </Link>
       </div>
 
       {/* ─── Power Drop ──────────────────────────────────────────────────────── */}

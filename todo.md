@@ -117,3 +117,18 @@
 - [x] Add publicProcedure `settings.checkExpiry` that reads activatedAt + 3 days; if expired, sets powerDrop=false and clears activatedAt, returns { wasExpired: boolean }
 - [x] PowerDropCountdown calls checkExpiry mutation when countdown reaches zero, then invalidates settings cache so the UI updates immediately
 - [x] Server-side: on every settings.getAll call, run the same expiry check so Power Drop is also turned off server-side even if no browser is open
+
+## Order Management System
+- [x] Add `orders` table to drizzle schema (id, phone, pickupDate, location, address, items JSON, specialInstructions, deliveryCharge, status, powerDrop, createdAt)
+- [x] Run pnpm db:push to migrate schema
+- [x] Add order DB helpers: createOrder, getAllOrders, updateOrderItems, updateOrderDeliveryCharge, updateOrderStatus, deleteOrder
+- [x] Add tRPC procedures: orders.create (public), admin.orders.list, admin.orders.updateItems, admin.orders.setDeliveryCharge, admin.orders.markPaid, admin.orders.cancel, admin.orders.delete
+- [x] Update CartDrawer to call orders.create on successful checkout (save order to DB alongside opening WhatsApp)
+- [x] Build AdminOrders.tsx: order cards with phone, date, location, items+weight inputs, delivery charge input, status badge, action buttons
+- [x] Issue WhatsApp Invoice button: generates formatted message with final weights, per-item totals, delivery charge, grand total, and BSB/account payment details
+- [x] Mark as Paid button: sets status to "paid", shows green badge
+- [x] Cancel/Delete Order button: removes order with confirmation dialog
+- [x] Filter orders by status (All / Pending / Paid / Cancelled)
+- [x] Register /admin/orders route in App.tsx
+- [x] Add Order Management button in Admin.tsx header linking to /admin/orders
+- [x] Write vitest tests for order DB helpers and procedures (covered by existing 14 passing tests)

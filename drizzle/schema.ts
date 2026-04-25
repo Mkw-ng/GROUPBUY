@@ -92,3 +92,45 @@ export const settings = mysqlTable("settings", {
 });
 
 export type Setting = typeof settings.$inferSelect;
+
+/**
+ * Orders table — each row is a customer order submitted through the cart checkout.
+ * items is stored as JSON text: Array<{ id: number; name: string; cut: string; qty: number; price: string; finalWeightKg?: string }>
+ * status: pending = awaiting payment, paid = payment confirmed, cancelled = order cancelled
+ */
+export const orders = mysqlTable("orders", {
+  id: int("id").autoincrement().primaryKey(),
+  /** Customer WhatsApp phone number — used as the order reference */
+  phone: varchar("phone", { length: 20 }).notNull(),
+  pickupDate: varchar("pickupDate", { length: 32 }).notNull(),
+  /** 'cranbourne' | 'clayton' | 'delivery' */
+  location: varchar("location", { length: 32 }).notNull(),
+  /** Delivery address — only set when location === 'delivery' */
+  deliveryAddress: text("deliveryAddress"),
+  /** JSON array of ordered items */
+  items: text("items").notNull(),
+  specialInstructions: text("specialInstructions"),
+  /** Delivery charge in dollars — admin sets this after reviewing the order */
+  deliveryCharge: decimal("deliveryCharge", { precision: 10, scale: 2 }).default("0.00"),
+  status: mysqlEnum("status", ["pending", "paid", "cancelled"]).notNull().default("pending"),
+  /** Whether this order was placed during a Power Drop event */
+  isPowerDrop: boolean("isPowerDrop").notNull().default(false),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Order = typeof orders.$inferSelect;
+export type InsertOrder = typeof orders.$inferInsert;
+
+/** Shape of each item stored in orders.items JSON */
+export interface OrderItem {
+  id: number;
+  name: string;
+  cut: string;
+  qty: number;
+  /** Price per unit at time of order */
+  price: string;
+  unit: string;
+  /** Final weight in kg — filled in by admin after weighing */
+  finalWeightKg?: string;
+}

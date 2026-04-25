@@ -22,6 +22,7 @@ import { format, isToday, isBefore, startOfDay } from "date-fns";
 import { DayPicker } from "react-day-picker";
 import "react-day-picker/style.css";
 import { useSavedOrderDetails } from "@/hooks/useSavedOrderDetails";
+import { trpc } from "@/lib/trpc";
 
 export interface CartItem {
   id: number;
@@ -61,6 +62,8 @@ export default function CartDrawer({
 }: CartDrawerProps) {
   const total = items.reduce((sum, item) => sum + item.price * item.qty, 0);
   const { saved, save, clear } = useSavedOrderDetails();
+
+  const createOrder = trpc.orders.create.useMutation();
 
   // ─── Order details state ────────────────────────────────────────────────────
   const [phone, setPhone] = useState("");
@@ -199,6 +202,26 @@ export default function CartDrawer({
     } else if (!saveDetails) {
       clear();
     }
+
+    // Save order to database (fire-and-forget — WhatsApp link still opens)
+    const dateStr = pickupDate ? format(pickupDate, "EEEE, d MMMM yyyy") : "";
+    const orderItems = items.map((i) => ({
+      id: i.id,
+      name: i.name,
+      cut: i.cut,
+      qty: i.qty,
+      price: i.price.toFixed(2),
+      unit: i.unit,
+    }));
+    createOrder.mutate({
+      phone: normalisePhone(phone),
+      pickupDate: dateStr,
+      location,
+      deliveryAddress: location === "delivery" ? deliveryAddress.trim() : undefined,
+      items: JSON.stringify(orderItems),
+      specialInstructions: instructions.trim() || undefined,
+      isPowerDrop: powerDropActive,
+    });
   }
 
   // ─── Shared input styles ────────────────────────────────────────────────────

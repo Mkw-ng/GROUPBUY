@@ -1,6 +1,6 @@
-import { eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, InsertProduct, products, settings, users } from "../drizzle/schema";
+import { InsertUser, InsertProduct, InsertOrder, orders, products, settings, users, OrderItem } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -171,6 +171,52 @@ export async function batchReorderProducts(updates: { id: number; sortOrder: num
  * If so, turn it off and clear the activation timestamp.
  * Returns true if it was expired and turned off, false otherwise.
  */
+// ─── Orders ─────────────────────────────────────────────────────────────────
+
+export async function createOrder(data: InsertOrder): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(orders).values(data);
+  return (result[0] as { insertId: number }).insertId;
+}
+
+export async function getAllOrders() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(orders).orderBy(desc(orders.createdAt));
+}
+
+export async function getOrderById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(orders).where(eq(orders.id, id)).limit(1);
+  return result[0];
+}
+
+export async function updateOrderItems(id: number, items: OrderItem[]): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(orders).set({ items: JSON.stringify(items) }).where(eq(orders.id, id));
+}
+
+export async function updateOrderDeliveryCharge(id: number, deliveryCharge: string): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(orders).set({ deliveryCharge }).where(eq(orders.id, id));
+}
+
+export async function updateOrderStatus(id: number, status: "pending" | "paid" | "cancelled"): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(orders).set({ status }).where(eq(orders.id, id));
+}
+
+export async function deleteOrder(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.delete(orders).where(eq(orders.id, id));
+}
+
 export async function checkAndExpirePowerDrop(): Promise<boolean> {
   const active = await getSetting("powerDropActive");
   if (active !== "true") return false;
