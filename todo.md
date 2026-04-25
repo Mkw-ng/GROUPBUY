@@ -158,3 +158,6 @@
 - [x] Add Express multipart upload endpoint POST /api/upload/product-image (admin only, stores to S3 via storagePut, returns URL)
 - [x] Add file picker button to product form in Admin.tsx — click to upload, shows upload progress, auto-fills image URL field on success
 - [x] Show live image preview from uploaded URL in the product form
+
+## Power Drop Button Click Effect
+- [x] Add a ripple/burst click animation to the "Secure Power-Drop ⚡" button in DealsSection

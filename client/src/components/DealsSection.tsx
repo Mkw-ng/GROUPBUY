@@ -5,7 +5,7 @@
  * Category tabs: left-border red indicator for active state
  * Power Drop: crossed-out original price + red Power Drop price, button changes to "Secure Power-Drop ⚡"
  */
-import { useState } from "react";
+import { useState, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ShoppingCart, Zap } from "lucide-react";
 import { toast } from "sonner";
@@ -117,6 +117,73 @@ interface DealsProps {
     unit: string;
   }) => void;
   powerDropActive?: boolean;
+}
+
+// ── PowerDropButton with ripple effect ──────────────────────────────────────
+interface PowerDropButtonProps {
+  showPowerDrop: boolean;
+  available: boolean;
+  onAdd: () => void;
+}
+
+function PowerDropButton({ showPowerDrop, available, onAdd }: PowerDropButtonProps) {
+  const [ripples, setRipples] = useState<{ id: number; x: number; y: number }[]>([]);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const nextId = useRef(0);
+
+  const handleClick = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
+    if (!available) return;
+    const rect = btnRef.current?.getBoundingClientRect();
+    if (rect) {
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      const id = nextId.current++;
+      setRipples((prev) => [...prev, { id, x, y }]);
+      setTimeout(() => setRipples((prev) => prev.filter((r) => r.id !== id)), 600);
+    }
+    onAdd();
+  }, [available, onAdd]);
+
+  return (
+    <button
+      ref={btnRef}
+      onClick={handleClick}
+      disabled={!available}
+      className={`relative overflow-hidden flex items-center gap-1.5 font-display text-[10px] tracking-widest px-3 py-2 transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+        showPowerDrop
+          ? "bg-[#c73e3a] text-[#f5f2ec] hover:bg-[#a83330]"
+          : "bg-[#0a0a0a] text-[#f5f2ec] hover:bg-[#c73e3a]"
+      }`}
+    >
+      {/* Ripple bursts */}
+      {ripples.map((r) => (
+        <span
+          key={r.id}
+          className="pointer-events-none absolute rounded-full animate-pd-ripple"
+          style={{
+            left: r.x,
+            top: r.y,
+            width: 8,
+            height: 8,
+            marginLeft: -4,
+            marginTop: -4,
+            background: showPowerDrop ? "rgba(255,255,255,0.55)" : "rgba(199,62,58,0.55)",
+          }}
+        />
+      ))}
+      {showPowerDrop ? (
+        <>
+          <Zap size={11} className="fill-current" />
+          Secure Power-Drop
+        </>
+      ) : (
+        <>
+          <ShoppingCart size={12} strokeWidth={1.5} />
+          Add
+        </>
+      )}
+    </button>
+  );
 }
 
 export default function DealsSection({ onAddToCart, powerDropActive = false }: DealsProps) {
@@ -315,9 +382,10 @@ export default function DealsSection({ onAddToCart, powerDropActive = false }: D
                               </div>
                             )}
                           </div>
-                          <button
-                            onClick={() => {
-                              if (!product.available) return;
+                          <PowerDropButton
+                            showPowerDrop={showPowerDrop}
+                            available={product.available}
+                            onAdd={() => {
                               onAddToCart({
                                 id: product.id,
                                 name: product.name,
@@ -328,25 +396,7 @@ export default function DealsSection({ onAddToCart, powerDropActive = false }: D
                               });
                               toast.success(`${product.name} added to cart`);
                             }}
-                            disabled={!product.available}
-                            className={`flex items-center gap-1.5 font-display text-[10px] tracking-widest px-3 py-2 transition-colors disabled:opacity-40 disabled:cursor-not-allowed active:scale-[1.04] ${
-                              showPowerDrop
-                                ? "bg-[#c73e3a] text-[#f5f2ec] hover:bg-[#a83330]"
-                                : "bg-[#0a0a0a] text-[#f5f2ec] hover:bg-[#c73e3a]"
-                            }`}
-                          >
-                            {showPowerDrop ? (
-                              <>
-                                <Zap size={11} className="fill-current" />
-                                Secure Power-Drop
-                              </>
-                            ) : (
-                              <>
-                                <ShoppingCart size={12} strokeWidth={1.5} />
-                                Add
-                              </>
-                            )}
-                          </button>
+                          />
                         </div>
                       </div>
                     </motion.div>
