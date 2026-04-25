@@ -27,8 +27,8 @@ function computeTimeLeft(activatedAt: string): TimeLeft {
   if (!activatedAt || isNaN(activated)) {
     return { days: 0, hours: 0, minutes: 0, seconds: 0, expired: false };
   }
-  // Deadline = activation + 14 days (end of the pickup window)
-  const deadline = activated + 14 * 24 * 60 * 60 * 1000;
+  // Deadline = activation + 3 days (end of the Power Drop ordering window)
+  const deadline = activated + 3 * 24 * 60 * 60 * 1000;
   const diff = deadline - Date.now();
 
   if (diff <= 0) {
