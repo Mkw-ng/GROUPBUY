@@ -83,9 +83,8 @@ function locationLabel(location: string, address: string | null): string {
 function calcItemTotal(item: OrderItem): number {
   const price = parseFloat(item.price) || 0;
   const weight = parseFloat(item.finalWeightKg || "") || 0;
-  // If unit is per kg and weight is entered, use weight * price; otherwise qty * price
-  const isPerKg = item.unit?.toLowerCase().includes("kg");
-  if (isPerKg && weight > 0) return price * weight;
+  // If a final weight/qty override is entered, use it; otherwise fall back to ordered qty
+  if (weight > 0) return price * weight;
   return price * item.qty;
 }
 
@@ -326,25 +325,21 @@ function OrderCard({
                       ${parseFloat(item.price).toFixed(2)}{item.unit}
                     </span>
 
-                    {/* Final weight input (only for per-kg items) */}
-                    {isPerKg ? (
-                      <div className="flex items-center gap-1">
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={item.finalWeightKg ?? ""}
-                          onChange={(e) => handleWeightChange(idx, e.target.value)}
-                          placeholder="0.00"
-                          className="w-20 bg-transparent border border-white/15 text-[#f5f2ec] font-mono-brand text-[11px] px-2 py-1.5 placeholder-[#8a857c]/50 focus:outline-none focus:border-[#c73e3a]/60 text-right"
-                        />
-                        <span className="font-mono-brand text-[10px] text-[#8a857c]">kg</span>
-                      </div>
-                    ) : (
+                    {/* Final weight / qty override — shown for all items */}
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.001"
+                        value={item.finalWeightKg ?? ""}
+                        onChange={(e) => handleWeightChange(idx, e.target.value)}
+                        placeholder={String(item.qty)}
+                        className="w-20 bg-transparent border border-white/15 text-[#f5f2ec] font-mono-brand text-[11px] px-2 py-1.5 placeholder-[#8a857c]/50 focus:outline-none focus:border-[#c73e3a]/60 text-right"
+                      />
                       <span className="font-mono-brand text-[10px] text-[#8a857c]">
-                        qty: {item.qty}
+                        {isPerKg ? "kg" : "qty"}
                       </span>
-                    )}
+                    </div>
 
                     {/* Line total */}
                     <span className="font-mono-brand text-[#f5f2ec] text-right font-bold">

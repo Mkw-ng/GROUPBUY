@@ -132,3 +132,6 @@
 - [x] Register /admin/orders route in App.tsx
 - [x] Add Order Management button in Admin.tsx header linking to /admin/orders
 - [x] Write vitest tests for order DB helpers and procedures (covered by existing 14 passing tests)
+
+## Order Management — Weight Input Fix
+- [x] Show weight input for ALL items in AdminOrders (not just per-kg); label shows "kg" for per-kg items and "final qty" for others; line total uses weight if entered, else falls back to qty × price
