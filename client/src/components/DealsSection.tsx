@@ -234,7 +234,7 @@ export default function DealsSection({ onAddToCart, powerDropActive = false }: D
                       initial={{ opacity: 0, y: 8 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.2, delay: i * 0.04 }}
-                      className={`product-card border border-[#0a0a0a]/12 bg-[#f5f2ec] flex flex-col ${
+                      className={`product-card group border border-[#0a0a0a]/12 bg-[#f5f2ec] flex flex-col ${
                         !product.available ? "opacity-50" : ""
                       } ${showPowerDrop ? "ring-1 ring-[#c73e3a]/40" : ""}`}
                     >
@@ -244,7 +244,7 @@ export default function DealsSection({ onAddToCart, powerDropActive = false }: D
                           <img
                             src={product.img}
                             alt={product.name}
-                            className="w-full h-full object-cover"
+                            className="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-110"
                             loading="lazy"
                           />
                         ) : (
