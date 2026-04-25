@@ -161,6 +161,10 @@ function OrderCard({
   const [items, setItems] = useState<OrderItem[]>(() => parseItems(order.items));
   const [deliveryCharge, setDeliveryCharge] = useState(order.deliveryCharge ?? "0");
   const [savingWeights, setSavingWeights] = useState(false);
+  const [confirmSaveWeights, setConfirmSaveWeights] = useState(false);
+  const [confirmSaveDelivery, setConfirmSaveDelivery] = useState(false);
+  const [confirmInvoice, setConfirmInvoice] = useState(false);
+  const [confirmMarkPaid, setConfirmMarkPaid] = useState(false);
 
   const updateItems = trpc.admin.orders.updateItems.useMutation({
     onSuccess: () => {
@@ -350,15 +354,35 @@ function OrderCard({
               })}
             </div>
 
-            <Button
-              size="sm"
-              variant="outline"
-              className="mt-3 font-display text-[10px] tracking-widest border-white/20 text-[#f5f2ec] hover:bg-white/10"
-              onClick={handleSaveWeights}
-              disabled={savingWeights || updateItems.isPending}
-            >
-              {updateItems.isPending ? "Saving…" : "Save Weights"}
-            </Button>
+            <AlertDialog open={confirmSaveWeights} onOpenChange={setConfirmSaveWeights}>
+              <AlertDialogTrigger asChild>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="mt-3 font-display text-[10px] tracking-widest border-white/20 text-[#f5f2ec] hover:bg-white/10"
+                  disabled={savingWeights || updateItems.isPending}
+                >
+                  {updateItems.isPending ? "Saving…" : "Save Weights"}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent className="section-ink border-white/10">
+                <AlertDialogHeader>
+                  <AlertDialogTitle className="font-display tracking-widest text-[#f5f2ec]">Save weight changes?</AlertDialogTitle>
+                  <AlertDialogDescription className="font-mono-brand text-[#8a857c]">
+                    This will update the final weights for order #{order.phone} and recalculate the totals.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel className="font-display text-[10px] tracking-widest">Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    className="font-display text-[10px] tracking-widest"
+                    onClick={() => { setConfirmSaveWeights(false); handleSaveWeights(); }}
+                  >
+                    Save Weights
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
 
           {/* Special instructions */}
@@ -389,15 +413,35 @@ function OrderCard({
                   onChange={(e) => setDeliveryCharge(e.target.value)}
                   className="w-28 bg-transparent border border-white/15 text-[#f5f2ec] font-mono-brand text-[12px] px-3 py-2 focus:outline-none focus:border-[#c73e3a]/60"
                 />
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="font-display text-[10px] tracking-widest border-white/20 text-[#f5f2ec] hover:bg-white/10"
-                  onClick={handleSaveDeliveryCharge}
-                  disabled={setDeliveryChargeMut.isPending}
-                >
-                  {setDeliveryChargeMut.isPending ? "Saving…" : "Set"}
-                </Button>
+                <AlertDialog open={confirmSaveDelivery} onOpenChange={setConfirmSaveDelivery}>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="font-display text-[10px] tracking-widest border-white/20 text-[#f5f2ec] hover:bg-white/10"
+                      disabled={setDeliveryChargeMut.isPending}
+                    >
+                      {setDeliveryChargeMut.isPending ? "Saving…" : "Set"}
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent className="section-ink border-white/10">
+                    <AlertDialogHeader>
+                      <AlertDialogTitle className="font-display tracking-widest text-[#f5f2ec]">Update delivery charge?</AlertDialogTitle>
+                      <AlertDialogDescription className="font-mono-brand text-[#8a857c]">
+                        Set delivery charge to ${deliveryCharge} for order #{order.phone}.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel className="font-display text-[10px] tracking-widest">Cancel</AlertDialogCancel>
+                      <AlertDialogAction
+                        className="font-display text-[10px] tracking-widest"
+                        onClick={() => { setConfirmSaveDelivery(false); handleSaveDeliveryCharge(); }}
+                      >
+                        Confirm
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               </div>
             </div>
           )}
@@ -423,26 +467,66 @@ function OrderCard({
           {/* Action buttons */}
           <div className="flex flex-wrap gap-2 pt-1">
             {/* Issue WhatsApp Invoice */}
-            <Button
-              size="sm"
-              className="font-display text-[10px] tracking-widest bg-[#25D366] hover:bg-[#1da851] text-white gap-1.5"
-              onClick={handleIssueInvoice}
-            >
-              <MessageCircle size={13} />
-              Issue WhatsApp Invoice
-            </Button>
+            <AlertDialog open={confirmInvoice} onOpenChange={setConfirmInvoice}>
+              <AlertDialogTrigger asChild>
+                <Button
+                  size="sm"
+                  className="font-display text-[10px] tracking-widest bg-[#25D366] hover:bg-[#1da851] text-white gap-1.5"
+                >
+                  <MessageCircle size={13} />
+                  Issue WhatsApp Invoice
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent className="section-ink border-white/10">
+                <AlertDialogHeader>
+                  <AlertDialogTitle className="font-display tracking-widest text-[#f5f2ec]">Send WhatsApp invoice?</AlertDialogTitle>
+                  <AlertDialogDescription className="font-mono-brand text-[#8a857c]">
+                    This will open WhatsApp with an invoice message to {order.phone} for ${grandTotal.toFixed(2)}. Make sure weights and delivery charge are saved first.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel className="font-display text-[10px] tracking-widest">Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    className="font-display text-[10px] tracking-widest bg-[#25D366] hover:bg-[#1da851] text-white"
+                    onClick={() => { setConfirmInvoice(false); handleIssueInvoice(); }}
+                  >
+                    Send Invoice
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
 
             {/* Mark as Paid */}
             {order.status !== "paid" && order.status !== "cancelled" && (
-              <Button
-                size="sm"
-                className="font-display text-[10px] tracking-widest bg-green-700 hover:bg-green-600 text-white gap-1.5"
-                onClick={() => markPaid.mutate({ id: order.id })}
-                disabled={markPaid.isPending}
-              >
-                <CheckCircle2 size={13} />
-                {markPaid.isPending ? "Saving…" : "Mark as Paid"}
-              </Button>
+              <AlertDialog open={confirmMarkPaid} onOpenChange={setConfirmMarkPaid}>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    size="sm"
+                    className="font-display text-[10px] tracking-widest bg-green-700 hover:bg-green-600 text-white gap-1.5"
+                    disabled={markPaid.isPending}
+                  >
+                    <CheckCircle2 size={13} />
+                    {markPaid.isPending ? "Saving…" : "Mark as Paid"}
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent className="section-ink border-white/10">
+                  <AlertDialogHeader>
+                    <AlertDialogTitle className="font-display tracking-widest text-[#f5f2ec]">Mark order as paid?</AlertDialogTitle>
+                    <AlertDialogDescription className="font-mono-brand text-[#8a857c]">
+                      Order #{order.phone} will be marked as PAID. This action cannot be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel className="font-display text-[10px] tracking-widest">Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      className="font-display text-[10px] tracking-widest bg-green-700 hover:bg-green-600"
+                      onClick={() => { setConfirmMarkPaid(false); markPaid.mutate({ id: order.id }); }}
+                    >
+                      Mark as Paid
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             )}
 
             {/* Cancel Order */}

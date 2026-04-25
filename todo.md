@@ -135,3 +135,11 @@
 
 ## Order Management — Weight Input Fix
 - [x] Show weight input for ALL items in AdminOrders (not just per-kg); label shows "kg" for per-kg items and "final qty" for others; line total uses weight if entered, else falls back to qty × price
+
+## Order Management — Confirmation Dialogs
+- [x] Save Weights: confirm before saving weight changes to DB
+- [x] Save Delivery Charge: confirm before updating delivery charge
+- [x] Issue WhatsApp Invoice: confirm before opening WhatsApp with invoice message
+- [x] Mark as Paid: confirm before marking order as paid
+- [x] Cancel Order: confirm before cancelling (AlertDialog verified)
+- [x] Delete Order: confirm before deleting (AlertDialog verified)
