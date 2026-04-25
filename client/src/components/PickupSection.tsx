@@ -1,30 +1,40 @@
 /*
  * GROUPBUY Pickup Section
- * Design: Ink background, two-column layout — left info, right map embed
+ * Design: Ink background, two-column layout — left info, right delivery zones
  * Pickup details in JetBrains Mono, address/hours in Inter Tight
  */
 import { motion } from "framer-motion";
-import { MapPin, Clock, Calendar } from "lucide-react";
+import { MapPin, Clock, Calendar, Truck } from "lucide-react";
 
-const PICKUP_DETAILS = [
+const PICKUP_LOCATIONS = [
   {
-    icon: MapPin,
-    label: "Location",
-    value: "Lyndhurst, VIC 3975",
-    sub: "Exact address shared on order confirmation",
+    name: "BQ Direct",
+    address: "126 Fairbank Rd, Clayton South VIC 3169",
   },
   {
-    icon: Calendar,
-    label: "Pickup Day",
-    value: "Every Saturday",
-    sub: "Orders close Thursday midnight",
+    name: "Mitchells Quality Meat",
+    address: "Cranbourne Park Shopping Centre",
   },
-  {
-    icon: Clock,
-    label: "Pickup Window",
-    value: "08:00 — 11:00",
-    sub: "No late pickups — please be on time",
-  },
+];
+
+const DELIVERY_ZONES = [
+  { suburb: "Clayton",       price: 5  },
+  { suburb: "Cranbourne",    price: 5  },
+  { suburb: "Berwick",       price: 10 },
+  { suburb: "Frankstone",    price: 10 },
+  { suburb: "Dandenong",     price: 10 },
+  { suburb: "Glen Waverley", price: 10 },
+  { suburb: "Cheltenham",    price: 10 },
+  { suburb: "Brighton",      price: 10 },
+  { suburb: "Pakenham",      price: 15 },
+  { suburb: "Tooradin",      price: 15 },
+  { suburb: "Mornington",    price: 15 },
+  { suburb: "Ringwood",      price: 15 },
+  { suburb: "Mooroolbark",   price: 15 },
+  { suburb: "Doncaster",     price: 15 },
+  { suburb: "Melbourne CBD", price: 15 },
+  { suburb: "Upwey",         price: 15 },
+  { suburb: "Dromana",       price: 20 },
 ];
 
 export default function PickupSection() {
@@ -52,63 +62,134 @@ export default function PickupSection() {
           {/* Left — details */}
           <div>
             <h2 className="font-display text-[clamp(1.8rem,4vw,3rem)] text-[#f5f2ec] mb-8 leading-tight">
-              Saturday<br />
-              <span className="text-[#c73e3a]">Pickup.</span>
+              Pick Up &<br />
+              <span className="text-[#c73e3a]">Delivery.</span>
             </h2>
 
-            <div className="flex flex-col gap-6">
-              {PICKUP_DETAILS.map((detail, i) => (
-                <motion.div
-                  key={detail.label}
-                  initial={{ opacity: 0, x: -8 }}
-                  whileInView={{ opacity: 1, x: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.35, delay: i * 0.1 }}
-                  className="flex gap-4 border-b border-white/10 pb-6 last:border-0"
-                >
-                  <div className="w-8 shrink-0 pt-0.5">
-                    <detail.icon size={16} strokeWidth={1.5} className="text-[#c73e3a]" />
-                  </div>
-                  <div>
-                    <p className="font-display text-[10px] tracking-[0.25em] text-[#8a857c] mb-1">
-                      {detail.label}
-                    </p>
-                    <p className="font-mono-brand text-[18px] font-bold text-[#f5f2ec] mb-1">
-                      {detail.value}
-                    </p>
-                    <p className="font-body text-[13px] text-[#8a857c]">
-                      {detail.sub}
-                    </p>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
+            {/* Pickup locations */}
+            <motion.div
+              initial={{ opacity: 0, x: -8 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.35 }}
+              className="flex gap-4 border-b border-white/10 pb-6 mb-6"
+            >
+              <div className="w-8 shrink-0 pt-0.5">
+                <MapPin size={16} strokeWidth={1.5} className="text-[#c73e3a]" />
+              </div>
+              <div className="flex-1">
+                <p className="font-display text-[10px] tracking-[0.25em] text-[#8a857c] mb-3">
+                  Pickup Locations
+                </p>
+                <div className="flex flex-col gap-3">
+                  {PICKUP_LOCATIONS.map((loc) => (
+                    <div key={loc.name}>
+                      <p className="font-mono-brand text-[15px] font-bold text-[#f5f2ec] leading-snug">
+                        {loc.name}
+                      </p>
+                      <p className="font-body text-[13px] text-[#8a857c] mt-0.5">
+                        {loc.address}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </motion.div>
 
-            <div className="mt-8 p-4 border border-white/10 bg-white/5">
-              <p className="font-mono-brand text-[11px] text-[#8a857c] leading-relaxed">
-                We service the South East corridor — Lyndhurst, Cranbourne, Berwick, Narre Warren, Pakenham and surrounds. If you're unsure whether we cover your area, message us on WhatsApp.
-              </p>
-            </div>
+            {/* Pickup day */}
+            <motion.div
+              initial={{ opacity: 0, x: -8 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.35, delay: 0.1 }}
+              className="flex gap-4 border-b border-white/10 pb-6 mb-6"
+            >
+              <div className="w-8 shrink-0 pt-0.5">
+                <Calendar size={16} strokeWidth={1.5} className="text-[#c73e3a]" />
+              </div>
+              <div>
+                <p className="font-display text-[10px] tracking-[0.25em] text-[#8a857c] mb-1">
+                  Pickup Days
+                </p>
+                <p className="font-mono-brand text-[18px] font-bold text-[#f5f2ec] mb-1">
+                  Monday — Saturday
+                </p>
+              </div>
+            </motion.div>
+
+            {/* Pickup window */}
+            <motion.div
+              initial={{ opacity: 0, x: -8 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.35, delay: 0.2 }}
+              className="flex gap-4 border-b border-white/10 pb-6 mb-6"
+            >
+              <div className="w-8 shrink-0 pt-0.5">
+                <Clock size={16} strokeWidth={1.5} className="text-[#c73e3a]" />
+              </div>
+              <div>
+                <p className="font-display text-[10px] tracking-[0.25em] text-[#8a857c] mb-1">
+                  Pickup Window
+                </p>
+                <p className="font-mono-brand text-[18px] font-bold text-[#f5f2ec] mb-1">
+                  9:00am — 5:00pm
+                </p>
+              </div>
+            </motion.div>
+
+            {/* Delivery note */}
+            <motion.div
+              initial={{ opacity: 0, x: -8 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.35, delay: 0.3 }}
+              className="flex gap-4"
+            >
+              <div className="w-8 shrink-0 pt-0.5">
+                <Truck size={16} strokeWidth={1.5} className="text-[#c73e3a]" />
+              </div>
+              <div>
+                <p className="font-display text-[10px] tracking-[0.25em] text-[#8a857c] mb-1">
+                  Delivery
+                </p>
+                <p className="font-body text-[13px] text-[#8a857c] leading-relaxed">
+                  We deliver within a 5 km radius of each zone listed. Not sure if we cover your area? Message us on WhatsApp.
+                </p>
+              </div>
+            </motion.div>
           </div>
 
-          {/* Right — map */}
+          {/* Right — delivery zones */}
           <motion.div
             initial={{ opacity: 0 }}
             whileInView={{ opacity: 1 }}
             viewport={{ once: true }}
             transition={{ duration: 0.5 }}
-            className="aspect-[4/3] border border-white/10 overflow-hidden"
           >
-            <iframe
-              title="Pickup Location Map"
-              src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3143.7!2d145.2667!3d-38.0833!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x6ad6140b8f2b8a5b%3A0x5045675218ce6e0!2sLyndhurst+VIC+3975!5e0!3m2!1sen!2sau!4v1234567890"
-              width="100%"
-              height="100%"
-              style={{ border: 0, filter: "invert(90%) hue-rotate(180deg)" }}
-              allowFullScreen
-              loading="lazy"
-              referrerPolicy="no-referrer-when-downgrade"
-            />
+            <p className="font-display text-[10px] tracking-[0.25em] text-[#8a857c] mb-5">
+              Delivery Zones &amp; Pricing
+            </p>
+            <div className="grid grid-cols-2 gap-0 border border-white/10">
+              {DELIVERY_ZONES.map((zone, i) => (
+                <div
+                  key={zone.suburb}
+                  className={`flex items-center justify-between px-4 py-3 border-b border-white/8 ${
+                    i % 2 === 0 ? "border-r border-r-white/8" : ""
+                  }`}
+                >
+                  <span className="font-body text-[13px] text-[#f5f2ec]/80">
+                    {zone.suburb}
+                  </span>
+                  <span className="font-mono-brand text-[13px] font-bold text-[#c73e3a]">
+                    ${zone.price}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <p className="font-mono-brand text-[10px] text-[#8a857c] mt-3">
+              * Prices are flat delivery fees per order within the 5 km radius bubble.
+            </p>
           </motion.div>
         </div>
       </div>
