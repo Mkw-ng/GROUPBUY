@@ -104,7 +104,7 @@ function buildInvoiceMessage(
     const finalVal = weight > 0 ? weight : item.qty;
     const unit = isPerKg && weight > 0 ? "kg" : "";
     const weightStr = ` × ${finalVal}${unit}`;
-    return `${item.name}${item.cut ? ` (${item.cut})` : ""}${weightStr} @ $${price.toFixed(2)}${item.unit} = *$${total.toFixed(2)}*`;
+    return `${item.name}${weightStr} @ $${price.toFixed(2)}${item.unit} = *$${total.toFixed(2)}*`;
   });
 
   const subtotal = items.reduce((sum, i) => sum + calcItemTotal(i), 0);
