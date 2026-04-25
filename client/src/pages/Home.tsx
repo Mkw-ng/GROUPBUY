@@ -19,6 +19,7 @@ import CartDrawer, { CartItem } from "@/components/CartDrawer";
 export default function Home() {
   const [cartOpen, setCartOpen] = useState(false);
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  const [cartBump, setCartBump] = useState(0);
 
   // Fetch site-wide settings (announcement, power drop state)
   const { data: settings } = trpc.settings.getAll.useQuery(undefined, {
@@ -30,6 +31,8 @@ export default function Home() {
   const announcementMessage =
     settings?.announcementMessage ??
     "New drop open now — Wagyu Ribeye MS7+ & Lamb Shoulder. Closes Thursday midnight.";
+
+  const triggerCartBump = () => setCartBump((n) => n + 1);
 
   const handleAddToCart = (product: {
     id: number;
@@ -61,6 +64,7 @@ export default function Home() {
         },
       ];
     });
+    triggerCartBump();
   };
 
   const handleRemove = (id: number) => {
@@ -85,6 +89,7 @@ export default function Home() {
         cartCount={cartCount}
         onCartClick={() => setCartOpen(true)}
         powerDropActive={powerDropActive}
+        cartBump={cartBump}
       />
 
       <main className="flex-1">

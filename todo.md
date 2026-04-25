@@ -161,3 +161,6 @@
 
 ## Power Drop Button Click Effect
 - [x] Add a ripple/burst click animation to the "Secure Power-Drop ⚡" button in DealsSection
+
+## Cart Icon Animation
+- [x] Add a satisfying bounce/shake animation to the cart icon in Navbar every time a product is added to the cart
