@@ -5,6 +5,7 @@
  */
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
+import { FlyToCartProvider } from "@/contexts/FlyToCartContext";
 import AnnouncementBanner from "@/components/AnnouncementBanner";
 import Navbar from "@/components/Navbar";
 import HeroSection from "@/components/HeroSection";
@@ -78,6 +79,7 @@ export default function Home() {
   const cartCount = cartItems.reduce((sum, i) => sum + i.qty, 0);
 
   return (
+    <FlyToCartProvider>
     <div className="min-h-screen flex flex-col">
       {announcementActive && (
         <AnnouncementBanner
@@ -113,5 +115,6 @@ export default function Home() {
         powerDropActivatedAt={settings?.powerDropActivatedAt ?? ""}
       />
     </div>
+    </FlyToCartProvider>
   );
 }

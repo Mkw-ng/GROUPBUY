@@ -10,6 +10,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ShoppingCart, Zap } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
+import { useFlyToCart } from "@/contexts/FlyToCartContext";
 
 const CATEGORIES = [
   { id: "all",               label: "All Drops" },
@@ -124,9 +125,10 @@ interface PowerDropButtonProps {
   showPowerDrop: boolean;
   available: boolean;
   onAdd: () => void;
+  onFlyTrigger?: (e: React.MouseEvent<HTMLButtonElement>) => void;
 }
 
-function PowerDropButton({ showPowerDrop, available, onAdd }: PowerDropButtonProps) {
+function PowerDropButton({ showPowerDrop, available, onAdd, onFlyTrigger }: PowerDropButtonProps) {
   const [ripples, setRipples] = useState<{ id: number; x: number; y: number }[]>([]);
   const btnRef = useRef<HTMLButtonElement>(null);
   const nextId = useRef(0);
@@ -141,8 +143,9 @@ function PowerDropButton({ showPowerDrop, available, onAdd }: PowerDropButtonPro
       setRipples((prev) => [...prev, { id, x, y }]);
       setTimeout(() => setRipples((prev) => prev.filter((r) => r.id !== id)), 600);
     }
+    onFlyTrigger?.(e);
     onAdd();
-  }, [available, onAdd]);
+  }, [available, onAdd, onFlyTrigger]);
 
   return (
     <button
@@ -189,6 +192,7 @@ function PowerDropButton({ showPowerDrop, available, onAdd }: PowerDropButtonPro
 export default function DealsSection({ onAddToCart, powerDropActive = false }: DealsProps) {
   const [activeCategory, setActiveCategory] = useState("all");
   const [search, setSearch] = useState("");
+  const { triggerFly } = useFlyToCart();
 
   const { data: dbProducts, isLoading } = trpc.products.list.useQuery(undefined, {
     staleTime: 30_000,
@@ -298,6 +302,7 @@ export default function DealsSection({ onAddToCart, powerDropActive = false }: D
                   return (
                     <motion.div
                       key={product.id}
+                      data-product-id={product.id}
                       initial={{ opacity: 0, y: 8 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.2, delay: i * 0.04 }}
@@ -306,7 +311,7 @@ export default function DealsSection({ onAddToCart, powerDropActive = false }: D
                       } ${showPowerDrop ? "ring-1 ring-[#c73e3a]/40" : ""}`}
                     >
                       {/* Image */}
-                      <div className="relative aspect-[4/3] overflow-hidden bg-[#eae3d2]">
+                      <div className="product-img relative aspect-[4/3] overflow-hidden bg-[#eae3d2]">
                         {product.img ? (
                           <img
                             src={product.img}
@@ -385,6 +390,17 @@ export default function DealsSection({ onAddToCart, powerDropActive = false }: D
                           <PowerDropButton
                             showPowerDrop={showPowerDrop}
                             available={product.available}
+                            onFlyTrigger={() => {
+                              // Find the product image element inside this card
+                              const cardEl = document.querySelector(
+                                `[data-product-id="${product.id}"] .product-img`
+                              ) as HTMLElement | null;
+                              const imgSrc = product.img ?? "";
+                              const sourceRect = cardEl
+                                ? cardEl.getBoundingClientRect()
+                                : (document.querySelector(`[data-product-id="${product.id}"]`) as HTMLElement | null)?.getBoundingClientRect() ?? new DOMRect();
+                              triggerFly(imgSrc, sourceRect);
+                            }}
                             onAdd={() => {
                               onAddToCart({
                                 id: product.id,

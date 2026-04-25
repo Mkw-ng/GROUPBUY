@@ -164,3 +164,10 @@
 
 ## Cart Icon Animation
 - [x] Add a satisfying bounce/shake animation to the cart icon in Navbar every time a product is added to the cart
+
+## Fly-to-Cart Animation
+- [x] Create FlyToCart context that holds a ref to the cart icon DOM element and exposes a triggerFly(imgSrc, sourceRect) function
+- [x] Build FlyingImage overlay component: renders a fixed-position image clone that animates from source rect to cart icon position, then fades out
+- [x] Navbar registers the cart button element into FlyToCart context via useFlyToCart().setCartIconEl (callback ref)
+- [x] Wire FlyToCart into DealsSection: on add, get the product image rect via data-product-id + .product-img selector and call triggerFly
+- [x] Wire FlyToCart into Home.tsx: wrap page in FlyToCartProvider so context is available to all children

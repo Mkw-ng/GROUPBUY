@@ -4,8 +4,9 @@
  * Behaviour: Sticky, slim (56px), red underline hover on links
  * Power Drop: pulsing red "POWER DROP LIVE" badge in right actions area
  */
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { ShoppingCart, Menu, X, Zap } from "lucide-react";
+import { useFlyToCart } from "@/contexts/FlyToCartContext";
 
 const NAV_LINKS = [
   { label: "How It Works", href: "#how-it-works" },
@@ -25,6 +26,11 @@ interface NavbarProps {
 export default function Navbar({ cartCount = 0, onCartClick, powerDropActive = false, cartBump = 0 }: NavbarProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [bumping, setBumping] = useState(false);
+  const { setCartIconEl } = useFlyToCart();
+
+  const cartBtnRef = useCallback((el: HTMLButtonElement | null) => {
+    setCartIconEl(el);
+  }, [setCartIconEl]);
 
   useEffect(() => {
     if (cartBump === 0) return;
@@ -86,6 +92,7 @@ export default function Navbar({ cartCount = 0, onCartClick, powerDropActive = f
             Order Now
           </a>
           <button
+            ref={cartBtnRef}
             onClick={onCartClick}
             className="relative flex items-center justify-center w-9 h-9 text-[#f5f2ec]/70 hover:text-[#f5f2ec] transition-colors"
             aria-label="Cart"
