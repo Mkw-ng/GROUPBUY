@@ -100,7 +100,10 @@ function buildInvoiceMessage(
     const isPerKg = item.unit?.toLowerCase().includes("kg");
     const weight = parseFloat(item.finalWeightKg || "") || 0;
     const total = calcItemTotal(item);
-    const weightStr = isPerKg && weight > 0 ? ` × ${weight}kg` : ` × ${item.qty}`;
+    // Use final entered value if set; otherwise fall back to original ordered qty
+    const finalVal = weight > 0 ? weight : item.qty;
+    const unit = isPerKg && weight > 0 ? "kg" : "";
+    const weightStr = ` × ${finalVal}${unit}`;
     return `${item.name}${item.cut ? ` (${item.cut})` : ""}${weightStr} @ $${price.toFixed(2)}${item.unit} = *$${total.toFixed(2)}*`;
   });
 

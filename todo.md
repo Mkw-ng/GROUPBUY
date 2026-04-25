@@ -143,3 +143,6 @@
 - [x] Mark as Paid: confirm before marking order as paid
 - [x] Cancel Order: confirm before cancelling (AlertDialog verified)
 - [x] Delete Order: confirm before deleting (AlertDialog verified)
+
+## Invoice Final Quantity Fix
+- [x] buildInvoiceMessage: use finalWeightKg (if set) over qty in item lines of the WhatsApp invoice message
