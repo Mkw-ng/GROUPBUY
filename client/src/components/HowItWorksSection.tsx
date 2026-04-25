@@ -9,23 +9,23 @@ import { motion } from "framer-motion";
 const STEPS = [
   {
     num: "01",
-    title: "Browse the Drop",
-    desc: "Check current deals on the site. New drops open weekly — beef, pork, lamb, poultry, seafood.",
-  },
-  {
-    num: "02",
     title: "Join the WhatsApp",
     desc: "Get notified the moment a drop opens. No WhatsApp, no deal — that's how the group works.",
   },
   {
+    num: "02",
+    title: "Power-Drop",
+    desc: "Goes live once a month. Unreal deals. 3 days to order. Sort payment and enjoy it next week.",
+  },
+  {
     num: "03",
-    title: "Confirm & Pay",
-    desc: "Add to cart and pay via bank transfer or card. Orders lock in 48 hours before pickup.",
+    title: "Casual Orders",
+    desc: "Order anytime. Schedule pick up in-store or delivery.",
   },
   {
     num: "04",
-    title: "Pickup Saturday",
-    desc: "Collect your order from the Lyndhurst pickup point. Bring a bag. Bring a friend.",
+    title: "Walk-Ins",
+    desc: "No need to pre-order. Walk in and mention GroupBuy. Have your deal sorted.",
   },
 ];
 
