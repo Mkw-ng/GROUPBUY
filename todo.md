@@ -146,3 +146,7 @@
 
 ## Invoice Final Quantity Fix
 - [x] buildInvoiceMessage: use finalWeightKg (if set) over qty in item lines of the WhatsApp invoice message
+
+## Invoice Personalized Opening
+- [x] Add editable opening sentence input in OrderCard (pre-filled with default, editable per order before sending invoice)
+- [x] Pass opening sentence into buildInvoiceMessage and use it as the first line of the WhatsApp message

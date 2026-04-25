@@ -92,7 +92,8 @@ function buildInvoiceMessage(
   order: Order,
   items: OrderItem[],
   deliveryCharge: string,
-  bankDetails: string
+  bankDetails: string,
+  openingSentence: string
 ): string {
   const locationStr = locationLabel(order.location, order.deliveryAddress);
   const itemLines = items.map((item) => {
@@ -112,7 +113,7 @@ function buildInvoiceMessage(
   const grandTotal = subtotal + delivery;
 
   const parts: string[] = [
-    `Hi! Here is your GROUPBUY invoice 🧾`,
+    openingSentence,
     ``,
     `*Order #:* ${order.phone}`,
     `*Pick-up Date:* ${order.pickupDate}`,
@@ -168,6 +169,8 @@ function OrderCard({
   const [confirmSaveDelivery, setConfirmSaveDelivery] = useState(false);
   const [confirmInvoice, setConfirmInvoice] = useState(false);
   const [confirmMarkPaid, setConfirmMarkPaid] = useState(false);
+  const defaultOpening = `Hi! Here is your GROUPBUY invoice 🧾`;
+  const [openingSentence, setOpeningSentence] = useState(defaultOpening);
 
   const updateItems = trpc.admin.orders.updateItems.useMutation({
     onSuccess: () => {
@@ -226,7 +229,7 @@ function OrderCard({
   }
 
   function handleIssueInvoice() {
-    const msg = buildInvoiceMessage(order, items, deliveryCharge, bankDetails);
+    const msg = buildInvoiceMessage(order, items, deliveryCharge, bankDetails, openingSentence);
     const phone = order.phone.replace(/\D/g, "");
     const intlPhone = phone.startsWith("0") ? `61${phone.slice(1)}` : phone;
     window.open(`https://wa.me/${intlPhone}?text=${encodeURIComponent(msg)}`, "_blank");
@@ -484,8 +487,24 @@ function OrderCard({
                 <AlertDialogHeader>
                   <AlertDialogTitle className="font-display tracking-widest text-[#f5f2ec]">Send WhatsApp invoice?</AlertDialogTitle>
                   <AlertDialogDescription className="font-mono-brand text-[#8a857c]">
-                    This will open WhatsApp with an invoice message to {order.phone} for ${grandTotal.toFixed(2)}. Make sure weights and delivery charge are saved first.
+                    Personalise the opening line, then send to {order.phone} (total: ${grandTotal.toFixed(2)}).
                   </AlertDialogDescription>
+                  <div className="mt-3">
+                    <label className="font-display text-[10px] tracking-widest text-[#8a857c] block mb-1">OPENING MESSAGE</label>
+                    <textarea
+                      rows={2}
+                      value={openingSentence}
+                      onChange={(e) => setOpeningSentence(e.target.value)}
+                      className="w-full bg-transparent border border-white/15 text-[#f5f2ec] font-mono-brand text-[12px] px-3 py-2 placeholder-[#8a857c]/50 focus:outline-none focus:border-[#c73e3a]/60 resize-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setOpeningSentence(defaultOpening)}
+                      className="font-mono-brand text-[10px] text-[#8a857c] hover:text-[#f5f2ec] mt-1 underline"
+                    >
+                      Reset to default
+                    </button>
+                  </div>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel className="font-display text-[10px] tracking-widest">Cancel</AlertDialogCancel>
