@@ -7,6 +7,7 @@ import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import {
   getAllProducts,
   getAllSettings,
+  checkAndExpirePowerDrop,
   deleteProduct,
   setSetting,
   setProductAvailability,
@@ -83,7 +84,16 @@ export const appRouter = router({
 
   settings: router({
     getAll: publicProcedure.query(async () => {
+      // Auto-expire Power Drop on every settings fetch so the server stays in sync
+      // even if no browser triggers the explicit expiry mutation.
+      await checkAndExpirePowerDrop();
       return getAllSettings();
+    }),
+
+    // Called by the countdown timer the moment it reaches zero.
+    checkExpiry: publicProcedure.mutation(async () => {
+      const wasExpired = await checkAndExpirePowerDrop();
+      return { wasExpired };
     }),
   }),
 

@@ -1,13 +1,13 @@
 /*
  * PowerDropCountdown
- * Counts down to the end of the Power Drop pickup window (activatedAt + 14 days).
- * Displays days / hours / minutes / seconds in monospace digits.
- * Shows "Order window closed" when the countdown reaches zero.
- * Only rendered when Power Drop is active.
+ * Counts down to activatedAt + 3 days.
+ * When the timer hits zero it calls settings.checkExpiry on the server to turn
+ * Power Drop off, then invalidates the settings cache so the UI updates immediately.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { Zap } from "lucide-react";
+import { trpc } from "@/lib/trpc";
 
 interface PowerDropCountdownProps {
   activatedAt: string; // ISO timestamp
@@ -21,14 +21,14 @@ interface TimeLeft {
   expired: boolean;
 }
 
+const POWER_DROP_WINDOW_MS = 3 * 24 * 60 * 60 * 1000; // 3 days
+
 function computeTimeLeft(activatedAt: string): TimeLeft {
   const activated = new Date(activatedAt).getTime();
-  // Guard against invalid/missing timestamp
   if (!activatedAt || isNaN(activated)) {
     return { days: 0, hours: 0, minutes: 0, seconds: 0, expired: false };
   }
-  // Deadline = activation + 3 days (end of the Power Drop ordering window)
-  const deadline = activated + 3 * 24 * 60 * 60 * 1000;
+  const deadline = activated + POWER_DROP_WINDOW_MS;
   const diff = deadline - Date.now();
 
   if (diff <= 0) {
@@ -36,12 +36,13 @@ function computeTimeLeft(activatedAt: string): TimeLeft {
   }
 
   const totalSeconds = Math.floor(diff / 1000);
-  const days = Math.floor(totalSeconds / 86400);
-  const hours = Math.floor((totalSeconds % 86400) / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
-
-  return { days, hours, minutes, seconds, expired: false };
+  return {
+    days: Math.floor(totalSeconds / 86400),
+    hours: Math.floor((totalSeconds % 86400) / 3600),
+    minutes: Math.floor((totalSeconds % 3600) / 60),
+    seconds: totalSeconds % 60,
+    expired: false,
+  };
 }
 
 function pad(n: number) {
@@ -50,14 +51,33 @@ function pad(n: number) {
 
 export default function PowerDropCountdown({ activatedAt }: PowerDropCountdownProps) {
   const [timeLeft, setTimeLeft] = useState<TimeLeft>(() => computeTimeLeft(activatedAt));
+  const hasTriggeredExpiry = useRef(false);
 
+  const utils = trpc.useUtils();
+  const checkExpiry = trpc.settings.checkExpiry.useMutation({
+    onSuccess: () => {
+      // Invalidate settings so Home.tsx re-fetches and hides Power Drop UI
+      utils.settings.getAll.invalidate();
+    },
+  });
+
+  // Tick every second
   useEffect(() => {
     if (timeLeft.expired) return;
     const id = setInterval(() => {
-      setTimeLeft(computeTimeLeft(activatedAt));
+      const next = computeTimeLeft(activatedAt);
+      setTimeLeft(next);
     }, 1000);
     return () => clearInterval(id);
   }, [activatedAt, timeLeft.expired]);
+
+  // When expired, call the server once to turn Power Drop off
+  useEffect(() => {
+    if (timeLeft.expired && !hasTriggeredExpiry.current) {
+      hasTriggeredExpiry.current = true;
+      checkExpiry.mutate();
+    }
+  }, [timeLeft.expired]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <motion.div

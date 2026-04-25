@@ -112,3 +112,8 @@
 - [x] Place timer prominently in the hero section below the Power Drop overlay text
 - [x] Style with red/ink theme matching Power Drop aesthetic (pulsing border, monospace digits)
 - [x] When countdown reaches zero, show "Order window closed" message
+
+## Power Drop Auto-Off on Expiry
+- [x] Add publicProcedure `settings.checkExpiry` that reads activatedAt + 3 days; if expired, sets powerDrop=false and clears activatedAt, returns { wasExpired: boolean }
+- [x] PowerDropCountdown calls checkExpiry mutation when countdown reaches zero, then invalidates settings cache so the UI updates immediately
+- [x] Server-side: on every settings.getAll call, run the same expiry check so Power Drop is also turned off server-side even if no browser is open
