@@ -3,7 +3,7 @@
  * Products panel: card grid, category filter tabs, search, drag-to-reorder,
  * coloured badge chips, image preview, skeleton loading, missing-PD-price warning
  */
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useRef } from "react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import DashboardLayout from "@/components/DashboardLayout";
@@ -569,6 +569,50 @@ function AdminContent() {
   const [productModalOpen, setProductModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<ProductForm>(EMPTY_FORM);
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Client-side validation before upload
+    if (!file.type.startsWith("image/")) {
+      toast.error("Only image files are allowed (JPG, PNG, WEBP, etc.)");
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("Image must be under 10 MB");
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("image", file);
+      const res = await fetch("/api/upload/product-image", {
+        method: "POST",
+        credentials: "include",
+        body: formData,
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ error: "Upload failed" })) as { error?: string };
+        throw new Error(body.error ?? "Upload failed");
+      }
+      const { url } = await res.json() as { url: string };
+      setEditingProduct((p) => ({ ...p, img: url }));
+      toast.success("Image uploaded successfully");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Upload failed";
+      toast.error(msg);
+      console.error(err);
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
 
   const openAddModal = () => {
     setEditingProduct({ ...EMPTY_FORM, sortOrder: (products?.length ?? 0) + 1 });
@@ -950,13 +994,36 @@ function AdminContent() {
                 )}
               </div>
               <div className="space-y-1.5">
-                <label className="text-sm font-medium">Image URL</label>
-                <Input
-                  value={editingProduct.img}
-                  onChange={(e) => setEditingProduct((p) => ({ ...p, img: e.target.value }))}
-                  placeholder="/manus-storage/product-xxx.jpg"
-                  className="text-xs"
+                <label className="text-sm font-medium">Product Image</label>
+                {/* Hidden file input */}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleImageUpload}
                 />
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="shrink-0"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploading}
+                  >
+                    {isUploading ? "Uploading…" : "📷 Upload Photo"}
+                  </Button>
+                  <Input
+                    value={editingProduct.img}
+                    onChange={(e) => setEditingProduct((p) => ({ ...p, img: e.target.value }))}
+                    placeholder="or paste image URL"
+                    className="text-xs"
+                  />
+                </div>
+                {isUploading && (
+                  <p className="text-xs text-muted-foreground animate-pulse">Uploading image…</p>
+                )}
               </div>
               {/* Badge preview */}
               {editingProduct.badge && (

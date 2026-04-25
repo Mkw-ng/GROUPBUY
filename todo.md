@@ -153,3 +153,8 @@
 
 ## Delivery Charge — All Orders
 - [x] Show delivery charge input for ALL orders (remove delivery-only conditional) so a charge can be applied to any order
+
+## Product Image Upload
+- [x] Add Express multipart upload endpoint POST /api/upload/product-image (admin only, stores to S3 via storagePut, returns URL)
+- [x] Add file picker button to product form in Admin.tsx — click to upload, shows upload progress, auto-fills image URL field on success
+- [x] Show live image preview from uploaded URL in the product form
