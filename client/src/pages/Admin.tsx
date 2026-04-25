@@ -98,6 +98,7 @@ function sortKey(field: SortField, dir: SortDir): string {
 type Category =
   | "limited-offer"
   | "featured-deals"
+  | "m3atfr3ak"
   | "beef"
   | "pork"
   | "lamb"
@@ -118,6 +119,7 @@ const CATEGORIES: { value: Category | "all"; label: string }[] = [
   { value: "all",               label: "All" },
   { value: "limited-offer",     label: "Limited Offer" },
   { value: "featured-deals",    label: "Featured Deals" },
+  { value: "m3atfr3ak",         label: "M3ATFR3AK" },
   { value: "beef",              label: "Beef" },
   { value: "pork",              label: "Pork" },
   { value: "lamb",              label: "Lamb" },
@@ -144,6 +146,7 @@ const BADGE_STYLES: Record<string, string> = {
 const CATEGORY_EMOJI: Record<string, string> = {
   "limited-offer":     "🔥",
   "featured-deals":    "⭐",
+  "m3atfr3ak":         "🥩🔥",
   beef:                "🥩",
   pork:                "🐷",
   lamb:                "🐑",

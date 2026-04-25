@@ -39,6 +39,7 @@ const productInput = z.object({
   category: z.enum([
     "limited-offer",
     "featured-deals",
+    "m3atfr3ak",
     "beef",
     "pork",
     "lamb",

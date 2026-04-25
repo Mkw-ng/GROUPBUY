@@ -16,6 +16,7 @@ const CATEGORIES = [
   { id: "all",               label: "All Drops" },
   { id: "limited-offer",     label: "Limited Offer" },
   { id: "featured-deals",    label: "Featured Deals" },
+  { id: "m3atfr3ak",         label: "M3ATFR3AK" },
   { id: "beef",              label: "Beef" },
   { id: "pork",              label: "Pork" },
   { id: "lamb",              label: "Lamb" },

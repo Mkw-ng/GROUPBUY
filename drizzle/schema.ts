@@ -45,6 +45,7 @@ export const products = mysqlTable("products", {
   category: mysqlEnum("category", [
     "limited-offer",
     "featured-deals",
+    "m3atfr3ak",
     "beef",
     "pork",
     "lamb",

@@ -182,3 +182,7 @@
 ## Pickup Map Integration
 - [x] Build PickupMap component using MapView with geocoded pickup pins and 5km delivery radius circles
 - [x] Integrate PickupMap into PickupSection
+
+## M3ATFR3AK Category
+- [x] Add "m3atfr3ak" to schema mysqlEnum, routers z.enum, DealsSection CATEGORIES, Admin CATEGORIES, Admin CATEGORY_EMOJI
+- [x] Run pnpm db:push to migrate the schema
