@@ -192,3 +192,6 @@
 
 ## WhatsApp Invoice Default Message
 - [x] Update defaultOpening in AdminOrders.tsx to new Power-Drop order confirmation copy
+
+## Order in Preparation WhatsApp Button
+- [x] Add "Order in Preparation" WhatsApp message button in AdminOrders.tsx with confirmation dialog, auto-inserting the order's pickup date

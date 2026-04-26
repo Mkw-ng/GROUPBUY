@@ -169,6 +169,7 @@ function OrderCard({
   const [confirmSaveDelivery, setConfirmSaveDelivery] = useState(false);
   const [confirmInvoice, setConfirmInvoice] = useState(false);
   const [confirmMarkPaid, setConfirmMarkPaid] = useState(false);
+  const [confirmPrep, setConfirmPrep] = useState(false);
   const defaultOpening = `We got your GroupBuy Power-Drop order ✅
 
 Here's how to lock it in:
@@ -232,6 +233,12 @@ Here's how to lock it in:
 
   async function handleSaveDeliveryCharge() {
     await setDeliveryChargeMut.mutateAsync({ id: order.id, deliveryCharge });
+  }
+
+  function handleSendPrepMessage() {
+    const msg = `📦 Your order is now in preparation\nEverything is on track for your scheduled pickup/delivery on ${order.pickupDate}`;
+    const intlPhone = order.phone.replace(/^0/, "61").replace(/[^\d]/g, "");
+    window.open(`https://wa.me/${intlPhone}?text=${encodeURIComponent(msg)}`, "_blank");
   }
 
   function handleIssueInvoice() {
@@ -521,6 +528,39 @@ Here's how to lock it in:
               </AlertDialogContent>
             </AlertDialog>
 
+            {/* Order in Preparation message */}
+            <AlertDialog open={confirmPrep} onOpenChange={setConfirmPrep}>
+              <AlertDialogTrigger asChild>
+                <Button
+                  size="sm"
+                  className="font-display text-[10px] tracking-widest bg-[#25D366] hover:bg-[#1da851] text-white gap-1.5"
+                >
+                  <MessageCircle size={13} />
+                  Order in Preparation
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent className="section-ink border-white/10">
+                <AlertDialogHeader>
+                  <AlertDialogTitle className="font-display tracking-widest text-[#f5f2ec]">Send preparation update?</AlertDialogTitle>
+                  <AlertDialogDescription className="font-mono-brand text-[#8a857c]">
+                    This will send the following message to {order.phone}:
+                  </AlertDialogDescription>
+                  <div className="mt-3 bg-white/5 border border-white/10 px-4 py-3 font-mono-brand text-[12px] text-[#f5f2ec] whitespace-pre-line">
+                    {`📦 Your order is now in preparation
+Everything is on track for your scheduled pickup/delivery on ${order.pickupDate}`}
+                  </div>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel className="font-display text-[10px] tracking-widest">Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    className="font-display text-[10px] tracking-widest bg-[#25D366] hover:bg-[#1da851] text-white"
+                    onClick={() => { setConfirmPrep(false); handleSendPrepMessage(); }}
+                  >
+                    Send Message
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
             {/* Mark as Paid */}
             {order.status !== "paid" && order.status !== "cancelled" && (
               <AlertDialog open={confirmMarkPaid} onOpenChange={setConfirmMarkPaid}>
