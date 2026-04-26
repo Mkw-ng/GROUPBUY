@@ -13,7 +13,7 @@ const STATS = [
   { value: "12,600+", label: "Members" },
   { value: "4 yrs", label: "Running" },
   { value: "$0", label: "Membership" },
-  { value: "Sat", label: "Pickup Day" },
+  { value: "Mon - Sat", label: "Pickup Day" },
 ];
 
 interface HeroProps {
