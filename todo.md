@@ -189,3 +189,6 @@
 
 ## Mobile Jump-to-Top Button
 - [x] Add mobile-only "Back to top" button after product grid in DealsSection, scrolls to top of deals section
+
+## WhatsApp Invoice Default Message
+- [x] Update defaultOpening in AdminOrders.tsx to new Power-Drop order confirmation copy

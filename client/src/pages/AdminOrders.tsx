@@ -169,7 +169,13 @@ function OrderCard({
   const [confirmSaveDelivery, setConfirmSaveDelivery] = useState(false);
   const [confirmInvoice, setConfirmInvoice] = useState(false);
   const [confirmMarkPaid, setConfirmMarkPaid] = useState(false);
-  const defaultOpening = `Hi! Here is your GROUPBUY invoice 🧾`;
+  const defaultOpening = `We got your GroupBuy Power-Drop order ✅
+
+Here's how to lock it in:
+1. Pay here
+2. Send me a photo remittance
+
+⏳ You have 48 hours to secure this order`;
   const [openingSentence, setOpeningSentence] = useState(defaultOpening);
 
   const updateItems = trpc.admin.orders.updateItems.useMutation({
