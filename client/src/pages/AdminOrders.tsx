@@ -173,10 +173,12 @@ function OrderCard({
   const defaultOpening = `We got your GroupBuy Power-Drop order ✅
 
 Here's how to lock it in:
-1. Pay here
+1. Pay here (Details below)
 2. Send me a photo remittance
 
-⏳ You have 48 hours to secure this order`;
+⏳ You have 48 hours to secure this order
+🚚 From there you'll be set for your pick up or delivery date the next week
+📦You'll get another message from me to let you know its all on track`;
   const [openingSentence, setOpeningSentence] = useState(defaultOpening);
 
   const updateItems = trpc.admin.orders.updateItems.useMutation({
