@@ -342,7 +342,7 @@ export default function DealsSection({ onAddToCart, powerDropActive = false }: D
                         )}
                         {/* Power Drop badge */}
                         {showPowerDrop && (
-                          <span className="absolute top-2 right-2 flex items-center gap-1 font-mono-brand text-[10px] tracking-wider px-2 py-0.5 bg-[#c73e3a] text-[#f5f2ec]">
+                          <span className="pd-badge absolute top-2 right-2 flex items-center gap-1 font-mono-brand text-[10px] tracking-wider px-2 py-0.5 bg-[#c73e3a] text-[#f5f2ec]">
                             <Zap size={9} className="fill-current" />
                             {savingsPct != null ? `SAVE ${savingsPct}%` : "POWER DROP"}
                           </span>

@@ -198,3 +198,6 @@
 
 ## Power Drop Savings Badge
 - [x] Update Power Drop badge on product cards to show ⚡ SAVE X% calculated from regular vs power-drop price
+
+## Power Drop Badge Animation
+- [x] Add pulsing glow, shimmer sweep, and scale-pop animation to the Power Drop savings badge
