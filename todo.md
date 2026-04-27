@@ -201,3 +201,6 @@
 
 ## Power Drop Badge Animation
 - [x] Add pulsing glow, shimmer sweep, and scale-pop animation to the Power Drop savings badge
+
+## Default Payment Details
+- [x] Update default payment details in AdminOrders.tsx invoice dialog: BSB 182-888, Account 001 052 935, Account Name BEST QUALITY BUTCHER

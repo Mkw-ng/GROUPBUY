@@ -680,7 +680,7 @@ export default function AdminOrders() {
   const { user, loading } = useAuth();
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [bankDetails, setBankDetails] = useState(
-    "BSB: 000-000\nAccount: 000 000 000\nAccount Name: GROUPBUY PTY LTD"
+    "BSB: 182-888\nAccount: 001 052 935\nAccount Name: BEST QUALITY BUTCHER"
   );
   const [editingBank, setEditingBank] = useState(false);
 
