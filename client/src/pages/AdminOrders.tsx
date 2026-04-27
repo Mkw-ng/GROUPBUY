@@ -170,15 +170,15 @@ function OrderCard({
   const [confirmInvoice, setConfirmInvoice] = useState(false);
   const [confirmMarkPaid, setConfirmMarkPaid] = useState(false);
   const [confirmPrep, setConfirmPrep] = useState(false);
-  const defaultOpening = `We got your GroupBuy Power-Drop order ✅
+  const defaultOpening = `We got your GroupBuy Power-Drop order!
 
 Here's how to lock it in:
 1. Pay here (Details below)
 2. Send me a photo remittance
 
-⏳ You have 48 hours to secure this order
-🚚 From there you'll be set for your pick up or delivery date the next week
-📦You'll get another message from me to let you know its all on track`;
+* Ensure payment is made by Saturday to avoid cancellation
+* From there you'll be set for your pick up or delivery date the next week
+* You'll get another message from me to let you know its all on track`;
   const [openingSentence, setOpeningSentence] = useState(defaultOpening);
 
   const updateItems = trpc.admin.orders.updateItems.useMutation({
