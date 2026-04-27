@@ -593,10 +593,15 @@ export default function CartDrawer({
             {/* Footer */}
             {items.length > 0 && (
               <div className="px-6 py-5 border-t border-white/10 shrink-0">
-                <div className="flex items-center justify-between mb-4">
-                  <span className="font-display text-[11px] tracking-widest text-[#8a857c]">
-                    Total
-                  </span>
+                <div className="flex items-end justify-between mb-4">
+                  <div className="flex flex-col gap-0.5">
+                    <span className="font-display text-[11px] tracking-widest text-[#8a857c]">
+                      Approx Total
+                    </span>
+                    <span className="font-mono-brand text-[9px] text-[#6b6560] uppercase tracking-wide">
+                      Subject to final weights
+                    </span>
+                  </div>
                   <span className="font-mono-brand text-[24px] font-bold text-[#f5f2ec]">
                     ${total.toFixed(2)}
                   </span>
