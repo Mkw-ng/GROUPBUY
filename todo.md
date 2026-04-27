@@ -195,3 +195,6 @@
 
 ## Order in Preparation WhatsApp Button
 - [x] Add "Order in Preparation" WhatsApp message button in AdminOrders.tsx with confirmation dialog, auto-inserting the order's pickup date
+
+## Power Drop Savings Badge
+- [x] Update Power Drop badge on product cards to show ⚡ SAVE X% calculated from regular vs power-drop price

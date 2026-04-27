@@ -299,6 +299,9 @@ export default function DealsSection({ onAddToCart, powerDropActive = false }: D
                   const regularPrice = parseFloat(product.price);
                   const pdPrice = product.powerDropPrice ? parseFloat(product.powerDropPrice) : null;
                   const showPowerDrop = powerDropActive && pdPrice != null;
+                  const savingsPct = (showPowerDrop && pdPrice != null && pdPrice < regularPrice)
+                    ? Math.round(((regularPrice - pdPrice) / regularPrice) * 100)
+                    : null;
 
                   return (
                     <motion.div
@@ -341,7 +344,7 @@ export default function DealsSection({ onAddToCart, powerDropActive = false }: D
                         {showPowerDrop && (
                           <span className="absolute top-2 right-2 flex items-center gap-1 font-mono-brand text-[10px] tracking-wider px-2 py-0.5 bg-[#c73e3a] text-[#f5f2ec]">
                             <Zap size={9} className="fill-current" />
-                            POWER DROP
+                            {savingsPct != null ? `SAVE ${savingsPct}%` : "POWER DROP"}
                           </span>
                         )}
                         {!product.available && (
