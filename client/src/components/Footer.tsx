@@ -9,14 +9,11 @@ const QUICK_LINKS = [
   { label: "How It Works", href: "#how-it-works" },
   { label: "Current Deals", href: "#deals" },
   { label: "Pickup Info", href: "#pickup" },
-  { label: "FAQ", href: "#faq" },
   { label: "Join Group", href: "#join" },
 ];
 
 const CONTACT = [
   { label: "WhatsApp", value: "+61 407 249 272", href: "https://wa.me/61407249272" },
-  { label: "Email", value: "hello@groupbuy.co", href: "mailto:hello@groupbuy.co" },
-  { label: "Instagram", value: "@groupbuy.co", href: "https://instagram.com/groupbuy.co" },
 ];
 
 export default function Footer() {
@@ -80,17 +77,7 @@ export default function Footer() {
               ))}
             </div>
 
-            <div className="mt-6 p-3 border border-white/10">
-              <p className="font-display text-[10px] tracking-wider text-[#8a857c] mb-1">
-                Pickup Hours
-              </p>
-              <p className="font-mono-brand text-[13px] text-[#f5f2ec]/70">
-                Sat 08:00 — 11:00
-              </p>
-              <p className="font-body text-[11px] text-[#8a857c] mt-1">
-                Lyndhurst, VIC 3975
-              </p>
-            </div>
+
           </div>
         </div>
 
