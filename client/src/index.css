@@ -317,3 +317,53 @@
   animation: pd-shimmer 2.4s linear 0.7s infinite;
   pointer-events: none;
 }
+
+/* ── Stakehouse Button ─────────────────────────────────────────── */
+@keyframes stakehouse-glow-pulse {
+  0%, 100% {
+    box-shadow: 0 0 6px 1px rgba(124, 58, 237, 0.4), 0 0 14px 3px rgba(124, 58, 237, 0.2);
+    border-color: rgba(124, 58, 237, 0.7);
+  }
+  50% {
+    box-shadow: 0 0 14px 4px rgba(124, 58, 237, 0.75), 0 0 30px 8px rgba(124, 58, 237, 0.35);
+    border-color: rgba(167, 139, 250, 1);
+  }
+}
+
+.stakehouse-btn {
+  border: 1px solid rgba(124, 58, 237, 0.7);
+  color: rgba(196, 181, 253, 1);
+  background: rgba(124, 58, 237, 0.08);
+  animation: stakehouse-glow-pulse 2.2s ease-in-out infinite;
+  overflow: hidden;
+  position: relative;
+}
+
+.stakehouse-btn::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -75%;
+  width: 50%;
+  height: 200%;
+  background: linear-gradient(
+    105deg,
+    transparent 40%,
+    rgba(196, 181, 253, 0.35) 50%,
+    transparent 60%
+  );
+  animation: stakehouse-shimmer 2.8s ease-in-out infinite;
+}
+
+@keyframes stakehouse-shimmer {
+  0%   { left: -75%; }
+  60%, 100% { left: 125%; }
+}
+
+.stakehouse-btn:hover {
+  background: rgba(124, 58, 237, 0.2);
+  color: rgba(221, 214, 254, 1);
+  animation-play-state: paused;
+  box-shadow: 0 0 20px 6px rgba(124, 58, 237, 0.8), 0 0 40px 12px rgba(124, 58, 237, 0.4);
+  border-color: rgba(167, 139, 250, 1);
+}

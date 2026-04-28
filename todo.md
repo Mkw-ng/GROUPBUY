@@ -204,3 +204,6 @@
 
 ## Default Payment Details
 - [x] Update default payment details in AdminOrders.tsx invoice dialog: BSB 182-888, Account 001 052 935, Account Name BEST QUALITY BUTCHER
+
+## The Stakehouse Button
+- [x] Add "The Stakehouse" button with dice icon to hero page, linking to the GroupBuy gaming room URL
