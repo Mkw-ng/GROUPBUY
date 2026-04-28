@@ -207,3 +207,6 @@
 
 ## The Stakehouse Button
 - [x] Add "The Stakehouse" button with dice icon to hero page, linking to the GroupBuy gaming room URL
+
+## Cart Unit Price Display
+- [x] Show $price/unit on each cart item instead of quantity-adjusted total (e.g. $25/kg or $25/steak)
