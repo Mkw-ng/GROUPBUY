@@ -335,7 +335,7 @@ export default function CartDrawer({
                               </button>
                             </div>
                             <span className="font-mono-brand text-[14px] font-bold text-[#c73e3a]">
-                              {`$${item.price.toFixed(2)}/${item.unit}`}
+                              {`$${item.price.toFixed(2)}/${item.unit.replace(/^\/\s*/, "")}`}
                             </span>
                           </div>
                         </div>
