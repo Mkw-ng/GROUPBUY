@@ -1,6 +1,6 @@
 import { desc, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, InsertProduct, InsertOrder, orders, products, settings, users, OrderItem } from "../drizzle/schema";
+import { InsertUser, InsertProduct, InsertOrder, orders, products, settings, users, OrderItem, drops, Drop } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -243,4 +243,56 @@ export async function setSetting(key: string, value: string): Promise<void> {
     .insert(settings)
     .values({ key, value })
     .onDuplicateKeyUpdate({ set: { value } });
+}
+
+// ─── Drops ─────────────────────────────────────────────────────────────────
+export async function getAllDrops(): Promise<Drop[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(drops).orderBy(desc(drops.createdAt));
+}
+
+export async function getActiveDrop(): Promise<Drop | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(drops).where(eq(drops.isActive, true)).limit(1);
+  return result[0];
+}
+
+export async function getDropById(id: number): Promise<Drop | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(drops).where(eq(drops.id, id)).limit(1);
+  return result[0];
+}
+
+export async function createDrop(name: string): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  // Deactivate all existing drops first
+  await db.update(drops).set({ isActive: false, closedAt: new Date() }).where(eq(drops.isActive, true));
+  const result = await db.insert(drops).values({ name, isActive: true });
+  return (result[0] as { insertId: number }).insertId;
+}
+
+export async function closeDrop(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(drops).set({ isActive: false, closedAt: new Date() }).where(eq(drops.id, id));
+}
+
+export async function assignOrderToDrop(orderId: number, dropId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(orders).set({ dropId }).where(eq(orders.id, orderId));
+}
+
+export async function getOrdersByDrop(dropId: number | null) {
+  const db = await getDb();
+  if (!db) return [];
+  if (dropId === null) {
+    const { isNull } = await import("drizzle-orm");
+    return db.select().from(orders).where(isNull(orders.dropId)).orderBy(desc(orders.createdAt));
+  }
+  return db.select().from(orders).where(eq(orders.dropId, dropId)).orderBy(desc(orders.createdAt));
 }

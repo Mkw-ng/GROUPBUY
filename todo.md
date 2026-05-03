@@ -254,3 +254,15 @@
 
 ## Day of Order WhatsApp Button (Admin Orders)
 - [x] Add "Day of Order" WhatsApp button in admin order panel — sends pickup/delivery day-of reminder message
+
+## Drops & Analytics System
+- [x] Add `drops` table to DB schema (id, name, isActive, createdAt, closedAt)
+- [x] Add `dropId` foreign key to `orders` table
+- [x] Run pnpm db:push to migrate schema
+- [x] Add tRPC procedures: drops.list, drops.create, drops.activate, drops.close, drops.assignOrder
+- [x] Add tRPC procedures: analytics.dropStats (per-drop KPIs, funnel, products, customers, fulfilment, order size distribution)
+- [x] Auto-tag new orders to active drop on order creation
+- [x] Build AdminDrops page (drops management with active banner, past drops list, new drop modal)
+- [x] Build AdminDropAnalytics page (per-drop KPI bar, funnel, products, fulfilment, repeat customers, order size, items per order, cancellations)
+- [x] Add Drops and Analytics nav links in admin sidebar/navigation
+- [x] Wire "View Analytics" buttons from drops page to analytics page

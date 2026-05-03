@@ -943,6 +943,12 @@ export default function AdminOrders() {
           >
             Refresh
           </button>
+          <div className="w-px h-4 bg-white/10" />
+          <Link href="/admin/drops">
+            <button className="font-mono-brand text-[10px] text-[#8a857c] hover:text-[#f5f2ec] transition-colors">
+              Drops & Analytics →
+            </button>
+          </Link>
         </div>
       </div>
 

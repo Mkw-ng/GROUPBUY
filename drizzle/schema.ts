@@ -116,6 +116,8 @@ export const orders = mysqlTable("orders", {
   status: mysqlEnum("status", ["pending", "paid", "cancelled"]).notNull().default("pending"),
   /** Whether this order was placed during a Power Drop event */
   isPowerDrop: boolean("isPowerDrop").notNull().default(false),
+  /** FK to drops table — which drop this order belongs to (null = unassigned) */
+  dropId: int("dropId"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -135,3 +137,21 @@ export interface OrderItem {
   /** Final weight in kg — filled in by admin after weighing */
   finalWeightKg?: string;
 }
+
+/**
+ * Drops table — each row represents one Power-Drop cycle.
+ * Only one drop can be active at a time (isActive = true).
+ * Orders are tagged to a drop via orders.dropId.
+ */
+export const drops = mysqlTable("drops", {
+  id: int("id").autoincrement().primaryKey(),
+  /** Sequential name e.g. "Drop 1", "Drop 2" */
+  name: varchar("name", { length: 64 }).notNull(),
+  /** Whether this is the currently active drop — only one can be true at a time */
+  isActive: boolean("isActive").notNull().default(false),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  /** Set when the drop is closed */
+  closedAt: timestamp("closedAt"),
+});
+export type Drop = typeof drops.$inferSelect;
+export type InsertDrop = typeof drops.$inferInsert;

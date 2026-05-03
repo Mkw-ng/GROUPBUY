@@ -697,12 +697,20 @@ function AdminContent() {
             Manage Power Drop events, announcements, and products.
           </p>
         </div>
-        <Link href="/admin/orders">
-          <Button variant="outline" size="sm" className="gap-1.5 shrink-0">
-            <span>📦</span>
-            Order Management
-          </Button>
-        </Link>
+        <div className="flex gap-2">
+          <Link href="/admin/orders">
+            <Button variant="outline" size="sm" className="gap-1.5 shrink-0">
+              <span>📦</span>
+              Order Management
+            </Button>
+          </Link>
+          <Link href="/admin/drops">
+            <Button variant="outline" size="sm" className="gap-1.5 shrink-0">
+              <span>📊</span>
+              Drops & Analytics
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {/* ─── Power Drop ──────────────────────────────────────────────────────── */}

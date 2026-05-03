@@ -19,7 +19,15 @@ import {
   setProductAvailability,
   upsertProduct,
   batchReorderProducts,
+  getAllDrops,
+  getActiveDrop,
+  getDropById,
+  createDrop,
+  closeDrop,
+  assignOrderToDrop,
+  getOrdersByDrop,
 } from "./db";
+import { OrderItem } from "../drizzle/schema";
 
 // ─── Admin guard middleware ─────────────────────────────────────────────────────────────────
 
@@ -77,6 +85,19 @@ const orderItemSchema = z.object({
   finalWeightKg: z.string().optional(),
 });
 
+// ─── Shared order total helper ─────────────────────────────────────────────────────────────────
+
+function calcOrderTotal(o: { items: string; deliveryCharge?: string | null }): number {
+  const items: OrderItem[] = JSON.parse(o.items || "[]");
+  const sub = items.reduce((s, item) => {
+    const p = parseFloat(item.price) || 0;
+    const kg = item.unit?.toLowerCase().includes("kg");
+    const w = parseFloat(item.finalWeightKg || "") || 0;
+    return s + (kg && w > 0 ? p * w : p * item.qty);
+  }, 0);
+  return sub + (parseFloat(o.deliveryCharge ?? "0") || 0);
+}
+
 // ─── App Router ─────────────────────────────────────────────────────────────────
 
 export const appRouter = router({
@@ -132,6 +153,7 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ input }) => {
+        const activeDrop = await getActiveDrop();
         const id = await createOrder({
           phone: input.phone,
           pickupDate: input.pickupDate,
@@ -142,6 +164,7 @@ export const appRouter = router({
           isPowerDrop: input.isPowerDrop,
           status: "pending",
           deliveryCharge: "0.00",
+          dropId: activeDrop?.id ?? null,
         });
         return { id };
       }),
@@ -247,6 +270,168 @@ export const appRouter = router({
         .mutation(async ({ input }) => {
           await Promise.all(input.map(({ key, value }) => setSetting(key, value)));
           return { success: true };
+        }),
+    }),
+
+    // ─── Admin: Drops ─────────────────────────────────────────────────────────
+    drops: router({
+      list: adminProcedure.query(async () => getAllDrops()),
+      getActive: adminProcedure.query(async () => (await getActiveDrop()) ?? null),
+      create: adminProcedure
+        .input(z.object({ name: z.string().min(1) }))
+        .mutation(async ({ input }) => {
+          const id = await createDrop(input.name);
+          return { id };
+        }),
+      close: adminProcedure
+        .input(z.object({ id: z.number() }))
+        .mutation(async ({ input }) => {
+          await closeDrop(input.id);
+          return { success: true };
+        }),
+      assignOrder: adminProcedure
+        .input(z.object({ orderId: z.number(), dropId: z.number() }))
+        .mutation(async ({ input }) => {
+          await assignOrderToDrop(input.orderId, input.dropId);
+          return { success: true };
+        }),
+    }),
+
+    // ─── Admin: Analytics ─────────────────────────────────────────────────────
+    analytics: router({
+      allDropsSummary: adminProcedure.query(async () => {
+        const allDropsList = await getAllDrops();
+        return Promise.all(
+          allDropsList.map(async (drop) => {
+            const dropOrders = await getOrdersByDrop(drop.id);
+            const placed = dropOrders.length;
+            const paid = dropOrders.filter((o) => o.status === "paid").length;
+            const conversionRate = placed > 0 ? Math.round((paid / placed) * 100) : 0;
+            const revenue = dropOrders
+              .filter((o) => o.status === "paid")
+              .reduce((sum, o) => sum + calcOrderTotal(o), 0);
+            const avgOrderValue = paid > 0 ? revenue / paid : 0;
+            return { ...drop, placed, paid, conversionRate, revenue, avgOrderValue };
+          })
+        );
+      }),
+
+      dropStats: adminProcedure
+        .input(z.object({ dropId: z.number().nullable() }))
+        .query(async ({ input }) => {
+          const dropOrders = await getOrdersByDrop(input.dropId);
+          const drop = input.dropId ? await getDropById(input.dropId) : null;
+          const placed = dropOrders.length;
+          const paid = dropOrders.filter((o) => o.status === "paid").length;
+          const cancelled = dropOrders.filter((o) => o.status === "cancelled").length;
+          const pending = dropOrders.filter((o) => o.status === "pending").length;
+          const conversionRate = placed > 0 ? Math.round((paid / placed) * 100) : 0;
+
+          const revenue = dropOrders.filter((o) => o.status === "paid").reduce((s, o) => s + calcOrderTotal(o), 0);
+          const avgOrderValue = paid > 0 ? revenue / paid : 0;
+          const pickupCount = dropOrders.filter((o) => o.location !== "delivery").length;
+          const deliveryCount = dropOrders.filter((o) => o.location === "delivery").length;
+
+          const locationMap: Record<string, number> = {};
+          for (const o of dropOrders) {
+            const loc =
+              o.location === "delivery" ? "Delivery" :
+              o.location === "cranbourne" ? "Cranbourne" :
+              o.location === "clayton" ? "Clayton" :
+              o.location === "mitchells-road" ? "Mitchells Road" : o.location;
+            locationMap[loc] = (locationMap[loc] || 0) + 1;
+          }
+          const locationBreakdown = Object.entries(locationMap)
+            .map(([name, count]) => ({ name, count }))
+            .sort((a, b) => b.count - a.count);
+
+          const productMap: Record<string, { name: string; count: number; revenue: number }> = {};
+          for (const o of dropOrders) {
+            const items: OrderItem[] = JSON.parse(o.items || "[]");
+            for (const item of items) {
+              if (!productMap[item.name]) productMap[item.name] = { name: item.name, count: 0, revenue: 0 };
+              productMap[item.name].count += 1;
+              const p = parseFloat(item.price) || 0;
+              const kg = item.unit?.toLowerCase().includes("kg");
+              const w = parseFloat(item.finalWeightKg || "") || 0;
+              productMap[item.name].revenue += kg && w > 0 ? p * w : p * item.qty;
+            }
+          }
+          const topProducts = Object.values(productMap).sort((a, b) => b.count - a.count).slice(0, 10);
+
+          const itemCounts = dropOrders.map((o) => (JSON.parse(o.items || "[]") as OrderItem[]).length);
+          const avgItemsPerOrder = itemCounts.length > 0 ? itemCounts.reduce((s, c) => s + c, 0) / itemCounts.length : 0;
+          const maxItemsPerOrder = itemCounts.length > 0 ? Math.max(...itemCounts) : 0;
+          const itemCountFreq: Record<number, number> = {};
+          for (const c of itemCounts) itemCountFreq[c] = (itemCountFreq[c] || 0) + 1;
+          const mostCommonEntry = Object.entries(itemCountFreq).sort((a, b) => b[1] - a[1])[0];
+
+          const orderTotals = dropOrders.map(calcOrderTotal);
+          const buckets = [
+            { label: "$0 – $100", min: 0, max: 100, count: 0 },
+            { label: "$100 – $200", min: 100, max: 200, count: 0 },
+            { label: "$200 – $300", min: 200, max: 300, count: 0 },
+            { label: "$300 – $400", min: 300, max: 400, count: 0 },
+            { label: "$400+", min: 400, max: Infinity, count: 0 },
+          ];
+          for (const total of orderTotals) {
+            for (const b of buckets) { if (total >= b.min && total < b.max) { b.count++; break; } }
+          }
+          const sorted = [...orderTotals].sort((a, b) => a - b);
+          const medianOrderValue = sorted.length > 0 ? sorted[Math.floor(sorted.length / 2)] : 0;
+          const maxOrderValue = sorted.length > 0 ? sorted[sorted.length - 1] : 0;
+          const minOrderValue = sorted.length > 0 ? sorted[0] : 0;
+
+          const allOrders = await getAllOrders();
+          const phoneDropMap: Record<string, Set<number | null>> = {};
+          for (const o of allOrders) {
+            if (!phoneDropMap[o.phone]) phoneDropMap[o.phone] = new Set();
+            phoneDropMap[o.phone].add(o.dropId ?? null);
+          }
+          const dropPhones = new Set(dropOrders.map((o) => o.phone));
+          const repeatCustomers = Array.from(dropPhones)
+            .filter((phone) => (phoneDropMap[phone]?.size ?? 0) > 1)
+            .map((phone) => {
+              const allForPhone = allOrders.filter((o) => o.phone === phone);
+              const totalRevenue = allForPhone.filter((o) => o.status === "paid").reduce((sum, o) => sum + calcOrderTotal(o), 0);
+              return {
+                phone: phone.replace(/(\d{4})(\d{3})(\d{3})/, "$1 \u2022\u2022\u2022 \u2022\u2022\u2022"),
+                dropCount: phoneDropMap[phone].size,
+                totalRevenue,
+              };
+            })
+            .sort((a, b) => b.dropCount - a.dropCount)
+            .slice(0, 5);
+
+          const cancelledOrders = dropOrders.filter((o) => o.status === "cancelled").map((o) => {
+            const items: OrderItem[] = JSON.parse(o.items || "[]");
+            const total = items.reduce((s, item) => {
+              const p = parseFloat(item.price) || 0;
+              const kg = item.unit?.toLowerCase().includes("kg");
+              const w = parseFloat(item.finalWeightKg || "") || 0;
+              return s + (kg && w > 0 ? p * w : p * item.qty);
+            }, 0);
+            const topItem = items[0];
+            return {
+              phone: o.phone.replace(/(\d{4})(\d{3})(\d{3})/, "$1 \u2022\u2022\u2022 \u2022\u2022\u2022"),
+              total,
+              summary: topItem ? `${topItem.name} \u00d7 ${topItem.qty}` : "\u2014",
+            };
+          });
+          const lostRevenue = cancelledOrders.reduce((s, o) => s + o.total, 0);
+
+          return {
+            drop, placed, paid, cancelled, pending, conversionRate, revenue, avgOrderValue,
+            pickupCount, deliveryCount, locationBreakdown, topProducts,
+            avgItemsPerOrder, maxItemsPerOrder,
+            mostCommonItemCount: mostCommonEntry ? { count: parseInt(mostCommonEntry[0]), orders: mostCommonEntry[1] } : null,
+            itemCountDistribution: Object.entries(itemCountFreq)
+              .map(([count, orders]) => ({ count: parseInt(count), orders }))
+              .sort((a, b) => a.count - b.count),
+            orderSizeBuckets: buckets, medianOrderValue, maxOrderValue, minOrderValue,
+            repeatCustomers, repeatCustomerCount: repeatCustomers.length,
+            cancelledOrders, lostRevenue,
+          };
         }),
     }),
   }),

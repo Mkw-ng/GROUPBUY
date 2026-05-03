@@ -7,6 +7,8 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import Home from "./pages/Home";
 import Admin from "./pages/Admin";
 import AdminOrders from "./pages/AdminOrders";
+import AdminDrops from "./pages/AdminDrops";
+import AdminDropAnalytics from "./pages/AdminDropAnalytics";
 
 function Router() {
   // make sure to consider if you need authentication for certain routes
@@ -15,6 +17,8 @@ function Router() {
       <Route path={"/"} component={Home} />
       <Route path={"/admin"} component={Admin} />
       <Route path={"/admin/orders"} component={AdminOrders} />
+      <Route path={"/admin/drops"} component={AdminDrops} />
+      <Route path={"/admin/drops/:dropId"} component={AdminDropAnalytics} />
       <Route path={"/404"} component={NotFound} />
       <Route component={NotFound} />
     </Switch>
