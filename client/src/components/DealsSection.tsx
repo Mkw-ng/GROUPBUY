@@ -191,7 +191,7 @@ function PowerDropButton({ showPowerDrop, available, onAdd, onFlyTrigger }: Powe
 }
 
 export default function DealsSection({ onAddToCart, powerDropActive = false }: DealsProps) {
-  const [activeCategory, setActiveCategory] = useState("all");
+  const [activeCategory, setActiveCategory] = useState("limited-offer");
   const [search, setSearch] = useState("");
   const { triggerFly } = useFlyToCart();
 
