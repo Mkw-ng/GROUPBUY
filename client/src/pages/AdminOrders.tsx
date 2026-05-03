@@ -19,6 +19,7 @@ import {
   Package,
   Clock,
   Ban,
+  FileDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -749,6 +750,35 @@ export default function AdminOrders() {
     "BSB: 182-888\nAccount: 001 052 935\nAccount Name: BEST QUALITY BUTCHER"
   );
   const [editingBank, setEditingBank] = useState(false);
+  const [downloadingInvoices, setDownloadingInvoices] = useState(false);
+
+  async function handleDownloadInvoices() {
+    setDownloadingInvoices(true);
+    try {
+      const params = new URLSearchParams({ bankDetails });
+      const res = await fetch(`/api/admin/invoices/download?${params}`, {
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "Unknown error" }));
+        toast.error(err.error || "Download failed");
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const timestamp = new Date().toISOString().slice(0, 10);
+      a.href = url;
+      a.download = `groupbuy-paid-invoices-${timestamp}.zip`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err);
+      toast.error("Download failed");
+    } finally {
+      setDownloadingInvoices(false);
+    }
+  }
 
   const { data: orders, isLoading, refetch } = trpc.admin.orders.list.useQuery(undefined, {
     enabled: user?.role === "admin",
@@ -818,12 +848,24 @@ export default function AdminOrders() {
             </span>
           </div>
         </div>
-        <button
-          onClick={() => refetch()}
-          className="font-mono-brand text-[10px] text-[#8a857c] hover:text-[#f5f2ec] transition-colors"
-        >
-          Refresh
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleDownloadInvoices}
+            disabled={downloadingInvoices || counts.paid === 0}
+            className="flex items-center gap-1.5 font-mono-brand text-[10px] text-[#8a857c] hover:text-[#f5f2ec] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            title={counts.paid === 0 ? "No paid orders to download" : `Download ${counts.paid} paid invoice${counts.paid !== 1 ? "s" : ""} as ZIP`}
+          >
+            <FileDown size={13} />
+            {downloadingInvoices ? "Generating…" : `Invoices ZIP (${counts.paid})`}
+          </button>
+          <div className="w-px h-4 bg-white/10" />
+          <button
+            onClick={() => refetch()}
+            className="font-mono-brand text-[10px] text-[#8a857c] hover:text-[#f5f2ec] transition-colors"
+          >
+            Refresh
+          </button>
+        </div>
       </div>
 
       <div className="max-w-4xl mx-auto px-6 py-8 space-y-8">

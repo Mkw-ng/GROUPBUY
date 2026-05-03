@@ -238,3 +238,9 @@
 
 ## Search Clear Button Bug Fix
 - [x] Fix: after clicking the clear (×) button, typing a new search yields no results — fixed by using onMouseDown+preventDefault on the clear button to keep focus in the input, then explicitly calling searchInputRef.current?.focus()
+
+## Paid Invoices ZIP Download
+- [x] Install archiver (ZIP) and pdfkit (PDF) npm packages
+- [x] Add Express GET /api/admin/invoices/download endpoint (admin-only) that generates one PDF per paid order and streams a ZIP file
+- [x] Each PDF invoice: order ID, customer phone, pickup date/location, itemised table with weights/qty/price, delivery charge, grand total, payment details (BSB/account)
+- [x] Add "Download Paid Invoices" button in AdminOrders header — triggers fetch download of the ZIP
