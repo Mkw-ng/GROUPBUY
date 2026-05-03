@@ -26,7 +26,8 @@ function pct(n: number, total: number) {
 export default function AdminDropAnalytics() {
   const { user, loading } = useAuth();
   const params = useParams<{ dropId: string }>();
-  const dropId = params.dropId ? parseInt(params.dropId) : null;
+  const rawId = params.dropId ? parseInt(params.dropId, 10) : NaN;
+  const dropId = Number.isFinite(rawId) ? rawId : null;
 
   if (loading) {
     return (
