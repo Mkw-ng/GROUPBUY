@@ -162,7 +162,7 @@ export default function CartDrawer({
     const itemLines = items.map((i) => {
       const qtyStr = i.qty % 1 === 0 ? String(i.qty) : i.qty.toFixed(1);
       const cleanUnit = i.unit.replace(/^\/\s*/, "");
-      return `${qtyStr}/${cleanUnit} x ${i.name}${i.cut ? ` (${i.cut})` : ""} — $${i.price.toFixed(2)}/${cleanUnit}`;
+      return `${qtyStr}/${cleanUnit} x ${i.name} — $${i.price.toFixed(2)}/${cleanUnit}`;
     });
 
     const parts: string[] = [
