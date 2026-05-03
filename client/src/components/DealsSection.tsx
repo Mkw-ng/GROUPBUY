@@ -193,6 +193,7 @@ function PowerDropButton({ showPowerDrop, available, onAdd, onFlyTrigger }: Powe
 export default function DealsSection({ onAddToCart, powerDropActive = false }: DealsProps) {
   const [activeCategory, setActiveCategory] = useState("limited-offer");
   const [search, setSearch] = useState("");
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const { triggerFly } = useFlyToCart();
 
   const { data: dbProducts, isLoading } = trpc.products.list.useQuery(undefined, {
@@ -272,6 +273,7 @@ export default function DealsSection({ onAddToCart, powerDropActive = false }: D
                 <path d="m21 21-4.35-4.35" />
               </svg>
               <input
+                ref={searchInputRef}
                 type="text"
                 placeholder="Search products..."
                 value={search}
@@ -280,7 +282,12 @@ export default function DealsSection({ onAddToCart, powerDropActive = false }: D
               />
               {search && (
                 <button
-                  onClick={() => setSearch("")}
+                  onMouseDown={(e) => {
+                    // Prevent the input from losing focus when clicking the clear button
+                    e.preventDefault();
+                    setSearch("");
+                    searchInputRef.current?.focus();
+                  }}
                   aria-label="Clear search"
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-[#8a857c] hover:text-[#c73e3a] transition-colors"
                 >

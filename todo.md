@@ -48,6 +48,9 @@
 - [ ] Replace placeholder product images with real photography
 - [ ] Confirm WhatsApp number (currently 61407249272)
 
+## Search Bar Clear Button
+- [x] Add clear (×) button to search input in DealsSection — appears when text is present, clears on click
+
 ## Admin Products Panel Improvements
 - [x] Switch products table to a card grid (image thumbnail, name, cut, price, PD price, badge chip, availability toggle, edit/delete)
 - [x] Category filter tabs (All / Beef / Pork / Lamb / Poultry / Seafood / Other) with count badges
@@ -232,3 +235,6 @@
 ## Cart Power Drop Savings Display
 - [x] Show per-item savings % badge next to each item in cart when Power Drop is active (regular vs power-drop price)
 - [x] Show approx total savings line at the bottom of cart when Power Drop is active
+
+## Search Clear Button Bug Fix
+- [x] Fix: after clicking the clear (×) button, typing a new search yields no results — fixed by using onMouseDown+preventDefault on the clear button to keep focus in the input, then explicitly calling searchInputRef.current?.focus()
