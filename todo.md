@@ -213,3 +213,6 @@
 
 ## WhatsApp Checkout Message Format
 - [x] Update item lines in WhatsApp checkout message to show qty/unit x Name — $price/unit (e.g. 1/kg x Asado Beef Rib — $19.99/kg)
+
+## Power Drop Only Order Recording
+- [x] Only save orders to the database when powerDropActive is true; skip createOrder.mutate for non-Power Drop checkouts

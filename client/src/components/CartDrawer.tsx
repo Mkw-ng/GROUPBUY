@@ -204,25 +204,27 @@ export default function CartDrawer({
       clear();
     }
 
-    // Save order to database (fire-and-forget — WhatsApp link still opens)
-    const dateStr = pickupDate ? format(pickupDate, "EEEE, d MMMM yyyy") : "";
-    const orderItems = items.map((i) => ({
-      id: i.id,
-      name: i.name,
-      cut: i.cut,
-      qty: i.qty,
-      price: i.price.toFixed(2),
-      unit: i.unit,
-    }));
-    createOrder.mutate({
-      phone: normalisePhone(phone),
-      pickupDate: dateStr,
-      location,
-      deliveryAddress: location === "delivery" ? deliveryAddress.trim() : undefined,
-      items: JSON.stringify(orderItems),
-      specialInstructions: instructions.trim() || undefined,
-      isPowerDrop: powerDropActive,
-    });
+    // Save order to database only for Power Drop orders
+    if (powerDropActive) {
+      const dateStr = pickupDate ? format(pickupDate, "EEEE, d MMMM yyyy") : "";
+      const orderItems = items.map((i) => ({
+        id: i.id,
+        name: i.name,
+        cut: i.cut,
+        qty: i.qty,
+        price: i.price.toFixed(2),
+        unit: i.unit,
+      }));
+      createOrder.mutate({
+        phone: normalisePhone(phone),
+        pickupDate: dateStr,
+        location,
+        deliveryAddress: location === "delivery" ? deliveryAddress.trim() : undefined,
+        items: JSON.stringify(orderItems),
+        specialInstructions: instructions.trim() || undefined,
+        isPowerDrop: true,
+      });
+    }
   }
 
   // ─── Shared input styles ────────────────────────────────────────────────────
