@@ -60,6 +60,7 @@ export default function Home() {
           name: product.name,
           cut: product.cut,
           price: effectivePrice,
+          regularPrice: product.price, // always store the base price for savings calc
           unit: product.unit,
           qty: 1,
         },

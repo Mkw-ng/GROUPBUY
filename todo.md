@@ -228,3 +228,7 @@
 
 ## WhatsApp Checkout Preamble
 - [x] Add preamble message before order details in the Power-Drop cart checkout WhatsApp message
+
+## Cart Power Drop Savings Display
+- [x] Show per-item savings % badge next to each item in cart when Power Drop is active (regular vs power-drop price)
+- [x] Show approx total savings line at the bottom of cart when Power Drop is active

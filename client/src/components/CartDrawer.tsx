@@ -29,6 +29,7 @@ export interface CartItem {
   name: string;
   cut: string;
   price: number;
+  regularPrice?: number; // original non-power-drop price, for savings display
   unit: string;
   qty: number;
 }
@@ -351,9 +352,16 @@ export default function CartDrawer({
                                 +
                               </button>
                             </div>
-                            <span className="font-mono-brand text-[14px] font-bold text-[#c73e3a]">
-                              {`$${item.price.toFixed(2)}/${item.unit.replace(/^\/\s*/, "")}`}
-                            </span>
+                            <div className="flex flex-col items-end gap-0.5">
+                              <span className="font-mono-brand text-[14px] font-bold text-[#c73e3a]">
+                                {`$${item.price.toFixed(2)}/${item.unit.replace(/^\/\s*/, "")}`}
+                              </span>
+                              {powerDropActive && item.regularPrice != null && item.regularPrice > item.price && (
+                                <span className="font-mono-brand text-[9px] font-bold text-emerald-400 bg-emerald-900/40 border border-emerald-700/50 px-1.5 py-0.5 rounded-full leading-none">
+                                  SAVE {Math.round(((item.regularPrice - item.price) / item.regularPrice) * 100)}%
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </div>
                         <button
@@ -618,6 +626,19 @@ export default function CartDrawer({
                     <span className="font-mono-brand text-[9px] text-[#6b6560] uppercase tracking-wide">
                       Subject to final weights
                     </span>
+                    {powerDropActive && (() => {
+                      const saving = items.reduce((s, i) => {
+                        if (i.regularPrice != null && i.regularPrice > i.price) {
+                          return s + (i.regularPrice - i.price) * i.qty;
+                        }
+                        return s;
+                      }, 0);
+                      return saving > 0 ? (
+                        <span className="font-mono-brand text-[10px] font-bold text-emerald-400 mt-1">
+                          ⚡ Approx saving: ${saving.toFixed(2)}
+                        </span>
+                      ) : null;
+                    })()}
                   </div>
                   <span className="font-mono-brand text-[24px] font-bold text-[#f5f2ec]">
                     ${total.toFixed(2)}
