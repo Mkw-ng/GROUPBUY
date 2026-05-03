@@ -216,3 +216,9 @@
 
 ## Power Drop Only Order Recording
 - [x] Only save orders to the database when powerDropActive is true; skip createOrder.mutate for non-Power Drop checkouts
+
+## Mark as Paid WhatsApp Confirmation
+- [x] When admin clicks Mark as Paid, open WhatsApp with a payment confirmation message to the customer including their pickup date and location
+
+## Mark as Paid WhatsApp - Timing Fix
+- [x] Open WhatsApp confirmation only after markPaid mutation succeeds (use onSuccess callback with order data, not inline onClick)

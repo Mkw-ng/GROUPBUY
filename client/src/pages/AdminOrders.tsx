@@ -197,12 +197,20 @@ Here's how to lock it in:
     onError: () => toast.error("Failed to update delivery charge"),
   });
 
+  const [pendingPaidOrder, setPendingPaidOrder] = useState<{phone: string; pickupDate: string; location: string; deliveryAddress: string | null} | null>(null);
   const markPaid = trpc.admin.orders.markPaid.useMutation({
     onSuccess: () => {
       toast.success("Order marked as paid ✓");
       utils.admin.orders.list.invalidate();
+      if (pendingPaidOrder) {
+        const locStr = locationLabel(pendingPaidOrder.location, pendingPaidOrder.deliveryAddress);
+        const msg = `Your payment for the GroupBuy Power-Drop order has been received and is now locked-in.\nSee you next week (${pendingPaidOrder.pickupDate}) at (${locStr})`;
+        const intlPhone = pendingPaidOrder.phone.replace(/\D/g, "").replace(/^0/, "61");
+        window.open(`https://wa.me/${intlPhone}?text=${encodeURIComponent(msg)}`, "_blank");
+        setPendingPaidOrder(null);
+      }
     },
-    onError: () => toast.error("Failed to mark as paid"),
+    onError: () => { toast.error("Failed to mark as paid"); setPendingPaidOrder(null); },
   });
 
   const cancelOrder = trpc.admin.orders.cancel.useMutation({
@@ -587,7 +595,11 @@ Everything is on track for your scheduled pickup/delivery on ${order.pickupDate}
                     <AlertDialogCancel className="font-display text-[10px] tracking-widest">Cancel</AlertDialogCancel>
                     <AlertDialogAction
                       className="font-display text-[10px] tracking-widest bg-green-700 hover:bg-green-600"
-                      onClick={() => { setConfirmMarkPaid(false); markPaid.mutate({ id: order.id }); }}
+                      onClick={() => {
+                        setConfirmMarkPaid(false);
+                        setPendingPaidOrder({ phone: order.phone, pickupDate: order.pickupDate, location: order.location, deliveryAddress: order.deliveryAddress });
+                        markPaid.mutate({ id: order.id });
+                      }}
                     >
                       Mark as Paid
                     </AlertDialogAction>
