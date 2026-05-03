@@ -283,3 +283,6 @@
 - [x] Add "Archived" tab to AdminOrders that shows only archived orders
 - [x] Add Archive button on each order card (with confirmation); add Unarchive button in Archived tab
 - [x] Ensure analytics (getOrdersByDrop) still includes archived orders so stats are not affected
+
+## Order Management Sort
+- [x] Add sort button to AdminOrders — sort by pickup date (earliest first / latest first), toggles on click, default is date added (newest first)

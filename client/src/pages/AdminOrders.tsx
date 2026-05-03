@@ -17,6 +17,9 @@ import {
   ChevronDown,
   ChevronUp,
   ArrowLeft,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
   Zap,
   Package,
   Clock,
@@ -890,6 +893,7 @@ Here's how to lock it in:
 export default function AdminOrders() {
   const { user, loading } = useAuth();
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [pickupSort, setPickupSort] = useState<"none" | "asc" | "desc">("none");
   const [bankDetails, setBankDetails] = useState(
     "BSB: 182-888\nAccount: 001 052 935\nAccount Name: BEST QUALITY BUTCHER"
   );
@@ -980,6 +984,13 @@ export default function AdminOrders() {
     { key: "cancelled", label: "Cancelled" },
     { key: "archived", label: "Archived" },
   ];
+  const sortedFiltered = pickupSort === "none"
+    ? filtered
+    : [...filtered].sort((a, b) => {
+        const da = new Date(a.pickupDate).getTime();
+        const db = new Date(b.pickupDate).getTime();
+        return pickupSort === "asc" ? da - db : db - da;
+      });
 
   return (
     <div className="min-h-screen section-ink">
@@ -1009,6 +1020,15 @@ export default function AdminOrders() {
           >
             <FileDown size={13} />
             {downloadingInvoices ? "Generating…" : `Invoices ZIP (${counts.paid})`}
+          </button>
+          <div className="w-px h-4 bg-white/10" />
+          <button
+            onClick={() => setPickupSort(s => s === "none" ? "asc" : s === "asc" ? "desc" : "none")}
+            className={`flex items-center gap-1 font-mono-brand text-[10px] transition-colors ${pickupSort !== "none" ? "text-[#c73e3a]" : "text-[#8a857c] hover:text-[#f5f2ec]"}`}
+            title="Sort by pickup date"
+          >
+            {pickupSort === "asc" ? <ArrowUp size={12} /> : pickupSort === "desc" ? <ArrowDown size={12} /> : <ArrowUpDown size={12} />}
+            {pickupSort === "asc" ? "Pickup ↑" : pickupSort === "desc" ? "Pickup ↓" : "Pickup Date"}
           </button>
           <div className="w-px h-4 bg-white/10" />
           <button
@@ -1095,7 +1115,7 @@ export default function AdminOrders() {
           </div>
         ) : (
           <div className="space-y-3">
-            {filtered.map((order) => (
+            {sortedFiltered.map((order) => (
               <OrderCard
                 key={order.id}
                 order={order as Order}
