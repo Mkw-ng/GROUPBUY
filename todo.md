@@ -225,3 +225,6 @@
 
 ## Delete Order WhatsApp Templates
 - [x] Add two WhatsApp message template buttons to the cancel/delete order dialog in AdminOrders.tsx
+
+## WhatsApp Checkout Preamble
+- [x] Add preamble message before order details in the Power-Drop cart checkout WhatsApp message

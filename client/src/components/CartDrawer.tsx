@@ -165,7 +165,21 @@ export default function CartDrawer({
       return `${qtyStr}/${cleanUnit} x ${i.name} — $${i.price.toFixed(2)}/${cleanUnit}`;
     });
 
+    const preamble = powerDropActive ? [
+      "Incoming GroupBuy Power-Drop Order",
+      "",
+      "Here\'s how it works:",
+      "",
+      "1. Orders close Wednesday night",
+      "2. You\'ll receive your invoice right here on WhatsApp",
+      "3. Send remittance before Saturday night cut-off to lock it in",
+      "4. Collect next week at your selected time",
+      "",
+      "---",
+      "",
+    ] : [];
     const parts: string[] = [
+      ...preamble,
       `*Order Number:* ${normalisePhone(phone)}`,
       `*Pick up Date:* ${dateStr}`,
       `*Pick up Location:* ${locationStr}`,
