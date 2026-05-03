@@ -244,3 +244,7 @@
 - [x] Add Express GET /api/admin/invoices/download endpoint (admin-only) that generates one PDF per paid order and streams a ZIP file
 - [x] Each PDF invoice: order ID, customer phone, pickup date/location, itemised table with weights/qty/price, delivery charge, grand total, payment details (BSB/account)
 - [x] Add "Download Paid Invoices" button in AdminOrders header — triggers fetch download of the ZIP
+
+## Share Deal Button
+- [x] Create ShareDealButton component with dark popover (WhatsApp, native share sheet, copy link)
+- [x] Integrate ShareDealButton into product cards in DealsSection

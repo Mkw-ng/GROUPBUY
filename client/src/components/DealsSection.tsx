@@ -11,6 +11,7 @@ import { ShoppingCart, Zap } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { useFlyToCart } from "@/contexts/FlyToCartContext";
+import ShareDealButton from "@/components/ShareDealButton";
 
 const CATEGORIES = [
   { id: "all",               label: "All Drops" },
@@ -382,7 +383,7 @@ export default function DealsSection({ onAddToCart, powerDropActive = false }: D
                         <h3 className="font-body text-[15px] font-bold text-[#0a0a0a] mb-3 leading-snug flex-1">
                           {product.name}
                         </h3>
-                        <div className="flex items-end justify-between">
+                        <div className="flex items-end justify-between gap-2">
                           <div>
                             {showPowerDrop ? (
                               <div className="flex flex-col gap-0.5">
@@ -409,32 +410,39 @@ export default function DealsSection({ onAddToCart, powerDropActive = false }: D
                               </div>
                             )}
                           </div>
-                          <PowerDropButton
-                            showPowerDrop={showPowerDrop}
-                            available={product.available}
-                            onFlyTrigger={() => {
-                              // Find the product image element inside this card
-                              const cardEl = document.querySelector(
-                                `[data-product-id="${product.id}"] .product-img`
-                              ) as HTMLElement | null;
-                              const imgSrc = product.img ?? "";
-                              const sourceRect = cardEl
-                                ? cardEl.getBoundingClientRect()
-                                : (document.querySelector(`[data-product-id="${product.id}"]`) as HTMLElement | null)?.getBoundingClientRect() ?? new DOMRect();
-                              triggerFly(imgSrc, sourceRect);
-                            }}
-                            onAdd={() => {
-                              onAddToCart({
-                                id: product.id,
-                                name: product.name,
-                                cut: product.cut,
-                                price: regularPrice,
-                                powerDropPrice: pdPrice,
-                                unit: product.unit,
-                              });
-                              toast.success(`${product.name} added to cart`);
-                            }}
-                          />
+                          <div className="flex items-center gap-1.5">
+                            <PowerDropButton
+                              showPowerDrop={showPowerDrop}
+                              available={product.available}
+                              onFlyTrigger={() => {
+                                // Find the product image element inside this card
+                                const cardEl = document.querySelector(
+                                  `[data-product-id="${product.id}"] .product-img`
+                                ) as HTMLElement | null;
+                                const imgSrc = product.img ?? "";
+                                const sourceRect = cardEl
+                                  ? cardEl.getBoundingClientRect()
+                                  : (document.querySelector(`[data-product-id="${product.id}"]`) as HTMLElement | null)?.getBoundingClientRect() ?? new DOMRect();
+                                triggerFly(imgSrc, sourceRect);
+                              }}
+                              onAdd={() => {
+                                onAddToCart({
+                                  id: product.id,
+                                  name: product.name,
+                                  cut: product.cut,
+                                  price: regularPrice,
+                                  powerDropPrice: pdPrice,
+                                  unit: product.unit,
+                                });
+                                toast.success(`${product.name} added to cart`);
+                              }}
+                            />
+                            <ShareDealButton
+                              productName={product.name}
+                              price={`$${(showPowerDrop && pdPrice != null ? pdPrice : regularPrice).toFixed(2)}${product.unit}`}
+                              isPowerDrop={showPowerDrop}
+                            />
+                          </div>
                         </div>
                       </div>
                     </motion.div>
