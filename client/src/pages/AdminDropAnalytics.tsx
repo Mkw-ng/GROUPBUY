@@ -3,9 +3,11 @@
  * Shows KPI bar, order funnel, fulfilment split, top products,
  * repeat customers, order size distribution, items per order, and cancellations.
  */
+import { useState } from "react";
 import { useParams, Link } from "wouter";
-import { ArrowLeft, BarChart2, Package, TrendingUp, Users, MapPin, ShoppingCart, XCircle } from "lucide-react";
+import { ArrowLeft, BarChart2, Check, Package, Pencil, TrendingUp, Users, MapPin, ShoppingCart, X, XCircle } from "lucide-react";
 import { trpc } from "@/lib/trpc";
+import { toast } from "sonner";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
 
@@ -62,6 +64,20 @@ export default function AdminDropAnalytics() {
 
 // ─── Analytics Content ────────────────────────────────────────────────────────
 function AnalyticsContent({ dropId }: { dropId: number | null }) {
+  const utils = trpc.useUtils();
+  const [renaming, setRenaming] = useState(false);
+  const [renameValue, setRenameValue] = useState("");
+  const renameDrop = trpc.admin.drops.rename.useMutation({
+    onSuccess: () => {
+      toast.success("Drop renamed");
+      utils.admin.analytics.dropStats.invalidate();
+      utils.admin.drops.list.invalidate();
+      utils.admin.analytics.allDropsSummary.invalidate();
+      setRenaming(false);
+      setRenameValue("");
+    },
+    onError: () => toast.error("Failed to rename drop"),
+  });
   const { data: stats, isLoading } = trpc.admin.analytics.dropStats.useQuery(
     { dropId },
     { enabled: dropId !== null }
@@ -89,9 +105,45 @@ function AnalyticsContent({ dropId }: { dropId: number | null }) {
           <div className="w-px h-4 bg-white/10" />
           <div className="flex items-center gap-2">
             <BarChart2 size={14} className="text-[#c73e3a]" />
-            <span className="font-display text-[11px] tracking-widest text-[#f5f2ec]">
-              {stats?.drop?.name?.toUpperCase() ?? "ANALYTICS"}
-            </span>
+            {renaming ? (
+              <div className="flex items-center gap-1">
+                <input
+                  autoFocus
+                  value={renameValue}
+                  onChange={e => setRenameValue(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === "Enter" && renameValue.trim() && dropId) renameDrop.mutate({ id: dropId, name: renameValue.trim() });
+                    if (e.key === "Escape") { setRenaming(false); setRenameValue(""); }
+                  }}
+                  className="bg-transparent border border-white/20 font-mono-brand text-[11px] text-[#f5f2ec] px-2 py-0.5 w-32 focus:outline-none focus:border-white/40"
+                />
+                <button
+                  onClick={() => { if (renameValue.trim() && dropId) renameDrop.mutate({ id: dropId, name: renameValue.trim() }); }}
+                  disabled={!renameValue.trim() || renameDrop.isPending}
+                  className="p-1 text-[#25D366] hover:text-[#f5f2ec] disabled:opacity-40"
+                >
+                  <Check size={12} />
+                </button>
+                <button onClick={() => { setRenaming(false); setRenameValue(""); }} className="p-1 text-[#8a857c] hover:text-[#f5f2ec]">
+                  <X size={12} />
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5">
+                <span className="font-display text-[11px] tracking-widest text-[#f5f2ec]">
+                  {stats?.drop?.name?.toUpperCase() ?? "ANALYTICS"}
+                </span>
+                {stats?.drop && (
+                  <button
+                    onClick={() => { setRenaming(true); setRenameValue(stats.drop?.name ?? ""); }}
+                    className="p-0.5 text-[#8a857c] hover:text-[#f5f2ec] transition-colors"
+                    title="Rename drop"
+                  >
+                    <Pencil size={10} />
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -113,9 +165,20 @@ function AnalyticsContent({ dropId }: { dropId: number | null }) {
         <div className="max-w-5xl mx-auto px-6 py-8 space-y-8">
           {/* Page header */}
           <div>
-            <h1 className="font-display text-[22px] tracking-widest text-[#f5f2ec]">
-              {stats.drop?.name?.toUpperCase() ?? "DROP"} ANALYTICS
-            </h1>
+            <div className="flex items-center gap-3">
+              <h1 className="font-display text-[22px] tracking-widest text-[#f5f2ec]">
+                {stats.drop?.name?.toUpperCase() ?? "DROP"} ANALYTICS
+              </h1>
+              {!renaming && (
+                <button
+                  onClick={() => { setRenaming(true); setRenameValue(stats.drop?.name ?? ""); }}
+                  className="p-1 text-[#8a857c] hover:text-[#f5f2ec] transition-colors mt-1"
+                  title="Rename drop"
+                >
+                  <Pencil size={14} />
+                </button>
+              )}
+            </div>
             <p className="font-mono-brand text-[10px] text-[#8a857c] mt-1">
               {fmtDate(stats.drop?.createdAt)} – {stats.drop?.isActive ? "Active" : fmtDate(stats.drop?.closedAt)}
             </p>

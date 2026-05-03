@@ -26,6 +26,8 @@ import {
   closeDrop,
   assignOrderToDrop,
   getOrdersByDrop,
+  renameDrop,
+  deleteDrop,
 } from "./db";
 import { OrderItem } from "../drizzle/schema";
 
@@ -293,6 +295,21 @@ export const appRouter = router({
         .input(z.object({ orderId: z.number(), dropId: z.number() }))
         .mutation(async ({ input }) => {
           await assignOrderToDrop(input.orderId, input.dropId);
+          return { success: true };
+        }),
+      rename: adminProcedure
+        .input(z.object({ id: z.number(), name: z.string().min(1) }))
+        .mutation(async ({ input }) => {
+          await renameDrop(input.id, input.name);
+          return { success: true };
+        }),
+      delete: adminProcedure
+        .input(z.object({ id: z.number() }))
+        .mutation(async ({ input }) => {
+          // Prevent deleting active drops
+          const drop = await getDropById(input.id);
+          if (drop?.isActive) throw new Error("Cannot delete an active drop. Close it first.");
+          await deleteDrop(input.id);
           return { success: true };
         }),
     }),

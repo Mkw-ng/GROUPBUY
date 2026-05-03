@@ -296,3 +296,17 @@ export async function getOrdersByDrop(dropId: number | null) {
   }
   return db.select().from(orders).where(eq(orders.dropId, dropId)).orderBy(desc(orders.createdAt));
 }
+
+export async function renameDrop(id: number, name: string): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(drops).set({ name }).where(eq(drops.id, id));
+}
+
+export async function deleteDrop(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  // Unlink all orders from this drop before deleting
+  await db.update(orders).set({ dropId: null }).where(eq(orders.dropId, id));
+  await db.delete(drops).where(eq(drops.id, id));
+}

@@ -5,7 +5,7 @@
  */
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { ArrowLeft, BarChart2, ChevronRight, Layers, Plus, X } from "lucide-react";
+import { ArrowLeft, BarChart2, ChevronRight, Check, Layers, Pencil, Plus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -109,6 +109,26 @@ function DropsContent({ onNavigate }: { onNavigate: (path: string) => void }) {
     },
     onError: () => toast.error("Failed to close drop"),
   });
+  const renameDrop = trpc.admin.drops.rename.useMutation({
+    onSuccess: () => {
+      toast.success("Drop renamed");
+      utils.admin.drops.list.invalidate();
+      utils.admin.analytics.allDropsSummary.invalidate();
+      setRenamingId(null);
+      setRenameValue("");
+    },
+    onError: () => toast.error("Failed to rename drop"),
+  });
+  const deleteDrop = trpc.admin.drops.delete.useMutation({
+    onSuccess: () => {
+      toast.success("Drop deleted");
+      utils.admin.drops.list.invalidate();
+      utils.admin.analytics.allDropsSummary.invalidate();
+    },
+    onError: (e) => toast.error(e.message || "Failed to delete drop"),
+  });
+  const [renamingId, setRenamingId] = useState<number | null>(null);
+  const [renameValue, setRenameValue] = useState("");
 
   return (
     <div className="min-h-screen section-ink">
@@ -325,10 +345,43 @@ function DropsContent({ onNavigate }: { onNavigate: (path: string) => void }) {
                     <div className="font-mono-brand text-[9px] text-[#8a857c] mt-1 text-right">{drop.conversionRate}%</div>
                   </div>
                   {/* Actions */}
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-mono-brand text-[9px] tracking-widest text-[#8a857c] border border-white/10 px-2 py-1">
                       CLOSED
                     </span>
+                    {/* Rename inline */}
+                    {renamingId === drop.id ? (
+                      <div className="flex items-center gap-1">
+                        <input
+                          autoFocus
+                          value={renameValue}
+                          onChange={e => setRenameValue(e.target.value)}
+                          onKeyDown={e => {
+                            if (e.key === "Enter" && renameValue.trim()) renameDrop.mutate({ id: drop.id, name: renameValue.trim() });
+                            if (e.key === "Escape") { setRenamingId(null); setRenameValue(""); }
+                          }}
+                          className="bg-transparent border border-white/20 font-mono-brand text-[11px] text-[#f5f2ec] px-2 py-1 w-28 focus:outline-none focus:border-white/40"
+                        />
+                        <button
+                          onClick={() => { if (renameValue.trim()) renameDrop.mutate({ id: drop.id, name: renameValue.trim() }); }}
+                          disabled={!renameValue.trim() || renameDrop.isPending}
+                          className="p-1 text-[#25D366] hover:text-[#f5f2ec] disabled:opacity-40"
+                        >
+                          <Check size={12} />
+                        </button>
+                        <button onClick={() => { setRenamingId(null); setRenameValue(""); }} className="p-1 text-[#8a857c] hover:text-[#f5f2ec]">
+                          <X size={12} />
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => { setRenamingId(drop.id); setRenameValue(drop.name); }}
+                        className="p-1 text-[#8a857c] hover:text-[#f5f2ec] transition-colors"
+                        title="Rename drop"
+                      >
+                        <Pencil size={11} />
+                      </button>
+                    )}
                     <button
                       onClick={() => onNavigate(`/admin/drops/${drop.id}`)}
                       className="flex items-center gap-1 font-mono-brand text-[10px] text-[#8a857c] hover:text-[#f5f2ec] border border-white/10 hover:border-white/25 px-3 py-1.5 transition-colors"
@@ -337,6 +390,34 @@ function DropsContent({ onNavigate }: { onNavigate: (path: string) => void }) {
                       Analytics
                       <ChevronRight size={11} />
                     </button>
+                    {/* Delete */}
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <button
+                          className="p-1.5 text-[#8a857c] hover:text-[#c73e3a] transition-colors"
+                          title="Delete drop"
+                        >
+                          <Trash2 size={11} />
+                        </button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent className="bg-[#1a1714] border-white/10 text-[#f5f2ec]">
+                        <AlertDialogHeader>
+                          <AlertDialogTitle className="font-display tracking-widest text-sm">DELETE {drop.name.toUpperCase()}?</AlertDialogTitle>
+                          <AlertDialogDescription className="font-mono-brand text-[12px] text-[#8a857c]">
+                            This permanently deletes the drop record. Orders tagged to it will become unassigned. This cannot be undone.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel className="font-mono-brand text-[11px] bg-transparent border-white/20 text-[#8a857c] hover:text-[#f5f2ec]">Cancel</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => deleteDrop.mutate({ id: drop.id })}
+                            className="font-mono-brand text-[11px] bg-[#c73e3a] hover:bg-[#a83230] text-white border-0"
+                          >
+                            Delete
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   </div>
                 </div>
               ))}

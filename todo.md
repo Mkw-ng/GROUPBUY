@@ -266,3 +266,10 @@
 - [x] Build AdminDropAnalytics page (per-drop KPI bar, funnel, products, fulfilment, repeat customers, order size, items per order, cancellations)
 - [x] Add Drops and Analytics nav links in admin sidebar/navigation
 - [x] Wire "View Analytics" buttons from drops page to analytics page
+
+## Drop Rename & Delete
+- [x] Add tRPC admin.drops.rename procedure (input: id, name)
+- [x] Add tRPC admin.drops.delete procedure (input: id) — only allows deleting inactive/past drops
+- [x] Add inline rename UI on AdminDrops page (pencil icon → editable name field, save on Enter/blur)
+- [x] Add delete button on past drop cards in AdminDrops (with confirmation dialog)
+- [x] Add rename button on AdminDropAnalytics page header (pencil icon next to drop name)
