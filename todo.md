@@ -251,3 +251,6 @@
 
 ## Final Call WhatsApp Button (Admin Orders)
 - [x] Add "Final Call" WhatsApp button in admin order panel — opens WhatsApp with pre-filled payment reminder message per customer phone number
+
+## Day of Order WhatsApp Button (Admin Orders)
+- [x] Add "Day of Order" WhatsApp button in admin order panel — sends pickup/delivery day-of reminder message
