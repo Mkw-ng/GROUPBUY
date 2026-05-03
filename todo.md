@@ -273,3 +273,13 @@
 - [x] Add inline rename UI on AdminDrops page (pencil icon → editable name field, save on Enter/blur)
 - [x] Add delete button on past drop cards in AdminDrops (with confirmation dialog)
 - [x] Add rename button on AdminDropAnalytics page header (pencil icon next to drop name)
+
+## Order Archiving
+- [x] Add `archived` boolean column (default false) to orders table in drizzle/schema.ts
+- [x] Run pnpm db:push to migrate
+- [x] Add archiveOrder / unarchiveOrder DB helpers in server/db.ts
+- [x] Add tRPC admin.orders.archive and admin.orders.unarchive mutations
+- [x] Update admin.orders.list to exclude archived orders by default (All/Pending/Paid tabs)
+- [x] Add "Archived" tab to AdminOrders that shows only archived orders
+- [x] Add Archive button on each order card (with confirmation); add Unarchive button in Archived tab
+- [x] Ensure analytics (getOrdersByDrop) still includes archived orders so stats are not affected

@@ -118,6 +118,8 @@ export const orders = mysqlTable("orders", {
   isPowerDrop: boolean("isPowerDrop").notNull().default(false),
   /** FK to drops table — which drop this order belongs to (null = unassigned) */
   dropId: int("dropId"),
+  /** Archived orders are hidden from active tabs but retained for analytics */
+  archived: boolean("archived").notNull().default(false),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

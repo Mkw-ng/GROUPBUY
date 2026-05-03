@@ -12,6 +12,8 @@ import {
   MessageCircle,
   CheckCircle2,
   Trash2,
+  Archive,
+  ArchiveRestore,
   ChevronDown,
   ChevronUp,
   ArrowLeft,
@@ -59,10 +61,11 @@ interface Order {
   deliveryCharge: string | null;
   status: "pending" | "paid" | "cancelled";
   isPowerDrop: boolean;
+  archived: boolean | null;
   createdAt: Date;
 }
 
-type StatusFilter = "all" | "pending" | "paid" | "cancelled";
+type StatusFilter = "all" | "pending" | "paid" | "cancelled" | "archived";
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -230,6 +233,22 @@ Here's how to lock it in:
       utils.admin.orders.list.invalidate();
     },
     onError: () => toast.error("Failed to delete order"),
+  });
+  const archiveOrder = trpc.admin.orders.archive.useMutation({
+    onSuccess: () => {
+      toast.success("Order archived");
+      utils.admin.orders.list.invalidate();
+      utils.admin.orders.listArchived.invalidate();
+    },
+    onError: () => toast.error("Failed to archive order"),
+  });
+  const unarchiveOrder = trpc.admin.orders.unarchive.useMutation({
+    onSuccess: () => {
+      toast.success("Order restored");
+      utils.admin.orders.list.invalidate();
+      utils.admin.orders.listArchived.invalidate();
+    },
+    onError: () => toast.error("Failed to restore order"),
   });
 
   function handleWeightChange(idx: number, value: string) {
@@ -751,6 +770,53 @@ Here's how to lock it in:
               </AlertDialog>
             )}
 
+            {/* Unarchive (restore) — only shown for archived orders */}
+            {order.archived && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="font-display text-[10px] tracking-widest border-green-500/40 text-green-400 hover:bg-green-500/10 gap-1.5"
+                onClick={() => unarchiveOrder.mutate({ id: order.id })}
+                disabled={unarchiveOrder.isPending}
+              >
+                <ArchiveRestore size={13} />
+                Restore
+              </Button>
+            )}
+            {/* Archive Order — only shown for non-archived orders */}
+            {!order.archived && <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="font-display text-[10px] tracking-widest border-amber-500/40 text-amber-400 hover:bg-amber-500/10 gap-1.5"
+                >
+                  <Archive size={13} />
+                  Archive
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent className="section-ink border-white/10">
+                <AlertDialogHeader>
+                  <AlertDialogTitle className="font-display tracking-widest text-[#f5f2ec]">
+                    Archive this order?
+                  </AlertDialogTitle>
+                  <AlertDialogDescription className="font-mono-brand text-[#8a857c]">
+                    Order #{order.phone} will be hidden from the active tabs (All, Pending, Paid, Cancelled) but kept for analytics. You can restore it from the Archived tab.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel className="font-display text-[10px] tracking-widest">
+                    Keep
+                  </AlertDialogCancel>
+                  <AlertDialogAction
+                    className="font-display text-[10px] tracking-widest bg-amber-600 hover:bg-amber-700"
+                    onClick={() => archiveOrder.mutate({ id: order.id })}
+                  >
+                    Archive
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>}
             {/* Delete Order */}
             <AlertDialog>
               <AlertDialogTrigger asChild>
@@ -862,6 +928,9 @@ export default function AdminOrders() {
     enabled: user?.role === "admin",
     refetchInterval: 30_000, // auto-refresh every 30s
   });
+  const { data: archivedOrders, isLoading: isLoadingArchived, refetch: refetchArchived } = trpc.admin.orders.listArchived.useQuery(undefined, {
+    enabled: user?.role === "admin",
+  });
 
   if (loading) {
     return (
@@ -888,8 +957,11 @@ export default function AdminOrders() {
   }
 
   const allOrders = (orders as Order[] | undefined) ?? [];
+  const allArchived = (archivedOrders as Order[] | undefined) ?? [];
   const filtered =
-    statusFilter === "all"
+    statusFilter === "archived"
+      ? allArchived
+      : statusFilter === "all"
       ? allOrders
       : allOrders.filter((o) => o.status === statusFilter);
 
@@ -898,6 +970,7 @@ export default function AdminOrders() {
     pending: allOrders.filter((o) => o.status === "pending").length,
     paid: allOrders.filter((o) => o.status === "paid").length,
     cancelled: allOrders.filter((o) => o.status === "cancelled").length,
+    archived: allArchived.length,
   };
 
   const filterTabs: { key: StatusFilter; label: string }[] = [
@@ -905,6 +978,7 @@ export default function AdminOrders() {
     { key: "pending", label: "Pending" },
     { key: "paid", label: "Paid" },
     { key: "cancelled", label: "Cancelled" },
+    { key: "archived", label: "Archived" },
   ];
 
   return (
@@ -1001,7 +1075,7 @@ export default function AdminOrders() {
         </div>
 
         {/* Orders list */}
-        {isLoading ? (
+        {(isLoading || (statusFilter === "archived" && isLoadingArchived)) ? (
           <div className="space-y-3">
             {[1, 2, 3].map((i) => (
               <div key={i} className="h-16 border border-white/10 animate-pulse bg-white/3" />
@@ -1011,7 +1085,7 @@ export default function AdminOrders() {
           <div className="flex flex-col items-center justify-center py-24 gap-3">
             <Package size={40} className="text-[#8a857c]/30" />
             <p className="font-display text-[11px] tracking-widest text-[#8a857c]">
-              {statusFilter === "all" ? "NO ORDERS YET" : `NO ${statusFilter.toUpperCase()} ORDERS`}
+              {statusFilter === "all" ? "NO ORDERS YET" : statusFilter === "archived" ? "NO ARCHIVED ORDERS" : `NO ${statusFilter.toUpperCase()} ORDERS`}
             </p>
             <p className="font-mono-brand text-[11px] text-[#8a857c]/60">
               {statusFilter === "all"

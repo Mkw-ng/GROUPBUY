@@ -183,7 +183,13 @@ export async function createOrder(data: InsertOrder): Promise<number> {
 export async function getAllOrders() {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(orders).orderBy(desc(orders.createdAt));
+  return db.select().from(orders).where(eq(orders.archived, false)).orderBy(desc(orders.createdAt));
+}
+
+export async function getArchivedOrders() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(orders).where(eq(orders.archived, true)).orderBy(desc(orders.createdAt));
 }
 
 export async function getOrderById(id: number) {
@@ -309,4 +315,16 @@ export async function deleteDrop(id: number): Promise<void> {
   // Unlink all orders from this drop before deleting
   await db.update(orders).set({ dropId: null }).where(eq(orders.dropId, id));
   await db.delete(drops).where(eq(drops.id, id));
+}
+
+export async function archiveOrder(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(orders).set({ archived: true }).where(eq(orders.id, id));
+}
+
+export async function unarchiveOrder(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(orders).set({ archived: false }).where(eq(orders.id, id));
 }

@@ -43,6 +43,13 @@
       "when": 1777794496732,
       "tag": "0005_dashing_true_believers",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1777796996736,
+      "tag": "0006_talented_maximus",
+      "breakpoints": true
     }
   ]
 }

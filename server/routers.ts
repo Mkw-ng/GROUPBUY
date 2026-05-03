@@ -28,6 +28,9 @@ import {
   getOrdersByDrop,
   renameDrop,
   deleteDrop,
+  archiveOrder,
+  unarchiveOrder,
+  getArchivedOrders,
 } from "./db";
 import { OrderItem } from "../drizzle/schema";
 
@@ -257,6 +260,19 @@ export const appRouter = router({
           await deleteOrder(input.id);
           return { success: true };
         }),
+      archive: adminProcedure
+        .input(z.object({ id: z.number() }))
+        .mutation(async ({ input }) => {
+          await archiveOrder(input.id);
+          return { success: true };
+        }),
+      unarchive: adminProcedure
+        .input(z.object({ id: z.number() }))
+        .mutation(async ({ input }) => {
+          await unarchiveOrder(input.id);
+          return { success: true };
+        }),
+      listArchived: adminProcedure.query(async () => getArchivedOrders()),
     }),
 
     settings: router({
