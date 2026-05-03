@@ -246,7 +246,8 @@ Here's how to lock it in:
   }
 
   function handleSendPrepMessage() {
-    const msg = `📦 Your order is now in preparation\nEverything is on track for your scheduled pickup/delivery on ${order.pickupDate}`;
+    const locStr = locationLabel(order.location, order.deliveryAddress);
+    const msg = `Just a heads up! \n\nYour order is now in preparation and everything is on track for your schedule: (${order.pickupDate}) at (${locStr})\n\nSee you then.`;
     const intlPhone = order.phone.replace(/^0/, "61").replace(/[^\d]/g, "");
     window.open(`https://wa.me/${intlPhone}?text=${encodeURIComponent(msg)}`, "_blank");
   }
@@ -556,8 +557,7 @@ Here's how to lock it in:
                     This will send the following message to {order.phone}:
                   </AlertDialogDescription>
                   <div className="mt-3 bg-white/5 border border-white/10 px-4 py-3 font-mono-brand text-[12px] text-[#f5f2ec] whitespace-pre-line">
-                    {`📦 Your order is now in preparation
-Everything is on track for your scheduled pickup/delivery on ${order.pickupDate}`}
+                    {`Just a heads up! \n\nYour order is now in preparation and everything is on track for your schedule: (${order.pickupDate}) at (${locationLabel(order.location, order.deliveryAddress)})\n\nSee you then.`}
                   </div>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
