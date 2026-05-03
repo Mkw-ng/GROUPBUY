@@ -210,3 +210,6 @@
 
 ## Cart Unit Price Display
 - [x] Show $price/unit on each cart item instead of quantity-adjusted total (e.g. $25/kg or $25/steak)
+
+## WhatsApp Checkout Message Format
+- [x] Update item lines in WhatsApp checkout message to show qty/unit x Name — $price/unit (e.g. 1/kg x Asado Beef Rib — $19.99/kg)
