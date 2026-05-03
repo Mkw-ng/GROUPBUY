@@ -248,3 +248,6 @@
 ## Share Deal Button
 - [x] Create ShareDealButton component with dark popover (WhatsApp, native share sheet, copy link)
 - [x] Integrate ShareDealButton into product cards in DealsSection
+
+## Final Call WhatsApp Button (Admin Orders)
+- [x] Add "Final Call" WhatsApp button in admin order panel — opens WhatsApp with pre-filled payment reminder message per customer phone number
