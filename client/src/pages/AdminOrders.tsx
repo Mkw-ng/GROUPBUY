@@ -630,6 +630,33 @@ Here's how to lock it in:
                       Order #{order.phone} will be marked as cancelled. This cannot be undone.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
+                  <div className="mt-4 space-y-2">
+                    <p className="font-mono-brand text-[11px] text-[#8a857c] mb-2">Send a message to customer:</p>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="w-full font-mono-brand text-[11px] text-left justify-start border-[#25D366]/40 text-[#25D366] hover:bg-[#25D366]/10 gap-2 h-auto py-2 px-3 whitespace-normal"
+                      onClick={() => {
+                        const intlPhone = order.phone.replace(/\D/g, "").replace(/^0/, "61");
+                        window.open(`https://wa.me/${intlPhone}?text=${encodeURIComponent("Quick one. Your payment didn't come through before the cut-off, so we couldn't get your order in this drop.\n\nNext Power-Drop is coming up next month - keep an eye out\n\nCatch you on the next one.")}`, "_blank");
+                      }}
+                    >
+                      <MessageCircle size={13} className="shrink-0 mt-0.5" />
+                      <span>Payment cut-off — missed this drop</span>
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="w-full font-mono-brand text-[11px] text-left justify-start border-[#25D366]/40 text-[#25D366] hover:bg-[#25D366]/10 gap-2 h-auto py-2 px-3 whitespace-normal"
+                      onClick={() => {
+                        const intlPhone = order.phone.replace(/\D/g, "").replace(/^0/, "61");
+                        window.open(`https://wa.me/${intlPhone}?text=${encodeURIComponent("Appreciate you getting involved in the Power-Drop.\n\nKeen to hear your thoughts - anything we could improve, fix, or do differently before the next one?")}`, "_blank");
+                      }}
+                    >
+                      <MessageCircle size={13} className="shrink-0 mt-0.5" />
+                      <span>Feedback request</span>
+                    </Button>
+                  </div>
                   <AlertDialogFooter>
                     <AlertDialogCancel className="font-display text-[10px] tracking-widest">
                       Keep
@@ -666,6 +693,33 @@ Here's how to lock it in:
                     Order #{order.phone} will be permanently removed. This cannot be undone.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
+                <div className="mt-4 space-y-2">
+                  <p className="font-mono-brand text-[11px] text-[#8a857c] mb-2">Send a message to customer:</p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-full font-mono-brand text-[11px] text-left justify-start border-[#25D366]/40 text-[#25D366] hover:bg-[#25D366]/10 gap-2 h-auto py-2 px-3 whitespace-normal"
+                    onClick={() => {
+                      const intlPhone = order.phone.replace(/\D/g, "").replace(/^0/, "61");
+                      window.open(`https://wa.me/${intlPhone}?text=${encodeURIComponent("Quick one. Your payment didn't come through before the cut-off, so we couldn't get your order in this drop.\n\nNext Power-Drop is coming up next month - keep an eye out\n\nCatch you on the next one.")}`, "_blank");
+                    }}
+                  >
+                    <MessageCircle size={13} className="shrink-0 mt-0.5" />
+                    <span>Payment cut-off — missed this drop</span>
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-full font-mono-brand text-[11px] text-left justify-start border-[#25D366]/40 text-[#25D366] hover:bg-[#25D366]/10 gap-2 h-auto py-2 px-3 whitespace-normal"
+                    onClick={() => {
+                      const intlPhone = order.phone.replace(/\D/g, "").replace(/^0/, "61");
+                      window.open(`https://wa.me/${intlPhone}?text=${encodeURIComponent("Appreciate you getting involved in the Power-Drop.\n\nKeen to hear your thoughts - anything we could improve, fix, or do differently before the next one?")}`, "_blank");
+                    }}
+                  >
+                    <MessageCircle size={13} className="shrink-0 mt-0.5" />
+                    <span>Feedback request</span>
+                  </Button>
+                </div>
                 <AlertDialogFooter>
                   <AlertDialogCancel className="font-display text-[10px] tracking-widest">
                     Keep

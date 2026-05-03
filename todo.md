@@ -222,3 +222,6 @@
 
 ## Mark as Paid WhatsApp - Timing Fix
 - [x] Open WhatsApp confirmation only after markPaid mutation succeeds (use onSuccess callback with order data, not inline onClick)
+
+## Delete Order WhatsApp Templates
+- [x] Add two WhatsApp message template buttons to the cancel/delete order dialog in AdminOrders.tsx
