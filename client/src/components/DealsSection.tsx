@@ -312,7 +312,7 @@ export default function DealsSection({ onAddToCart, powerDropActive = false }: D
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.15 }}
-                className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4"
+                className="grid grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4"
               >
                 {filtered.map((product, i) => {
                   const regularPrice = parseFloat(product.price);
@@ -376,14 +376,14 @@ export default function DealsSection({ onAddToCart, powerDropActive = false }: D
                       </div>
 
                       {/* Info */}
-                      <div className="p-4 flex flex-col flex-1">
-                        <p className="font-mono-brand text-[10px] text-[#8a857c] mb-1 uppercase tracking-wider">
+                      <div className="p-2 sm:p-4 flex flex-col flex-1">
+                        <p className="font-mono-brand text-[9px] sm:text-[10px] text-[#8a857c] mb-0.5 sm:mb-1 uppercase tracking-wider">
                           {product.cut}
                         </p>
-                        <h3 className="font-body text-[15px] font-bold text-[#0a0a0a] mb-3 leading-snug flex-1">
+                        <h3 className="font-body text-[12px] sm:text-[15px] font-bold text-[#0a0a0a] mb-1.5 sm:mb-3 leading-snug flex-1 line-clamp-2">
                           {product.name}
                         </h3>
-                        <div className="flex items-end justify-between gap-2">
+                        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-1.5 sm:gap-2">
                           <div>
                             {showPowerDrop ? (
                               <div className="flex flex-col gap-0.5">
@@ -391,7 +391,7 @@ export default function DealsSection({ onAddToCart, powerDropActive = false }: D
                                   ${regularPrice.toFixed(2)}
                                 </span>
                                 <div className="flex items-baseline gap-1">
-                                  <span className="font-mono-brand text-[22px] font-bold text-[#c73e3a]">
+                                  <span className="font-mono-brand text-[16px] sm:text-[22px] font-bold text-[#c73e3a]">
                                     ${pdPrice!.toFixed(2)}
                                   </span>
                                   <span className="font-mono-brand text-[11px] text-[#8a857c]">
@@ -401,7 +401,7 @@ export default function DealsSection({ onAddToCart, powerDropActive = false }: D
                               </div>
                             ) : (
                               <div className="flex items-baseline gap-1">
-                                <span className="font-mono-brand text-[22px] font-bold text-[#c73e3a]">
+                                <span className="font-mono-brand text-[16px] sm:text-[22px] font-bold text-[#c73e3a]">
                                   ${regularPrice.toFixed(2)}
                                 </span>
                                 <span className="font-mono-brand text-[11px] text-[#8a857c]">
@@ -410,7 +410,7 @@ export default function DealsSection({ onAddToCart, powerDropActive = false }: D
                               </div>
                             )}
                           </div>
-                          <div className="flex items-center gap-1.5">
+                          <div className="flex items-center gap-1 sm:gap-1.5">
                             <PowerDropButton
                               showPowerDrop={showPowerDrop}
                               available={product.available}

@@ -286,3 +286,7 @@
 
 ## Order Management Sort
 - [x] Add sort button to AdminOrders — sort by pickup date (earliest first / latest first), toggles on click, default is date added (newest first)
+
+## 2-Column Mobile Product Grid
+- [x] Update DealsSection grid to use 2 columns on mobile (< 640px), 3 columns on tablet, 4 on desktop
+- [x] Adjust card layout for compact 2-column display: vertical image-on-top, 2-line name clamp, stacked pricing, compact Add + Share buttons
