@@ -6,7 +6,7 @@
  * Power Drop: red overlay banner with pulsing indicator when active
  */
 import { motion } from "framer-motion";
-import { ArrowRight, MessageCircle, Zap, Rocket, Dices } from "lucide-react";
+import { ArrowRight, MessageCircle, Zap, Rocket, Dices, BarChart2 } from "lucide-react";
 import PowerDropCountdown from "@/components/PowerDropCountdown";
 
 const STATS = [
@@ -185,6 +185,13 @@ export default function HeroSection({ powerDropActive = false, powerDropActivate
           >
             <Dices size={14} strokeWidth={1.5} />
             The Stakehouse
+          </a>
+          <a
+            href="/my-stats"
+            className="inline-flex items-center gap-2 font-display text-[11px] tracking-widest border border-[#f5f2ec]/20 text-[#f5f2ec]/60 px-6 py-3.5 hover:border-[#c73e3a]/60 hover:text-[#c73e3a] transition-colors"
+          >
+            <BarChart2 size={14} strokeWidth={1.5} />
+            Check My Stats
           </a>
         </motion.div>
 

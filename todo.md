@@ -330,3 +330,6 @@
 - [x] Extend customers.lookup tRPC to return full order history (all archived orders, not just 5 recent)
 - [x] Build OrderHistoryAccordion component — collapsible per-order rows with item list, weights, totals
 - [x] Integrate OrderHistoryAccordion into /my-stats receipt card below badges section
+
+## Hero Section CTA
+- [x] Add "Check My Stats" secondary button to HeroSection alongside the existing CTA
