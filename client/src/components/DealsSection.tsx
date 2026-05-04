@@ -5,7 +5,7 @@
  * Category tabs: left-border red indicator for active state
  * Power Drop: crossed-out original price + red Power Drop price, button changes to "Secure Power-Drop ⚡"
  */
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ShoppingCart, Zap } from "lucide-react";
 import { toast } from "sonner";
@@ -195,6 +195,9 @@ export default function DealsSection({ onAddToCart, powerDropActive = false }: D
   const [activeCategory, setActiveCategory] = useState("limited-offer");
   const [search, setSearch] = useState("");
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [highlightedIdx, setHighlightedIdx] = useState(-1);
+  const searchWrapperRef = useRef<HTMLDivElement>(null);
   const { triggerFly } = useFlyToCart();
 
   const { data: dbProducts, isLoading } = trpc.products.list.useQuery(undefined, {
@@ -211,6 +214,52 @@ export default function DealsSection({ onAddToCart, powerDropActive = false }: D
     const matchSearch = p.name.toLowerCase().includes(search.toLowerCase());
     return matchCat && matchSearch;
   });
+
+  // Predictive suggestions: match on name, cut, or category (max 6)
+  const suggestions = search.trim().length > 0
+    ? allProducts
+        .filter(p =>
+          p.name.toLowerCase().includes(search.toLowerCase()) ||
+          p.cut.toLowerCase().includes(search.toLowerCase()) ||
+          p.category.toLowerCase().includes(search.toLowerCase())
+        )
+        .slice(0, 6)
+    : [];
+
+  // Close suggestions when clicking outside
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (searchWrapperRef.current && !searchWrapperRef.current.contains(e.target as Node)) {
+        setShowSuggestions(false);
+        setHighlightedIdx(-1);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  // Highlight helper — wraps matching text in a span
+  const highlight = (text: string, query: string) => {
+    if (!query.trim()) return <>{text}</>;
+    const idx = text.toLowerCase().indexOf(query.toLowerCase());
+    if (idx === -1) return <>{text}</>;
+    return (
+      <>
+        {text.slice(0, idx)}
+        <mark className="bg-[#c73e3a]/20 text-[#c73e3a] font-semibold not-italic">{text.slice(idx, idx + query.length)}</mark>
+        {text.slice(idx + query.length)}
+      </>
+    );
+  };
+
+  // Scroll to and flash a product card
+  const scrollToProduct = (productId: number) => {
+    const el = document.querySelector(`[data-product-id="${productId}"]`) as HTMLElement | null;
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    el.classList.add("ring-2", "ring-[#c73e3a]", "ring-offset-2");
+    setTimeout(() => el.classList.remove("ring-2", "ring-[#c73e3a]", "ring-offset-2"), 1500);
+  };
 
   return (
     <section id="deals" className="section-paper py-20 md:py-28">
@@ -262,7 +311,7 @@ export default function DealsSection({ onAddToCart, powerDropActive = false }: D
           {/* Right — search + grid */}
           <div className="flex-1 min-w-0">
             {/* Search */}
-            <div className="relative mb-8 max-w-sm">
+            <div className="relative mb-8 max-w-sm" ref={searchWrapperRef}>
               <svg
                 className="absolute left-3 top-1/2 -translate-y-1/2 text-[#8a857c] w-3.5 h-3.5"
                 fill="none"
@@ -278,8 +327,36 @@ export default function DealsSection({ onAddToCart, powerDropActive = false }: D
                 type="text"
                 placeholder="Search products..."
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setShowSuggestions(true);
+                  setHighlightedIdx(-1);
+                }}
+                onFocus={() => { if (search.trim()) setShowSuggestions(true); }}
+                onKeyDown={(e) => {
+                  if (!showSuggestions || suggestions.length === 0) return;
+                  if (e.key === "ArrowDown") {
+                    e.preventDefault();
+                    setHighlightedIdx(i => Math.min(i + 1, suggestions.length - 1));
+                  } else if (e.key === "ArrowUp") {
+                    e.preventDefault();
+                    setHighlightedIdx(i => Math.max(i - 1, -1));
+                  } else if (e.key === "Enter" && highlightedIdx >= 0) {
+                    e.preventDefault();
+                    const p = suggestions[highlightedIdx];
+                    setSearch(p.name);
+                    setShowSuggestions(false);
+                    setHighlightedIdx(-1);
+                    // Switch to the product's category if needed
+                    setActiveCategory("all");
+                    setTimeout(() => scrollToProduct(p.id), 100);
+                  } else if (e.key === "Escape") {
+                    setShowSuggestions(false);
+                    setHighlightedIdx(-1);
+                  }
+                }}
                 className="w-full font-body text-[13px] bg-transparent border border-[#0a0a0a]/15 pl-9 pr-8 py-2.5 focus:outline-none focus:border-[#c73e3a] transition-colors placeholder:text-[#8a857c]"
+                autoComplete="off"
               />
               {search && (
                 <button
@@ -287,6 +364,8 @@ export default function DealsSection({ onAddToCart, powerDropActive = false }: D
                     // Prevent the input from losing focus when clicking the clear button
                     e.preventDefault();
                     setSearch("");
+                    setShowSuggestions(false);
+                    setHighlightedIdx(-1);
                     searchInputRef.current?.focus();
                   }}
                   aria-label="Clear search"
@@ -296,6 +375,61 @@ export default function DealsSection({ onAddToCart, powerDropActive = false }: D
                     <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </button>
+              )}
+              {/* Predictive suggestions dropdown */}
+              {showSuggestions && suggestions.length > 0 && (
+                <div className="absolute top-full left-0 right-0 z-50 mt-1 border border-[#0a0a0a]/15 bg-[#f5f2ec] shadow-lg overflow-hidden">
+                  {suggestions.map((p, idx) => {
+                    const regPrice = parseFloat(p.price);
+                    const pdPrice = p.powerDropPrice ? parseFloat(p.powerDropPrice) : null;
+                    const showPD = powerDropActive && pdPrice != null;
+                    return (
+                      <button
+                        key={p.id}
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          setSearch(p.name);
+                          setShowSuggestions(false);
+                          setHighlightedIdx(-1);
+                          setActiveCategory("all");
+                          setTimeout(() => scrollToProduct(p.id), 100);
+                        }}
+                        className={`w-full text-left flex items-center gap-3 px-3 py-2.5 border-b border-[#0a0a0a]/8 last:border-b-0 transition-colors ${
+                          idx === highlightedIdx ? "bg-[#eae3d2]" : "hover:bg-[#eae3d2]"
+                        }`}
+                      >
+                        {/* Thumbnail */}
+                        {p.img ? (
+                          <img src={p.img} alt={p.name} className="w-9 h-9 object-cover shrink-0 border border-[#0a0a0a]/10" />
+                        ) : (
+                          <div className="w-9 h-9 bg-[#eae3d2] shrink-0 flex items-center justify-center border border-[#0a0a0a]/10">
+                            <span className="font-display text-[8px] text-[#8a857c]">{p.category.slice(0,3).toUpperCase()}</span>
+                          </div>
+                        )}
+                        {/* Text */}
+                        <div className="flex-1 min-w-0">
+                          <p className="font-body text-[13px] font-semibold text-[#0a0a0a] truncate">
+                            {highlight(p.name, search)}
+                          </p>
+                          <p className="font-mono-brand text-[10px] text-[#8a857c] truncate">
+                            {highlight(p.cut, search)}
+                          </p>
+                        </div>
+                        {/* Price */}
+                        <div className="shrink-0 text-right">
+                          {showPD ? (
+                            <>
+                              <p className="font-mono-brand text-[10px] text-[#8a857c] line-through">${regPrice.toFixed(2)}</p>
+                              <p className="font-mono-brand text-[13px] font-bold text-[#c73e3a]">${pdPrice!.toFixed(2)}</p>
+                            </>
+                          ) : (
+                            <p className="font-mono-brand text-[13px] font-bold text-[#c73e3a]">${regPrice.toFixed(2)}</p>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
               )}
             </div>
 

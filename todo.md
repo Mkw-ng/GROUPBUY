@@ -290,3 +290,9 @@
 ## 2-Column Mobile Product Grid
 - [x] Update DealsSection grid to use 2 columns on mobile (< 640px), 3 columns on tablet, 4 on desktop
 - [x] Adjust card layout for compact 2-column display: vertical image-on-top, 2-line name clamp, stacked pricing, compact Add + Share buttons
+
+## Predictive Search
+- [x] Add predictive search dropdown to DealsSection search bar — shows matching products (name, cut, price, category) as user types, with highlighted matching text
+- [x] Keyboard navigation (↑↓ to move, Enter to select, Escape to dismiss)
+- [x] Clicking a suggestion scrolls to and briefly highlights the product card
+- [x] Clicking outside dismisses the dropdown
