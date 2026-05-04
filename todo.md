@@ -299,3 +299,18 @@
 
 ## Cart Quantity Input
 - [x] Replace the quantity display in CartDrawer with a typeable number input between the - and + buttons; validates on blur/Enter (min 0.5, step 0.5), falls back to 1 on invalid input
+
+## Customer Analytics System
+- [x] Add `customers` table to DB schema (id, phone, name, firstOrderDate, lastOrderDate, totalOrders, totalSpend, totalKg, largestOrder, smallestOrder, longestStreak, currentStreak, powerDropsAttended, totalSavings, favouriteItems JSON, favouriteCategory, preferredLocation, biggestSingleItem)
+- [x] Add `customerName` nullable text column to `orders` table
+- [x] Run pnpm db:push migration
+- [x] Add DB helpers: upsertCustomerFromOrder, getCustomerByPhone, getAllCustomers, getCustomerOrders
+- [x] Add tRPC procedures: customers.list, customers.get, customers.getOrders (admin), customers.lookup (public)
+- [x] Wire archiveOrder to call upsertCustomerFromOrder after archiving
+- [x] Add optional Customer Name field to AdminOrders order card (admin can fill in)
+- [x] Build AdminCustomers list page (/admin/customers) — searchable table with key stats
+- [x] Build AdminCustomerProfile page (/admin/customers/:phone) — full stats + order history
+- [x] Build public /my-stats page — phone number prompt, receipt-style stats card, loyalty tier badge, shareable layout
+- [x] Add "Check My Stats" teaser button in JoinSection and footer quick links
+- [x] Add "My Stats" link to site navigation (Navbar + Footer)
+- [x] Add Customers nav link in admin panel header (Admin.tsx + AdminOrders.tsx)

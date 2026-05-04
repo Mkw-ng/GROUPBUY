@@ -710,6 +710,12 @@ function AdminContent() {
               Drops & Analytics
             </Button>
           </Link>
+          <Link href="/admin/customers">
+            <Button variant="outline" size="sm" className="gap-1.5 shrink-0">
+              <span>👥</span>
+              Customers
+            </Button>
+          </Link>
         </div>
       </div>
 

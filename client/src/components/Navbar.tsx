@@ -13,6 +13,7 @@ const NAV_LINKS = [
   { label: "Current Deals", href: "#deals" },
   { label: "Pickup Info", href: "#pickup" },
   { label: "Join Group", href: "#join" },
+  { label: "My Stats", href: "/my-stats" },
 ];
 
 interface NavbarProps {

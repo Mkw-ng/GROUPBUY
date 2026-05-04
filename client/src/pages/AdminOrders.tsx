@@ -65,6 +65,7 @@ interface Order {
   status: "pending" | "paid" | "cancelled";
   isPowerDrop: boolean;
   archived: boolean | null;
+  customerName: string | null;
   createdAt: Date;
 }
 
@@ -171,6 +172,16 @@ function OrderCard({
   const [expanded, setExpanded] = useState(true);
   const [items, setItems] = useState<OrderItem[]>(() => parseItems(order.items));
   const [deliveryCharge, setDeliveryCharge] = useState(order.deliveryCharge ?? "0");
+  const [customerName, setCustomerName] = useState(order.customerName ?? "");
+  const [editingName, setEditingName] = useState(false);
+  const updateCustomerName = trpc.admin.orders.updateCustomerName.useMutation({
+    onSuccess: () => {
+      toast.success("Customer name saved");
+      utils.admin.orders.list.invalidate();
+      setEditingName(false);
+    },
+    onError: () => toast.error("Failed to save name"),
+  });
   const [savingWeights, setSavingWeights] = useState(false);
   const [confirmSaveWeights, setConfirmSaveWeights] = useState(false);
   const [confirmSaveDelivery, setConfirmSaveDelivery] = useState(false);
@@ -331,6 +342,11 @@ Here's how to lock it in:
             <span className="font-mono-brand text-[11px] text-[#8a857c] mt-0.5">
               {locationLabel(order.location, order.deliveryAddress)} · {order.pickupDate}
             </span>
+            {order.customerName && (
+              <span className="font-mono-brand text-[11px] text-[#c73e3a]/80 mt-0.5">
+                {order.customerName}
+              </span>
+            )}
           </div>
         </div>
 
@@ -452,6 +468,55 @@ Here's how to lock it in:
             </div>
           )}
 
+          {/* Customer name */}
+          <div>
+            <p className="font-display text-[10px] tracking-widest text-[#8a857c] mb-2">
+              CUSTOMER NAME
+            </p>
+            {editingName ? (
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={customerName}
+                  onChange={(e) => setCustomerName(e.target.value)}
+                  placeholder="e.g. John Smith"
+                  className="flex-1 bg-transparent border border-white/15 text-[#f5f2ec] font-mono-brand text-[12px] px-3 py-2 focus:outline-none focus:border-[#c73e3a]/60"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") updateCustomerName.mutate({ id: order.id, customerName: customerName || null });
+                    if (e.key === "Escape") { setCustomerName(order.customerName ?? ""); setEditingName(false); }
+                  }}
+                  autoFocus
+                />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="font-display text-[10px] tracking-widest border-white/20 text-[#f5f2ec] hover:bg-white/10"
+                  disabled={updateCustomerName.isPending}
+                  onClick={() => updateCustomerName.mutate({ id: order.id, customerName: customerName || null })}
+                >
+                  {updateCustomerName.isPending ? "Saving…" : "Save"}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="font-display text-[10px] tracking-widest text-[#8a857c] hover:text-[#f5f2ec]"
+                  onClick={() => { setCustomerName(order.customerName ?? ""); setEditingName(false); }}
+                >
+                  Cancel
+                </Button>
+              </div>
+            ) : (
+              <div
+                className="flex items-center gap-2 cursor-pointer group"
+                onClick={() => setEditingName(true)}
+              >
+                <span className="font-mono-brand text-[12px] text-[#f5f2ec]/80 group-hover:text-[#f5f2ec]">
+                  {customerName || <span className="text-[#8a857c] italic">Add name…</span>}
+                </span>
+                <span className="font-mono-brand text-[10px] text-[#8a857c] group-hover:text-[#c73e3a]">✎</span>
+              </div>
+            )}
+          </div>
           {/* Delivery charge */}
           <div>
             <p className="font-display text-[10px] tracking-widest text-[#8a857c] mb-2">
@@ -1041,6 +1106,12 @@ export default function AdminOrders() {
           <Link href="/admin/drops">
             <button className="font-mono-brand text-[10px] text-[#8a857c] hover:text-[#f5f2ec] transition-colors">
               Drops & Analytics →
+            </button>
+          </Link>
+          <div className="w-px h-4 bg-white/10" />
+          <Link href="/admin/customers">
+            <button className="font-mono-brand text-[10px] text-[#8a857c] hover:text-[#f5f2ec] transition-colors">
+              Customers →
             </button>
           </Link>
         </div>

@@ -33,6 +33,13 @@ import {
   getArchivedOrders,
 } from "./db";
 import { OrderItem } from "../drizzle/schema";
+import {
+  upsertCustomerFromOrder,
+  getCustomerByPhone,
+  getAllCustomers,
+  getCustomerOrders,
+  getLoyaltyTier,
+} from "./customerDb";
 
 // ─── Admin guard middleware ─────────────────────────────────────────────────────────────────
 
@@ -105,8 +112,39 @@ function calcOrderTotal(o: { items: string; deliveryCharge?: string | null }): n
 
 // ─── App Router ─────────────────────────────────────────────────────────────────
 
+// ─── Customer analytics router ──────────────────────────────────────────────
+const customersRouter = router({
+  list: adminProcedure.query(async () => {
+    const rows = await getAllCustomers();
+    return rows.map((c) => ({ ...c, loyaltyTier: getLoyaltyTier(c.totalOrders) }));
+  }),
+  get: adminProcedure
+    .input(z.object({ phone: z.string() }))
+    .query(async ({ input }) => {
+      const c = await getCustomerByPhone(input.phone);
+      if (!c) return null;
+      return { ...c, loyaltyTier: getLoyaltyTier(c.totalOrders) };
+    }),
+  getOrders: adminProcedure
+    .input(z.object({ phone: z.string() }))
+    .query(async ({ input }) => getCustomerOrders(input.phone)),
+  lookup: publicProcedure
+    .input(z.object({ phone: z.string().min(8) }))
+    .query(async ({ input }) => {
+      const c = await getCustomerByPhone(input.phone);
+      if (!c) return null;
+      const orderHistory = await getCustomerOrders(input.phone);
+      return {
+        ...c,
+        loyaltyTier: getLoyaltyTier(c.totalOrders),
+        recentOrders: orderHistory.slice(0, 5),
+      };
+    }),
+});
+
 export const appRouter = router({
   system: systemRouter,
+  customers: customersRouter,
 
   auth: router({
     me: publicProcedure.query((opts) => opts.ctx.user),
@@ -264,6 +302,19 @@ export const appRouter = router({
         .input(z.object({ id: z.number() }))
         .mutation(async ({ input }) => {
           await archiveOrder(input.id);
+          // Update customer analytics whenever an order is archived
+          try { await upsertCustomerFromOrder(input.id); } catch (e) { console.error('[customerDb] upsert failed', e); }
+          return { success: true };
+        }),
+      updateCustomerName: adminProcedure
+        .input(z.object({ id: z.number(), customerName: z.string().nullable() }))
+        .mutation(async ({ input }) => {
+          const { getDb } = await import('./db');
+          const db = await getDb();
+          if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
+          const { orders: ordersTable } = await import('../drizzle/schema');
+          const { eq } = await import('drizzle-orm');
+          await db.update(ordersTable).set({ customerName: input.customerName }).where(eq(ordersTable.id, input.id));
           return { success: true };
         }),
       unarchive: adminProcedure

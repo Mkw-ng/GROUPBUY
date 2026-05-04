@@ -76,6 +76,12 @@ export default function JoinSection() {
             Browse Deals
             <ArrowRight size={14} strokeWidth={1.5} />
           </a>
+          <a
+            href="/my-stats"
+            className="inline-flex items-center gap-2 font-display text-[11px] tracking-widest border border-[#f5f2ec]/25 text-[#f5f2ec]/70 px-7 py-4 hover:border-[#f5f2ec]/50 hover:text-[#f5f2ec] transition-colors"
+          >
+            ⭐ Check My Stats
+          </a>
         </motion.div>
       </div>
     </section>

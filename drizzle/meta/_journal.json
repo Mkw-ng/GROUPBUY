@@ -50,6 +50,13 @@
       "when": 1777796996736,
       "tag": "0006_talented_maximus",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "5",
+      "when": 1777855673769,
+      "tag": "0007_burly_sir_ram",
+      "breakpoints": true
     }
   ]
 }

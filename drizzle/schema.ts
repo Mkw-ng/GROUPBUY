@@ -120,6 +120,8 @@ export const orders = mysqlTable("orders", {
   dropId: int("dropId"),
   /** Archived orders are hidden from active tabs but retained for analytics */
   archived: boolean("archived").notNull().default(false),
+  /** Optional customer name filled in by admin */
+  customerName: varchar("customerName", { length: 255 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -157,3 +159,50 @@ export const drops = mysqlTable("drops", {
 });
 export type Drop = typeof drops.$inferSelect;
 export type InsertDrop = typeof drops.$inferInsert;
+
+/**
+ * Customers table — one row per unique phone number.
+ * Created/updated automatically when an order is archived.
+ * Used for customer analytics and the public "Check My Stats" feature.
+ */
+export const customers = mysqlTable("customers", {
+  id: int("id").autoincrement().primaryKey(),
+  /** Phone number — unique identifier for the customer */
+  phone: varchar("phone", { length: 20 }).notNull().unique(),
+  /** Optional name filled in by admin on any of their orders */
+  name: varchar("name", { length: 255 }),
+  /** Date of their first archived order */
+  firstOrderDate: timestamp("firstOrderDate"),
+  /** Date of their most recent archived order */
+  lastOrderDate: timestamp("lastOrderDate"),
+  /** Total number of archived orders */
+  totalOrders: int("totalOrders").notNull().default(0),
+  /** Total spend across all archived orders */
+  totalSpend: decimal("totalSpend", { precision: 12, scale: 2 }).notNull().default("0.00"),
+  /** Total kg ordered across all archived orders */
+  totalKg: decimal("totalKg", { precision: 10, scale: 3 }).notNull().default("0.000"),
+  /** Grand total of the largest single archived order */
+  largestOrder: decimal("largestOrder", { precision: 10, scale: 2 }).notNull().default("0.00"),
+  /** Grand total of the smallest single archived order */
+  smallestOrder: decimal("smallestOrder", { precision: 10, scale: 2 }).notNull().default("0.00"),
+  /** Number of archived orders that were Power Drop orders */
+  powerDropsAttended: int("powerDropsAttended").notNull().default(0),
+  /** Total dollar savings from Power Drop pricing across all archived orders */
+  totalSavings: decimal("totalSavings", { precision: 10, scale: 2 }).notNull().default("0.00"),
+  /** JSON: top 5 most ordered product names */
+  favouriteItems: text("favouriteItems"),
+  /** Most ordered product category */
+  favouriteCategory: varchar("favouriteCategory", { length: 64 }),
+  /** Most used pickup location */
+  preferredLocation: varchar("preferredLocation", { length: 32 }),
+  /** Current consecutive drop streak */
+  currentStreak: int("currentStreak").notNull().default(0),
+  /** Longest ever consecutive drop streak */
+  longestStreak: int("longestStreak").notNull().default(0),
+  /** JSON: { name, qty, orderId } of the biggest single item ever ordered */
+  biggestSingleItem: text("biggestSingleItem"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type Customer = typeof customers.$inferSelect;
+export type InsertCustomer = typeof customers.$inferInsert;
