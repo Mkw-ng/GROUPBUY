@@ -325,3 +325,8 @@
 - [x] Build BadgeGrid component in client/src/components/BadgeGrid.tsx — shows earned badges (bright) and locked badges (greyed out with lock icon)
 - [x] Integrate BadgeGrid into /my-stats receipt card below loyalty tier section
 - [x] Add badge count line to receipt card header ("X / Y badges earned")
+
+## Order History Accordion (/my-stats)
+- [x] Extend customers.lookup tRPC to return full order history (all archived orders, not just 5 recent)
+- [x] Build OrderHistoryAccordion component — collapsible per-order rows with item list, weights, totals
+- [x] Integrate OrderHistoryAccordion into /my-stats receipt card below badges section

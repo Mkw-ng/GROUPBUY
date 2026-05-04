@@ -10,6 +10,7 @@ import { Phone, Search, Share2, Copy, Check, Flame, Star, ShoppingBag, DollarSig
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import BadgeGrid from "@/components/BadgeGrid";
+import OrderHistoryAccordion from "@/components/OrderHistoryAccordion";
 
 const TIER_COLORS: Record<string, { bg: string; text: string; border: string }> = {
   Legend: { bg: "bg-yellow-50", text: "text-yellow-700", border: "border-yellow-300" },
@@ -269,6 +270,16 @@ export default function MyStats() {
                         earnedCount={stats.earnedBadgeCount ?? 0}
                         totalCount={stats.totalBadgeCount ?? 0}
                       />
+                    </div>
+                  </>
+                )}
+
+                {/* Order history accordion */}
+                {stats.orderHistory && stats.orderHistory.length > 0 && (
+                  <>
+                    <ReceiptDivider />
+                    <div className="py-1">
+                      <OrderHistoryAccordion orders={stats.orderHistory} />
                     </div>
                   </>
                 )}

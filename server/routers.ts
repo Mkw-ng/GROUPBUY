@@ -148,10 +148,38 @@ const customersRouter = router({
           return RARITY_ORDER[a.rarity] - RARITY_ORDER[b.rarity];
         });
 
+      // Build safe read-only order history (archived orders only, no admin-only fields)
+      const safeOrders = orderHistory
+        .filter((o) => o.archived)
+        .map((o) => {
+          // Compute order total from items + delivery
+          let items: Array<{ name: string; cut?: string; qty: number; price: string; unit: string; finalWeightKg?: string }> = [];
+          try { items = JSON.parse(o.items || "[]"); } catch { items = []; }
+          const sub = items.reduce((s, item) => {
+            const p = parseFloat(item.price) || 0;
+            const isKg = (item.unit || "").toLowerCase().includes("kg");
+            const w = parseFloat(item.finalWeightKg || "") || 0;
+            return s + (isKg && w > 0 ? p * w : p * item.qty);
+          }, 0);
+          const delivery = parseFloat(o.deliveryCharge ?? "0") || 0;
+          const total = (sub + delivery).toFixed(2);
+          return {
+            id: o.id,
+            createdAt: o.createdAt,
+            pickupDate: o.pickupDate,
+            location: o.location,
+            status: o.status,
+            isPowerDrop: o.isPowerDrop,
+            deliveryCharge: o.deliveryCharge,
+            items,
+            total,
+          };
+        });
+
       return {
         ...c,
         loyaltyTier: getLoyaltyTier(c.totalOrders),
-        recentOrders: orderHistory.slice(0, 5),
+        orderHistory: safeOrders,
         badges: allBadges,
         earnedBadgeCount: earnedIds.length,
         totalBadgeCount: ALL_BADGES.length,
