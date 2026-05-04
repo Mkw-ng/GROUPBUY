@@ -6,6 +6,7 @@ import { eq, desc, asc } from "drizzle-orm";
 import { getDb } from "./db";
 import { customers, orders, drops } from "../drizzle/schema";
 import type { Order, OrderItem } from "../drizzle/schema";
+import { ALL_BADGES } from "../shared/badges";
 
 // ─── Loyalty tier helper ────────────────────────────────────────────────────
 export function getLoyaltyTier(dropsAttended: number): {
@@ -20,6 +21,91 @@ export function getLoyaltyTier(dropsAttended: number): {
   if (dropsAttended >= 3) return { tier: "Regular", emoji: "🔪", next: "Loyal", dropsToNext: 6 - dropsAttended };
   if (dropsAttended >= 1) return { tier: "Fresh Cut", emoji: "🥩", next: "Regular", dropsToNext: 3 - dropsAttended };
   return { tier: "New", emoji: "🌱", next: "Fresh Cut", dropsToNext: 1 };
+}
+
+// ─── Badge unlock logic ──────────────────────────────────────────────────────
+interface BadgeInput {
+  totalOrders: number;
+  totalSpend: number;
+  totalKg: number;
+  largestOrder: number;
+  currentStreak: number;
+  longestStreak: number;
+  powerDropsAttended: number;
+  totalSavings: number;
+  favouriteCategory: string | null;
+  firstOrderDate: Date | null;
+  loyaltyTier: string;
+  favouriteItems: string[];
+  categoryHistory: string[];
+}
+
+export function computeBadges(stats: BadgeInput): string[] {
+  const earned: string[] = [];
+  const now = new Date();
+
+  const check = (id: string, condition: boolean) => {
+    if (condition) earned.push(id);
+  };
+
+  // First-time milestones
+  check("first_drop", stats.totalOrders >= 1);
+  check("welcome_to_the_family", stats.totalOrders >= 1);
+
+  // Order count milestones
+  check("five_drops", stats.totalOrders >= 5);
+  check("ten_drops", stats.totalOrders >= 10);
+  check("twenty_five_drops", stats.totalOrders >= 25);
+  check("fifty_drops", stats.totalOrders >= 50);
+
+  // Streak badges
+  check("on_fire", stats.longestStreak >= 3);
+  check("unstoppable", stats.longestStreak >= 5);
+  check("iron_streak", stats.longestStreak >= 10);
+
+  // Spend milestones
+  check("century_club", stats.totalSpend >= 100);
+  check("five_hundred_club", stats.totalSpend >= 500);
+  check("grand_club", stats.totalSpend >= 1000);
+  check("high_roller", stats.totalSpend >= 5000);
+
+  // Big order badges
+  check("big_order", stats.largestOrder >= 200);
+  check("mega_haul", stats.largestOrder >= 500);
+
+  // Power Drop badges
+  check("power_player", stats.powerDropsAttended >= 3);
+  check("power_addict", stats.powerDropsAttended >= 10);
+
+  // Weight / kg badges
+  check("ten_kg", stats.totalKg >= 10);
+  check("fifty_kg", stats.totalKg >= 50);
+  check("hundred_kg", stats.totalKg >= 100);
+
+  // Category loyalty badges
+  check("beef_loyalist", stats.favouriteCategory === "beef");
+  check("lamb_lover", stats.favouriteCategory === "lamb");
+  check("pork_king", stats.favouriteCategory === "pork");
+  check("seafood_fanatic", stats.favouriteCategory === "seafood");
+  check("m3atfr3ak", stats.categoryHistory.includes("m3atfr3ak"));
+
+  // Longevity / tenure badges
+  if (stats.firstOrderDate) {
+    const monthsOld =
+      (now.getTime() - stats.firstOrderDate.getTime()) / (1000 * 60 * 60 * 24 * 30.44);
+    check("three_months", monthsOld >= 3);
+    check("six_months", monthsOld >= 6);
+    check("one_year", monthsOld >= 12);
+  }
+
+  // Special / fun badges
+  check("savings_king", stats.totalSavings >= 100);
+  check("og_member", stats.loyaltyTier === "OG" || stats.loyaltyTier === "Legend");
+  check("legend", stats.loyaltyTier === "Legend");
+
+  // Only return IDs that exist in ALL_BADGES
+  const validIds = new Set(ALL_BADGES.map((b) => b.id));
+  return earned.filter((id) => validIds.has(id));
 }
 
 // ─── Recompute customer stats from all their archived orders ────────────────
@@ -54,6 +140,8 @@ export async function upsertCustomerFromOrder(orderId: number): Promise<void> {
   let powerDropsAttended = 0;
   const totalSavings = 0;
   const itemCounts: Record<string, number> = {};
+  const categoryCounts: Record<string, number> = {};
+  const categoryHistory: string[] = [];
   const locationCounts: Record<string, number> = {};
   let biggestSingleItem: { name: string; qty: number; orderId: number } | null = null;
 
@@ -83,6 +171,20 @@ export async function upsertCustomerFromOrder(orderId: number): Promise<void> {
       // Biggest single item
       if (!biggestSingleItem || qty > biggestSingleItem.qty) {
         biggestSingleItem = { name: item.name, qty, orderId: o.id };
+      }
+
+      // Category heuristic from item name keywords
+      const nameLower = (item.name || "").toLowerCase();
+      const catGuess =
+        nameLower.includes("beef") || nameLower.includes("wagyu") || nameLower.includes("ribeye") || nameLower.includes("brisket") || nameLower.includes("striploin") || nameLower.includes("scotch") ? "beef" :
+        nameLower.includes("lamb") || nameLower.includes("mutton") ? "lamb" :
+        nameLower.includes("pork") || nameLower.includes("bacon") || nameLower.includes("ham") ? "pork" :
+        nameLower.includes("chicken") || nameLower.includes("duck") || nameLower.includes("turkey") ? "poultry" :
+        nameLower.includes("prawn") || nameLower.includes("fish") || nameLower.includes("salmon") || nameLower.includes("seafood") || nameLower.includes("lobster") || nameLower.includes("crab") ? "seafood" :
+        null;
+      if (catGuess) {
+        categoryCounts[catGuess] = (categoryCounts[catGuess] || 0) + qty;
+        if (!categoryHistory.includes(catGuess)) categoryHistory.push(catGuess);
       }
     }
 
@@ -152,6 +254,30 @@ export async function upsertCustomerFromOrder(orderId: number): Promise<void> {
       .reverse()
       .find((o: Order) => o.customerName)?.customerName ?? null;
 
+  // ── Favourite category ────────────────────────────────────────────────────
+  const favouriteCategory =
+    Object.entries(categoryCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+
+  // ── Loyalty tier ─────────────────────────────────────────────────────────
+  const loyaltyTier = getLoyaltyTier(archivedOrders.length);
+
+  // ── Compute badges ────────────────────────────────────────────────────────
+  const earnedBadges = computeBadges({
+    totalOrders: archivedOrders.length,
+    totalSpend,
+    totalKg,
+    largestOrder,
+    currentStreak,
+    longestStreak,
+    powerDropsAttended,
+    totalSavings,
+    favouriteCategory,
+    firstOrderDate,
+    loyaltyTier: loyaltyTier.tier,
+    favouriteItems,
+    categoryHistory,
+  });
+
   // ── Upsert customer record ───────────────────────────────────────────────
   const existing = await db.select().from(customers).where(eq(customers.phone, phone));
 
@@ -172,6 +298,7 @@ export async function upsertCustomerFromOrder(orderId: number): Promise<void> {
     currentStreak,
     longestStreak,
     ...(biggestSingleItem != null ? { biggestSingleItem: JSON.stringify(biggestSingleItem) } : {}),
+    badges: JSON.stringify(earnedBadges),
   };
 
   if (existing.length > 0) {

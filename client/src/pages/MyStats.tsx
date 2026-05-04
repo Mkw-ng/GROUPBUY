@@ -9,6 +9,7 @@ import { Link } from "wouter";
 import { Phone, Search, Share2, Copy, Check, Flame, Star, ShoppingBag, DollarSign, Scale, Zap, MapPin, Calendar, ChevronLeft } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import BadgeGrid from "@/components/BadgeGrid";
 
 const TIER_COLORS: Record<string, { bg: string; text: string; border: string }> = {
   Legend: { bg: "bg-yellow-50", text: "text-yellow-700", border: "border-yellow-300" },
@@ -257,6 +258,20 @@ export default function MyStats() {
                     />
                   )}
                 </div>
+
+                {/* Achievement badges */}
+                {stats.badges && stats.badges.length > 0 && (
+                  <>
+                    <ReceiptDivider />
+                    <div className="py-1">
+                      <BadgeGrid
+                        badges={stats.badges}
+                        earnedCount={stats.earnedBadgeCount ?? 0}
+                        totalCount={stats.totalBadgeCount ?? 0}
+                      />
+                    </div>
+                  </>
+                )}
 
                 {/* Receipt footer */}
                 <div className="border-t border-dashed border-[#2b2b2b]/20 px-6 py-4 text-center">

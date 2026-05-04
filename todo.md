@@ -314,3 +314,14 @@
 - [x] Add "Check My Stats" teaser button in JoinSection and footer quick links
 - [x] Add "My Stats" link to site navigation (Navbar + Footer)
 - [x] Add Customers nav link in admin panel header (Admin.tsx + AdminOrders.tsx)
+
+## Achievement Badges System
+- [x] Define badge list (id, name, emoji, description, unlock condition) in shared/badges.ts
+- [x] Add `badges` JSON column to `customers` table in drizzle/schema.ts
+- [x] Run pnpm db:push to migrate
+- [x] Build computeBadges(stats) function in server/customerDb.ts — evaluates all unlock conditions
+- [x] Wire computeBadges into upsertCustomerFromOrder so badges are recalculated on every archive
+- [x] Expose earned badges via customers.lookup tRPC response
+- [x] Build BadgeGrid component in client/src/components/BadgeGrid.tsx — shows earned badges (bright) and locked badges (greyed out with lock icon)
+- [x] Integrate BadgeGrid into /my-stats receipt card below loyalty tier section
+- [x] Add badge count line to receipt card header ("X / Y badges earned")

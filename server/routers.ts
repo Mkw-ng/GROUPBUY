@@ -40,6 +40,7 @@ import {
   getCustomerOrders,
   getLoyaltyTier,
 } from "./customerDb";
+import { ALL_BADGES, RARITY_ORDER } from "../shared/badges";
 
 // ─── Admin guard middleware ─────────────────────────────────────────────────────────────────
 
@@ -134,10 +135,26 @@ const customersRouter = router({
       const c = await getCustomerByPhone(input.phone);
       if (!c) return null;
       const orderHistory = await getCustomerOrders(input.phone);
+
+      // Parse earned badge IDs stored as JSON
+      let earnedIds: string[] = [];
+      try { earnedIds = JSON.parse(c.badges || "[]"); } catch { earnedIds = []; }
+
+      // Build full badge list sorted: earned first, then by rarity
+      const allBadges = ALL_BADGES
+        .map((def) => ({ ...def, earned: earnedIds.includes(def.id) }))
+        .sort((a, b) => {
+          if (a.earned !== b.earned) return a.earned ? -1 : 1;
+          return RARITY_ORDER[a.rarity] - RARITY_ORDER[b.rarity];
+        });
+
       return {
         ...c,
         loyaltyTier: getLoyaltyTier(c.totalOrders),
         recentOrders: orderHistory.slice(0, 5),
+        badges: allBadges,
+        earnedBadgeCount: earnedIds.length,
+        totalBadgeCount: ALL_BADGES.length,
       };
     }),
 });

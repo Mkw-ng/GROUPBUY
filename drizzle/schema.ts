@@ -201,6 +201,8 @@ export const customers = mysqlTable("customers", {
   longestStreak: int("longestStreak").notNull().default(0),
   /** JSON: { name, qty, orderId } of the biggest single item ever ordered */
   biggestSingleItem: text("biggestSingleItem"),
+  /** JSON: array of earned badge IDs e.g. ["first_drop","on_fire"] */
+  badges: text("badges"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
