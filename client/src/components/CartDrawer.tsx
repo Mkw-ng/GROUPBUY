@@ -339,9 +339,31 @@ export default function CartDrawer({
                               >
                                 −
                               </button>
-                              <span className="w-8 text-center font-mono-brand text-[12px] text-[#f5f2ec]">
-                                {item.qty % 1 === 0 ? item.qty : item.qty.toFixed(1)}
-                              </span>
+                              <input
+                                type="number"
+                                min="0.5"
+                                step="0.5"
+                                value={item.qty % 1 === 0 ? item.qty : item.qty.toFixed(1)}
+                                onChange={(e) => {
+                                  const val = parseFloat(e.target.value);
+                                  if (!isNaN(val) && val >= 0.5) {
+                                    onQtyChange(item.id, Math.round(val * 10) / 10);
+                                  }
+                                }}
+                                onBlur={(e) => {
+                                  const val = parseFloat(e.target.value);
+                                  if (isNaN(val) || val < 0.5) {
+                                    onQtyChange(item.id, 1);
+                                  } else {
+                                    onQtyChange(item.id, Math.round(val * 10) / 10);
+                                  }
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                                }}
+                                onFocus={(e) => e.target.select()}
+                                className="w-12 text-center font-mono-brand text-[12px] text-[#f5f2ec] bg-transparent border-x border-white/15 py-0.5 focus:outline-none focus:bg-white/5 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                              />
                               <button
                                 onClick={() => {
                                   const next = Math.round((item.qty + 0.5) * 10) / 10;

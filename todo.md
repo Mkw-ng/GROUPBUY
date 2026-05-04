@@ -296,3 +296,6 @@
 - [x] Keyboard navigation (↑↓ to move, Enter to select, Escape to dismiss)
 - [x] Clicking a suggestion scrolls to and briefly highlights the product card
 - [x] Clicking outside dismisses the dropdown
+
+## Cart Quantity Input
+- [x] Replace the quantity display in CartDrawer with a typeable number input between the - and + buttons; validates on blur/Enter (min 0.5, step 0.5), falls back to 1 on invalid input
