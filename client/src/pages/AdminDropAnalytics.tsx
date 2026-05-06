@@ -444,41 +444,44 @@ function AnalyticsContent({ dropId }: { dropId: number | null }) {
                 {stats.categoryBreakdown.map((cat) => {
                   const isActive = selectedCategory === cat.label;
                   return (
-                    <button
+                    <div
                       key={cat.label}
+                      role="button"
+                      tabIndex={0}
                       onClick={() => setSelectedCategory(isActive ? null : cat.label)}
-                      className={`w-full flex items-center gap-3 text-left group transition-all rounded-none px-2 py-1 -mx-2 ${
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setSelectedCategory(isActive ? null : cat.label); }}
+                      className={`w-full flex items-center gap-3 cursor-pointer select-none group transition-all rounded-none px-2 py-1 -mx-2 ${
                         isActive
                           ? "bg-[#c73e3a]/10 ring-1 ring-[#c73e3a]/40"
                           : "hover:bg-white/[0.03]"
                       }`}
                     >
-                      <div className={`w-28 font-mono-brand text-[10px] truncate transition-colors ${
+                      <div className={`w-28 font-mono-brand text-[10px] truncate transition-colors pointer-events-none ${
                         isActive ? "text-[#f5f2ec]" : "text-[#8a857c] group-hover:text-[#f5f2ec]"
                       }`}>
                         {cat.label}
                       </div>
-                      <div className="flex-1 h-4 bg-white/5 overflow-hidden">
+                      <div className="flex-1 h-4 bg-white/5 overflow-hidden pointer-events-none">
                         <div
-                          className={`h-full transition-all ${
+                          className={`h-full transition-all pointer-events-none ${
                             isActive ? "bg-[#c73e3a]" : "bg-[#c73e3a]/60 group-hover:bg-[#c73e3a]/80"
                           }`}
                           style={{ width: stats.categoryBreakdown[0].revenue > 0 ? `${(cat.revenue / stats.categoryBreakdown[0].revenue) * 100}%` : "0%" }}
                         />
                       </div>
-                      <div className={`w-16 text-right font-mono-brand text-[10px] transition-colors ${
+                      <div className={`w-16 text-right font-mono-brand text-[10px] transition-colors pointer-events-none ${
                         isActive ? "text-[#f5f2ec]" : "text-[#f5f2ec]"
                       }`}>{fmtCurrency(cat.revenue)}</div>
-                      <div className="w-12 text-right font-mono-brand text-[10px] text-[#8a857c]">{cat.orders} orders</div>
+                      <div className="w-12 text-right font-mono-brand text-[10px] text-[#8a857c] pointer-events-none">{cat.orders} orders</div>
                       {cat.totalKg > 0 && (
-                        <div className="w-14 text-right font-mono-brand text-[10px] text-[#8a857c]">{cat.totalKg.toFixed(1)} kg</div>
+                        <div className="w-14 text-right font-mono-brand text-[10px] text-[#8a857c] pointer-events-none">{cat.totalKg.toFixed(1)} kg</div>
                       )}
                       {isActive && (
-                        <div className="w-4 flex items-center justify-center">
+                        <div className="w-4 flex items-center justify-center pointer-events-none">
                           <X size={10} className="text-[#c73e3a]" />
                         </div>
                       )}
-                    </button>
+                    </div>
                   );
                 })}
               </div>
@@ -553,7 +556,7 @@ function ItemBreakdownTable({
       }
       return sortDir === "asc" ? (av as number) - (bv as number) : (bv as number) - (av as number);
     });
-  }, [items, sortKey, sortDir, search]);
+  }, [items, sortKey, sortDir, search, selectedCategory]);
 
   const totalRevenue = items.reduce((s, i) => s + i.revenue, 0);
   const totalKg = items.reduce((s, i) => s + i.totalKg, 0);

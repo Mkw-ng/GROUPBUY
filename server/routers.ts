@@ -535,8 +535,9 @@ export const appRouter = router({
               }
             }
           }
-          const itemBreakdown = Object.values(itemMap).sort((a, b) => b.revenue - a.revenue);
-
+           const itemBreakdown = Object.values(itemMap).sort((a, b) => b.revenue - a.revenue);
+          console.log('[DEBUG dropStats] itemBreakdown sample:', JSON.stringify(itemBreakdown.slice(0,2).map(i => ({name: i.name, category: i.category, categoryLabel: i.categoryLabel}))));
+          console.log('[DEBUG dropStats] productCategoryMap keys:', Object.keys(productCategoryMap).slice(0,5));
           // ── Category breakdown: infer category from product catalogue ──
           const categoryMap: Record<string, { label: string; orders: number; revenue: number; totalQty: number; totalKg: number }> = {};
           for (const o of dropOrders) {
