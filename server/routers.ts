@@ -488,6 +488,69 @@ export const appRouter = router({
           }
           const topProducts = Object.values(productMap).sort((a, b) => b.count - a.count).slice(0, 10);
 
+          // ── Item breakdown: full table with qty, kg, revenue per product ──
+          interface ItemBreakdownEntry {
+            name: string;
+            cut: string;
+            unit: string;
+            ordersContaining: number; // how many orders include this item
+            totalQty: number;         // sum of qty (for unit-priced items)
+            totalKg: number;          // sum of finalWeightKg (for kg-priced items)
+            revenue: number;
+          }
+          const itemMap: Record<string, ItemBreakdownEntry> = {};
+          for (const o of dropOrders) {
+            const items: OrderItem[] = JSON.parse(o.items || "[]");
+            for (const item of items) {
+              const key = item.name;
+              if (!itemMap[key]) {
+                itemMap[key] = { name: item.name, cut: item.cut || "", unit: item.unit || "", ordersContaining: 0, totalQty: 0, totalKg: 0, revenue: 0 };
+              }
+              itemMap[key].ordersContaining += 1;
+              const p = parseFloat(item.price) || 0;
+              const isKg = (item.unit || "").toLowerCase().includes("kg");
+              const w = parseFloat(item.finalWeightKg || "") || 0;
+              if (isKg) {
+                itemMap[key].totalKg += w;
+                itemMap[key].revenue += w > 0 ? p * w : 0;
+              } else {
+                itemMap[key].totalQty += item.qty;
+                itemMap[key].revenue += p * item.qty;
+              }
+            }
+          }
+          const itemBreakdown = Object.values(itemMap).sort((a, b) => b.revenue - a.revenue);
+
+          // ── Category breakdown: infer category from product catalogue ──
+          const allProducts = await getAllProducts();
+          const productCategoryMap: Record<string, string> = {};
+          for (const p of allProducts) productCategoryMap[p.name.toLowerCase()] = p.category;
+
+          const CATEGORY_LABELS: Record<string, string> = {
+            beef: "Beef", pork: "Pork", lamb: "Lamb", poultry: "Poultry", seafood: "Seafood",
+            "whole-slabs": "Whole Slabs", "whole-animal": "Whole Animal", "box-deals": "Box Deals",
+            mince: "Mince", "limited-offer": "Limited Offer", "featured-deals": "Featured Deals",
+            m3atfr3ak: "M3ATFR3AK", other: "Other",
+          };
+          const categoryMap: Record<string, { label: string; orders: number; revenue: number; totalQty: number; totalKg: number }> = {};
+          for (const o of dropOrders) {
+            const items: OrderItem[] = JSON.parse(o.items || "[]");
+            const seenCats = new Set<string>();
+            for (const item of items) {
+              const cat = productCategoryMap[item.name.toLowerCase()] ?? "other";
+              const label = CATEGORY_LABELS[cat] ?? cat;
+              if (!categoryMap[cat]) categoryMap[cat] = { label, orders: 0, revenue: 0, totalQty: 0, totalKg: 0 };
+              const p = parseFloat(item.price) || 0;
+              const isKg = (item.unit || "").toLowerCase().includes("kg");
+              const w = parseFloat(item.finalWeightKg || "") || 0;
+              categoryMap[cat].revenue += isKg && w > 0 ? p * w : p * item.qty;
+              if (isKg) categoryMap[cat].totalKg += w;
+              else categoryMap[cat].totalQty += item.qty;
+              if (!seenCats.has(cat)) { categoryMap[cat].orders += 1; seenCats.add(cat); }
+            }
+          }
+          const categoryBreakdown = Object.values(categoryMap).sort((a, b) => b.revenue - a.revenue);
+
           const itemCounts = dropOrders.map((o) => (JSON.parse(o.items || "[]") as OrderItem[]).length);
           const avgItemsPerOrder = itemCounts.length > 0 ? itemCounts.reduce((s, c) => s + c, 0) / itemCounts.length : 0;
           const maxItemsPerOrder = itemCounts.length > 0 ? Math.max(...itemCounts) : 0;
@@ -560,6 +623,7 @@ export const appRouter = router({
             orderSizeBuckets: buckets, medianOrderValue, maxOrderValue, minOrderValue,
             repeatCustomers, repeatCustomerCount: repeatCustomers.length,
             cancelledOrders, lostRevenue,
+            itemBreakdown, categoryBreakdown,
           };
         }),
     }),

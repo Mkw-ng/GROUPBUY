@@ -3,9 +3,9 @@
  * Shows KPI bar, order funnel, fulfilment split, top products,
  * repeat customers, order size distribution, items per order, and cancellations.
  */
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useParams, Link } from "wouter";
-import { ArrowLeft, BarChart2, Check, Package, Pencil, TrendingUp, Users, MapPin, ShoppingCart, X, XCircle } from "lucide-react";
+import { ArrowLeft, BarChart2, Check, Package, Pencil, TrendingUp, Users, MapPin, ShoppingCart, X, XCircle, Tag, ArrowUpDown, ChevronUp, ChevronDown } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -424,6 +424,35 @@ function AnalyticsContent({ dropId }: { dropId: number | null }) {
             </SectionCard>
           )}
 
+          {/* Category Distribution */}
+          {stats.categoryBreakdown && stats.categoryBreakdown.length > 0 && (
+            <SectionCard title="CATEGORY DISTRIBUTION" icon={<Tag size={12} />}>
+              <div className="space-y-2">
+                {stats.categoryBreakdown.map((cat) => (
+                  <div key={cat.label} className="flex items-center gap-3">
+                    <div className="w-28 font-mono-brand text-[10px] text-[#8a857c] truncate">{cat.label}</div>
+                    <div className="flex-1 h-4 bg-white/5 overflow-hidden">
+                      <div
+                        className="h-full bg-[#c73e3a]/60 transition-all"
+                        style={{ width: stats.categoryBreakdown[0].revenue > 0 ? `${(cat.revenue / stats.categoryBreakdown[0].revenue) * 100}%` : "0%" }}
+                      />
+                    </div>
+                    <div className="w-16 text-right font-mono-brand text-[10px] text-[#f5f2ec]">{fmtCurrency(cat.revenue)}</div>
+                    <div className="w-12 text-right font-mono-brand text-[10px] text-[#8a857c]">{cat.orders} orders</div>
+                    {cat.totalKg > 0 && (
+                      <div className="w-14 text-right font-mono-brand text-[10px] text-[#8a857c]">{cat.totalKg.toFixed(1)} kg</div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </SectionCard>
+          )}
+
+          {/* Item Breakdown */}
+          {stats.itemBreakdown && stats.itemBreakdown.length > 0 && (
+            <ItemBreakdownTable items={stats.itemBreakdown} />
+          )}
+
           {stats.placed === 0 && (
             <div className="border border-dashed border-white/15 p-8 text-center">
               <p className="font-mono-brand text-[11px] text-[#8a857c]">No orders have been assigned to this drop yet.</p>
@@ -431,6 +460,155 @@ function AnalyticsContent({ dropId }: { dropId: number | null }) {
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── Item Breakdown Table ────────────────────────────────────────────────────
+type SortKey = "name" | "ordersContaining" | "totalQty" | "totalKg" | "revenue";
+type SortDir = "asc" | "desc";
+
+interface ItemBreakdownEntry {
+  name: string;
+  cut: string;
+  unit: string;
+  ordersContaining: number;
+  totalQty: number;
+  totalKg: number;
+  revenue: number;
+}
+
+function ItemBreakdownTable({ items }: { items: ItemBreakdownEntry[] }) {
+  const [sortKey, setSortKey] = useState<SortKey>("revenue");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [search, setSearch] = useState("");
+
+  const sorted = useMemo(() => {
+    const filtered = search
+      ? items.filter((i) => i.name.toLowerCase().includes(search.toLowerCase()) || i.cut.toLowerCase().includes(search.toLowerCase()))
+      : items;
+    return [...filtered].sort((a, b) => {
+      const av = a[sortKey];
+      const bv = b[sortKey];
+      if (typeof av === "string" && typeof bv === "string") {
+        return sortDir === "asc" ? av.localeCompare(bv) : bv.localeCompare(av);
+      }
+      return sortDir === "asc" ? (av as number) - (bv as number) : (bv as number) - (av as number);
+    });
+  }, [items, sortKey, sortDir, search]);
+
+  const totalRevenue = items.reduce((s, i) => s + i.revenue, 0);
+  const totalKg = items.reduce((s, i) => s + i.totalKg, 0);
+
+  function handleSort(key: SortKey) {
+    if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else { setSortKey(key); setSortDir("desc"); }
+  }
+
+  function SortIcon({ col }: { col: SortKey }) {
+    if (sortKey !== col) return <ArrowUpDown size={9} className="opacity-30" />;
+    return sortDir === "asc" ? <ChevronUp size={9} className="text-[#c73e3a]" /> : <ChevronDown size={9} className="text-[#c73e3a]" />;
+  }
+
+  return (
+    <div className="border border-white/10 bg-white/[0.02] p-5">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-1.5 font-mono-brand text-[9px] tracking-widest text-[#8a857c]">
+          <Package size={12} />
+          ITEM BREAKDOWN
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="font-mono-brand text-[9px] text-[#8a857c]">{items.length} items</span>
+          <input
+            type="text"
+            placeholder="Search items…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="bg-white/5 border border-white/10 text-[#f5f2ec] font-mono-brand text-[10px] px-2 py-1 w-36 focus:outline-none focus:border-white/25 placeholder:text-[#8a857c]"
+          />
+        </div>
+      </div>
+
+      {/* Summary totals */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4 border border-white/8 bg-white/[0.02] p-3">
+        <div>
+          <div className="font-mono-brand text-[9px] tracking-widest text-[#8a857c]">UNIQUE ITEMS</div>
+          <div className="font-mono-brand text-[14px] text-[#f5f2ec]">{items.length}</div>
+        </div>
+        <div>
+          <div className="font-mono-brand text-[9px] tracking-widest text-[#8a857c]">TOTAL REVENUE</div>
+          <div className="font-mono-brand text-[14px] text-[#f5f2ec]">{fmtCurrency(totalRevenue)}</div>
+        </div>
+        {totalKg > 0 && (
+          <div>
+            <div className="font-mono-brand text-[9px] tracking-widest text-[#8a857c]">TOTAL KG SOLD</div>
+            <div className="font-mono-brand text-[14px] text-[#f5f2ec]">{totalKg.toFixed(1)} kg</div>
+          </div>
+        )}
+      </div>
+
+      {/* Table */}
+      <div className="overflow-x-auto">
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr className="border-b border-white/10">
+              {([
+                { key: "name" as SortKey, label: "ITEM", align: "left" },
+                { key: "ordersContaining" as SortKey, label: "ORDERS", align: "right" },
+                { key: "totalQty" as SortKey, label: "QTY", align: "right" },
+                { key: "totalKg" as SortKey, label: "KG", align: "right" },
+                { key: "revenue" as SortKey, label: "REVENUE", align: "right" },
+              ] as const).map(({ key, label, align }) => (
+                <th
+                  key={key}
+                  onClick={() => handleSort(key)}
+                  className={`pb-2 font-mono-brand text-[9px] tracking-widest text-[#8a857c] cursor-pointer hover:text-[#f5f2ec] select-none ${
+                    align === "right" ? "text-right" : ""
+                  }`}
+                >
+                  <span className="inline-flex items-center gap-1">
+                    {label} <SortIcon col={key} />
+                  </span>
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {sorted.map((item, i) => {
+              const isKg = (item.unit || "").toLowerCase().includes("kg");
+              const revShare = totalRevenue > 0 ? (item.revenue / totalRevenue) * 100 : 0;
+              return (
+                <tr key={item.name} className={`border-b border-white/5 hover:bg-white/[0.03] transition-colors ${
+                  i % 2 === 0 ? "" : "bg-white/[0.01]"
+                }`}>
+                  <td className="py-2 pr-3">
+                    <div className="font-mono-brand text-[11px] text-[#f5f2ec] font-semibold">{item.name}</div>
+                    {item.cut && <div className="font-mono-brand text-[9px] text-[#8a857c]">{item.cut}</div>}
+                    {/* Revenue share bar */}
+                    <div className="mt-1 h-1 bg-white/5 w-32 overflow-hidden">
+                      <div className="h-full bg-[#c73e3a]/50" style={{ width: `${revShare}%` }} />
+                    </div>
+                  </td>
+                  <td className="py-2 text-right font-mono-brand text-[10px] text-[#8a857c]">{item.ordersContaining}</td>
+                  <td className="py-2 text-right font-mono-brand text-[10px] text-[#8a857c]">
+                    {isKg ? "—" : item.totalQty > 0 ? `${item.totalQty}×` : "—"}
+                  </td>
+                  <td className="py-2 text-right font-mono-brand text-[10px] text-[#8a857c]">
+                    {isKg && item.totalKg > 0 ? `${item.totalKg.toFixed(2)} kg` : "—"}
+                  </td>
+                  <td className="py-2 text-right font-mono-brand text-[11px] text-[#f5f2ec] font-semibold">
+                    {item.revenue > 0 ? fmtCurrency(item.revenue) : "—"}
+                    <div className="font-mono-brand text-[9px] text-[#8a857c] font-normal">{revShare.toFixed(1)}%</div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+        {sorted.length === 0 && (
+          <div className="py-6 text-center font-mono-brand text-[10px] text-[#8a857c]">No items match your search.</div>
+        )}
+      </div>
     </div>
   );
 }

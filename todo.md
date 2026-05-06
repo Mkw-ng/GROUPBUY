@@ -333,3 +333,8 @@
 
 ## Hero Section CTA
 - [x] Add "Check My Stats" secondary button to HeroSection alongside the existing CTA
+
+## Drop Analytics — Item Breakdown
+- [x] Extend dropStats tRPC: compute categoryBreakdown (orders, qty, revenue per category) and full itemBreakdown (qty sold, total kg, total revenue per product)
+- [x] Add Category Distribution section to AdminDropAnalytics (bar chart with revenue + order count per category)
+- [x] Add Item Breakdown table to AdminDropAnalytics (sortable by qty/revenue, shows kg for weight-based items)
