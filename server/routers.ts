@@ -105,8 +105,8 @@ function calcOrderTotal(o: { items: string; deliveryCharge?: string | null }): n
   const sub = items.reduce((s, item) => {
     const p = parseFloat(item.price) || 0;
     const kg = item.unit?.toLowerCase().includes("kg");
-    const w = parseFloat(item.finalWeightKg || "") || 0;
-    return s + (kg && w > 0 ? p * w : p * item.qty);
+    const w = parseFloat(item.finalWeightKg || "") || (kg ? item.qty : 0);
+    return s + (kg ? p * w : p * item.qty);
   }, 0);
   return sub + (parseFloat(o.deliveryCharge ?? "0") || 0);
 }
@@ -158,8 +158,8 @@ const customersRouter = router({
           const sub = items.reduce((s, item) => {
             const p = parseFloat(item.price) || 0;
             const isKg = (item.unit || "").toLowerCase().includes("kg");
-            const w = parseFloat(item.finalWeightKg || "") || 0;
-            return s + (isKg && w > 0 ? p * w : p * item.qty);
+            const w = parseFloat(item.finalWeightKg || "") || (isKg ? item.qty : 0);
+            return s + (isKg ? p * w : p * item.qty);
           }, 0);
           const delivery = parseFloat(o.deliveryCharge ?? "0") || 0;
           const total = (sub + delivery).toFixed(2);
@@ -482,8 +482,8 @@ export const appRouter = router({
               productMap[item.name].count += 1;
               const p = parseFloat(item.price) || 0;
               const kg = item.unit?.toLowerCase().includes("kg");
-              const w = parseFloat(item.finalWeightKg || "") || 0;
-              productMap[item.name].revenue += kg && w > 0 ? p * w : p * item.qty;
+              const w = parseFloat(item.finalWeightKg || "") || (kg ? item.qty : 0);
+              productMap[item.name].revenue += kg ? p * w : p * item.qty;
             }
           }
           const topProducts = Object.values(productMap).sort((a, b) => b.count - a.count).slice(0, 10);
@@ -525,7 +525,8 @@ export const appRouter = router({
               itemMap[key].ordersContaining += 1;
               const p = parseFloat(item.price) || 0;
               const isKg = (item.unit || "").toLowerCase().includes("kg");
-              const w = parseFloat(item.finalWeightKg || "") || 0;
+              // finalWeightKg is set after admin confirms weight; fall back to qty for kg items
+              const w = parseFloat(item.finalWeightKg || "") || (isKg ? item.qty : 0);
               if (isKg) {
                 itemMap[key].totalKg += w;
                 itemMap[key].revenue += w > 0 ? p * w : 0;
@@ -535,9 +536,7 @@ export const appRouter = router({
               }
             }
           }
-           const itemBreakdown = Object.values(itemMap).sort((a, b) => b.revenue - a.revenue);
-          console.log('[DEBUG dropStats] itemBreakdown sample:', JSON.stringify(itemBreakdown.slice(0,2).map(i => ({name: i.name, category: i.category, categoryLabel: i.categoryLabel}))));
-          console.log('[DEBUG dropStats] productCategoryMap keys:', Object.keys(productCategoryMap).slice(0,5));
+          const itemBreakdown = Object.values(itemMap).sort((a, b) => b.revenue - a.revenue);
           // ── Category breakdown: infer category from product catalogue ──
           const categoryMap: Record<string, { label: string; orders: number; revenue: number; totalQty: number; totalKg: number }> = {};
           for (const o of dropOrders) {
@@ -549,8 +548,8 @@ export const appRouter = router({
               if (!categoryMap[cat]) categoryMap[cat] = { label, orders: 0, revenue: 0, totalQty: 0, totalKg: 0 };
               const p = parseFloat(item.price) || 0;
               const isKg = (item.unit || "").toLowerCase().includes("kg");
-              const w = parseFloat(item.finalWeightKg || "") || 0;
-              categoryMap[cat].revenue += isKg && w > 0 ? p * w : p * item.qty;
+              const w = parseFloat(item.finalWeightKg || "") || (isKg ? item.qty : 0);
+              categoryMap[cat].revenue += isKg ? p * w : p * item.qty;
               if (isKg) categoryMap[cat].totalKg += w;
               else categoryMap[cat].totalQty += item.qty;
               if (!seenCats.has(cat)) { categoryMap[cat].orders += 1; seenCats.add(cat); }
@@ -607,8 +606,8 @@ export const appRouter = router({
             const total = items.reduce((s, item) => {
               const p = parseFloat(item.price) || 0;
               const kg = item.unit?.toLowerCase().includes("kg");
-              const w = parseFloat(item.finalWeightKg || "") || 0;
-              return s + (kg && w > 0 ? p * w : p * item.qty);
+              const w = parseFloat(item.finalWeightKg || "") || (kg ? item.qty : 0);
+              return s + (kg ? p * w : p * item.qty);
             }, 0);
             const topItem = items[0];
             return {
