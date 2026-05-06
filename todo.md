@@ -344,3 +344,6 @@
 - [x] Category bars become clickable toggles (active = red ring highlight, click again to deselect)
 - [x] Item Breakdown table filters to only show items in the selected category when a category is active
 - [x] Show "Filtered by: X — clear" chip above the item table when a category is active
+
+## Order Management — Phone Sort
+- [x] Add phone number as a sort option in AdminOrders (sort A→Z and Z→A by phone number)
