@@ -338,3 +338,9 @@
 - [x] Extend dropStats tRPC: compute categoryBreakdown (orders, qty, revenue per category) and full itemBreakdown (qty sold, total kg, total revenue per product)
 - [x] Add Category Distribution section to AdminDropAnalytics (bar chart with revenue + order count per category)
 - [x] Add Item Breakdown table to AdminDropAnalytics (sortable by qty/revenue, shows kg for weight-based items)
+
+## Drop Analytics — Clickable Category Filter
+- [x] Lift selectedCategory state into AnalyticsContent, pass it to both Category Distribution and Item Breakdown
+- [x] Category bars become clickable toggles (active = red ring highlight, click again to deselect)
+- [x] Item Breakdown table filters to only show items in the selected category when a category is active
+- [x] Show "Filtered by: X — clear" chip above the item table when a category is active

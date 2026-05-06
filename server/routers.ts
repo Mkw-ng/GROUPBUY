@@ -488,11 +488,25 @@ export const appRouter = router({
           }
           const topProducts = Object.values(productMap).sort((a, b) => b.count - a.count).slice(0, 10);
 
+          // ── Category lookup (shared by both item breakdown and category breakdown) ──
+          const allProducts = await getAllProducts();
+          const productCategoryMap: Record<string, string> = {};
+          for (const p of allProducts) productCategoryMap[p.name.toLowerCase()] = p.category;
+
+          const CATEGORY_LABELS: Record<string, string> = {
+            beef: "Beef", pork: "Pork", lamb: "Lamb", poultry: "Poultry", seafood: "Seafood",
+            "whole-slabs": "Whole Slabs", "whole-animal": "Whole Animal", "box-deals": "Box Deals",
+            mince: "Mince", "limited-offer": "Limited Offer", "featured-deals": "Featured Deals",
+            m3atfr3ak: "M3ATFR3AK", other: "Other",
+          };
+
           // ── Item breakdown: full table with qty, kg, revenue per product ──
           interface ItemBreakdownEntry {
             name: string;
             cut: string;
             unit: string;
+            category: string; // resolved from product catalogue, or "Other"
+            categoryLabel: string;
             ordersContaining: number; // how many orders include this item
             totalQty: number;         // sum of qty (for unit-priced items)
             totalKg: number;          // sum of finalWeightKg (for kg-priced items)
@@ -504,7 +518,9 @@ export const appRouter = router({
             for (const item of items) {
               const key = item.name;
               if (!itemMap[key]) {
-                itemMap[key] = { name: item.name, cut: item.cut || "", unit: item.unit || "", ordersContaining: 0, totalQty: 0, totalKg: 0, revenue: 0 };
+                const cat = productCategoryMap[item.name.toLowerCase()] ?? "other";
+                const catLabel = CATEGORY_LABELS[cat] ?? cat;
+                itemMap[key] = { name: item.name, cut: item.cut || "", unit: item.unit || "", category: cat, categoryLabel: catLabel, ordersContaining: 0, totalQty: 0, totalKg: 0, revenue: 0 };
               }
               itemMap[key].ordersContaining += 1;
               const p = parseFloat(item.price) || 0;
@@ -522,16 +538,6 @@ export const appRouter = router({
           const itemBreakdown = Object.values(itemMap).sort((a, b) => b.revenue - a.revenue);
 
           // ── Category breakdown: infer category from product catalogue ──
-          const allProducts = await getAllProducts();
-          const productCategoryMap: Record<string, string> = {};
-          for (const p of allProducts) productCategoryMap[p.name.toLowerCase()] = p.category;
-
-          const CATEGORY_LABELS: Record<string, string> = {
-            beef: "Beef", pork: "Pork", lamb: "Lamb", poultry: "Poultry", seafood: "Seafood",
-            "whole-slabs": "Whole Slabs", "whole-animal": "Whole Animal", "box-deals": "Box Deals",
-            mince: "Mince", "limited-offer": "Limited Offer", "featured-deals": "Featured Deals",
-            m3atfr3ak: "M3ATFR3AK", other: "Other",
-          };
           const categoryMap: Record<string, { label: string; orders: number; revenue: number; totalQty: number; totalKg: number }> = {};
           for (const o of dropOrders) {
             const items: OrderItem[] = JSON.parse(o.items || "[]");

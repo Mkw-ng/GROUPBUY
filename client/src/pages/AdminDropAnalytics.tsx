@@ -67,6 +67,7 @@ function AnalyticsContent({ dropId }: { dropId: number | null }) {
   const utils = trpc.useUtils();
   const [renaming, setRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const renameDrop = trpc.admin.drops.rename.useMutation({
     onSuccess: () => {
       toast.success("Drop renamed");
@@ -427,30 +428,73 @@ function AnalyticsContent({ dropId }: { dropId: number | null }) {
           {/* Category Distribution */}
           {stats.categoryBreakdown && stats.categoryBreakdown.length > 0 && (
             <SectionCard title="CATEGORY DISTRIBUTION" icon={<Tag size={12} />}>
+              {selectedCategory && (
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="font-mono-brand text-[9px] text-[#8a857c]">FILTERED BY:</span>
+                  <span className="font-mono-brand text-[10px] text-[#f5f2ec] border border-[#c73e3a]/50 bg-[#c73e3a]/10 px-2 py-0.5">{selectedCategory}</span>
+                  <button
+                    onClick={() => setSelectedCategory(null)}
+                    className="font-mono-brand text-[9px] text-[#8a857c] hover:text-[#c73e3a] underline transition-colors"
+                  >
+                    clear
+                  </button>
+                </div>
+              )}
               <div className="space-y-2">
-                {stats.categoryBreakdown.map((cat) => (
-                  <div key={cat.label} className="flex items-center gap-3">
-                    <div className="w-28 font-mono-brand text-[10px] text-[#8a857c] truncate">{cat.label}</div>
-                    <div className="flex-1 h-4 bg-white/5 overflow-hidden">
-                      <div
-                        className="h-full bg-[#c73e3a]/60 transition-all"
-                        style={{ width: stats.categoryBreakdown[0].revenue > 0 ? `${(cat.revenue / stats.categoryBreakdown[0].revenue) * 100}%` : "0%" }}
-                      />
-                    </div>
-                    <div className="w-16 text-right font-mono-brand text-[10px] text-[#f5f2ec]">{fmtCurrency(cat.revenue)}</div>
-                    <div className="w-12 text-right font-mono-brand text-[10px] text-[#8a857c]">{cat.orders} orders</div>
-                    {cat.totalKg > 0 && (
-                      <div className="w-14 text-right font-mono-brand text-[10px] text-[#8a857c]">{cat.totalKg.toFixed(1)} kg</div>
-                    )}
-                  </div>
-                ))}
+                {stats.categoryBreakdown.map((cat) => {
+                  const isActive = selectedCategory === cat.label;
+                  return (
+                    <button
+                      key={cat.label}
+                      onClick={() => setSelectedCategory(isActive ? null : cat.label)}
+                      className={`w-full flex items-center gap-3 text-left group transition-all rounded-none px-2 py-1 -mx-2 ${
+                        isActive
+                          ? "bg-[#c73e3a]/10 ring-1 ring-[#c73e3a]/40"
+                          : "hover:bg-white/[0.03]"
+                      }`}
+                    >
+                      <div className={`w-28 font-mono-brand text-[10px] truncate transition-colors ${
+                        isActive ? "text-[#f5f2ec]" : "text-[#8a857c] group-hover:text-[#f5f2ec]"
+                      }`}>
+                        {cat.label}
+                      </div>
+                      <div className="flex-1 h-4 bg-white/5 overflow-hidden">
+                        <div
+                          className={`h-full transition-all ${
+                            isActive ? "bg-[#c73e3a]" : "bg-[#c73e3a]/60 group-hover:bg-[#c73e3a]/80"
+                          }`}
+                          style={{ width: stats.categoryBreakdown[0].revenue > 0 ? `${(cat.revenue / stats.categoryBreakdown[0].revenue) * 100}%` : "0%" }}
+                        />
+                      </div>
+                      <div className={`w-16 text-right font-mono-brand text-[10px] transition-colors ${
+                        isActive ? "text-[#f5f2ec]" : "text-[#f5f2ec]"
+                      }`}>{fmtCurrency(cat.revenue)}</div>
+                      <div className="w-12 text-right font-mono-brand text-[10px] text-[#8a857c]">{cat.orders} orders</div>
+                      {cat.totalKg > 0 && (
+                        <div className="w-14 text-right font-mono-brand text-[10px] text-[#8a857c]">{cat.totalKg.toFixed(1)} kg</div>
+                      )}
+                      {isActive && (
+                        <div className="w-4 flex items-center justify-center">
+                          <X size={10} className="text-[#c73e3a]" />
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
+              {!selectedCategory && (
+                <p className="font-mono-brand text-[9px] text-[#8a857c]/60 mt-3">Click a category to filter the item breakdown below.</p>
+              )}
             </SectionCard>
           )}
 
           {/* Item Breakdown */}
           {stats.itemBreakdown && stats.itemBreakdown.length > 0 && (
-            <ItemBreakdownTable items={stats.itemBreakdown} />
+            <ItemBreakdownTable
+              items={stats.itemBreakdown}
+              selectedCategory={selectedCategory}
+              onClearCategory={() => setSelectedCategory(null)}
+            />
           )}
 
           {stats.placed === 0 && (
@@ -472,21 +516,35 @@ interface ItemBreakdownEntry {
   name: string;
   cut: string;
   unit: string;
+  category?: string;
+  categoryLabel?: string;
   ordersContaining: number;
   totalQty: number;
   totalKg: number;
   revenue: number;
 }
 
-function ItemBreakdownTable({ items }: { items: ItemBreakdownEntry[] }) {
+function ItemBreakdownTable({
+  items,
+  selectedCategory,
+  onClearCategory,
+}: {
+  items: ItemBreakdownEntry[];
+  selectedCategory?: string | null;
+  onClearCategory?: () => void;
+}) {
   const [sortKey, setSortKey] = useState<SortKey>("revenue");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [search, setSearch] = useState("");
 
   const sorted = useMemo(() => {
-    const filtered = search
-      ? items.filter((i) => i.name.toLowerCase().includes(search.toLowerCase()) || i.cut.toLowerCase().includes(search.toLowerCase()))
+    // Apply category filter first using the categoryLabel field attached by the server
+    let base = selectedCategory
+      ? items.filter((i) => i.categoryLabel === selectedCategory)
       : items;
+    const filtered = search
+      ? base.filter((i) => i.name.toLowerCase().includes(search.toLowerCase()) || i.cut.toLowerCase().includes(search.toLowerCase()))
+      : base;
     return [...filtered].sort((a, b) => {
       const av = a[sortKey];
       const bv = b[sortKey];
@@ -518,7 +576,18 @@ function ItemBreakdownTable({ items }: { items: ItemBreakdownEntry[] }) {
           ITEM BREAKDOWN
         </div>
         <div className="flex items-center gap-3">
-          <span className="font-mono-brand text-[9px] text-[#8a857c]">{items.length} items</span>
+          {selectedCategory && (
+            <div className="flex items-center gap-1.5">
+              <span className="font-mono-brand text-[9px] text-[#8a857c] border border-[#c73e3a]/40 bg-[#c73e3a]/10 px-2 py-0.5 text-[#f5f2ec]">{selectedCategory}</span>
+              <button
+                onClick={onClearCategory}
+                className="font-mono-brand text-[9px] text-[#8a857c] hover:text-[#c73e3a] underline transition-colors"
+              >
+                clear
+              </button>
+            </div>
+          )}
+          <span className="font-mono-brand text-[9px] text-[#8a857c]">{sorted.length}{selectedCategory ? ` of ${items.length}` : ""} items</span>
           <input
             type="text"
             placeholder="Search items…"
