@@ -3,7 +3,7 @@
  * Design: "Butcher's Receipt" — Ink/Paper/Cream alternating sections
  * Sections: Announcement → Navbar → Hero → HowItWorks → Deals → Pickup → FAQ → Join → Footer
  */
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { FlyToCartProvider } from "@/contexts/FlyToCartContext";
 import AnnouncementBanner from "@/components/AnnouncementBanner";
@@ -19,8 +19,24 @@ import CartDrawer, { CartItem } from "@/components/CartDrawer";
 
 export default function Home() {
   const [cartOpen, setCartOpen] = useState(false);
-  const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  const [cartItems, setCartItems] = useState<CartItem[]>(() => {
+    try {
+      const saved = localStorage.getItem("groupbuy_cart");
+      return saved ? (JSON.parse(saved) as CartItem[]) : [];
+    } catch {
+      return [];
+    }
+  });
   const [cartBump, setCartBump] = useState(0);
+
+  // Persist cart to localStorage on every change
+  useEffect(() => {
+    try {
+      localStorage.setItem("groupbuy_cart", JSON.stringify(cartItems));
+    } catch {
+      // storage full or unavailable — silently ignore
+    }
+  }, [cartItems]);
 
   // Fetch site-wide settings (announcement, power drop state)
   const { data: settings } = trpc.settings.getAll.useQuery(undefined, {
@@ -109,6 +125,10 @@ export default function Home() {
       <CartDrawer
         open={cartOpen}
         onClose={() => setCartOpen(false)}
+        onCheckoutSuccess={() => {
+          setCartItems([]);
+          try { localStorage.removeItem("groupbuy_cart"); } catch {}
+        }}
         items={cartItems}
         onRemove={handleRemove}
         onQtyChange={handleQtyChange}

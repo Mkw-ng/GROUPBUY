@@ -40,6 +40,7 @@ interface CartDrawerProps {
   items: CartItem[];
   onRemove: (id: number) => void;
   onQtyChange: (id: number, qty: number) => void;
+  onCheckoutSuccess?: () => void;
   powerDropActive?: boolean;
   powerDropActivatedAt?: string; // ISO timestamp of when Power Drop was activated
 }
@@ -58,6 +59,7 @@ export default function CartDrawer({
   items,
   onRemove,
   onQtyChange,
+  onCheckoutSuccess,
   powerDropActive = false,
   powerDropActivatedAt = "",
 }: CartDrawerProps) {
@@ -240,6 +242,8 @@ export default function CartDrawer({
         isPowerDrop: true,
       });
     }
+    // Clear the cart after checkout
+    onCheckoutSuccess?.();
   }
 
   // ─── Shared input styles ────────────────────────────────────────────────────

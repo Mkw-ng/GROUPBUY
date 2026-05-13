@@ -347,3 +347,7 @@
 
 ## Order Management — Phone Sort
 - [x] Add phone number as a sort option in AdminOrders (sort A→Z and Z→A by phone number)
+
+## Cart Persistence
+- [x] Persist cart items to localStorage so the cart survives page refreshes
+- [x] Clear cart from localStorage after successful checkout
