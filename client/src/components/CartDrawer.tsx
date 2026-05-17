@@ -8,7 +8,6 @@
  */
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useLocation } from "wouter";
 import {
   X,
   Trash2,
@@ -66,7 +65,6 @@ export default function CartDrawer({
 }: CartDrawerProps) {
   const total = items.reduce((sum, item) => sum + item.price * item.qty, 0);
   const { saved, save, clear } = useSavedOrderDetails();
-  const [, navigate] = useLocation();
 
   const createOrder = trpc.orders.create.useMutation();
 
@@ -244,34 +242,8 @@ export default function CartDrawer({
         isPowerDrop: true,
       });
     }
-    // Save order summary to sessionStorage for the success page
-    try {
-      const dateStr = pickupDate ? format(pickupDate, "EEEE, d MMMM yyyy") : "";
-      const orderSummary = {
-        phone: normalisePhone(phone),
-        pickupDate: dateStr,
-        location,
-        deliveryAddress: location === "delivery" ? deliveryAddress.trim() : undefined,
-        items: items.map((i) => ({
-          name: i.name,
-          cut: i.cut,
-          qty: i.qty,
-          price: i.price,
-          unit: i.unit,
-        })),
-        total: items.reduce((sum, i) => sum + i.price * i.qty, 0),
-        isPowerDrop: powerDropActive,
-        whatsappUrl: buildWhatsAppUrl(),
-        timestamp: Date.now(),
-      };
-      sessionStorage.setItem("groupbuy_last_order", JSON.stringify(orderSummary));
-    } catch {
-      // sessionStorage unavailable — silently ignore
-    }
     // Clear the cart after checkout
     onCheckoutSuccess?.();
-    // Navigate to success page after a short delay to allow WhatsApp to open
-    setTimeout(() => navigate("/order-success"), 400);
   }
 
   // ─── Shared input styles ────────────────────────────────────────────────────

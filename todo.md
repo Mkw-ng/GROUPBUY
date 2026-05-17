@@ -351,9 +351,3 @@
 ## Cart Persistence
 - [x] Persist cart items to localStorage so the cart survives page refreshes
 - [x] Clear cart from localStorage after successful checkout
-
-## Order Success Page
-- [x] Build /order-success page — receipt-style confirmation with order summary, next steps, WhatsApp retry link
-- [x] Pass order details (items, total, phone, location, pickup date) to the page via sessionStorage
-- [x] Wire CartDrawer checkout to navigate to /order-success after opening the WhatsApp link
-- [x] Register /order-success route in App.tsx

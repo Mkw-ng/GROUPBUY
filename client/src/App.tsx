@@ -12,7 +12,6 @@ import AdminDropAnalytics from "./pages/AdminDropAnalytics";
 import AdminCustomers from "./pages/AdminCustomers";
 import AdminCustomerProfile from "./pages/AdminCustomerProfile";
 import MyStats from "./pages/MyStats";
-import OrderSuccess from "./pages/OrderSuccess";
 
 function Router() {
   // make sure to consider if you need authentication for certain routes
@@ -26,7 +25,6 @@ function Router() {
       <Route path={"/admin/customers"} component={AdminCustomers} />
       <Route path={"/admin/customers/:phone"} component={AdminCustomerProfile} />
       <Route path={"/my-stats"} component={MyStats} />
-      <Route path={"/order-success"} component={OrderSuccess} />
       <Route path={"/404"} component={NotFound} />
       <Route component={NotFound} />
     </Switch>
