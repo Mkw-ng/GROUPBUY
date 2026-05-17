@@ -351,3 +351,9 @@
 ## Cart Persistence
 - [x] Persist cart items to localStorage so the cart survives page refreshes
 - [x] Clear cart from localStorage after successful checkout
+
+## Retail Price on Products
+- [x] Add `retailPrice` nullable decimal column to `products` table in drizzle/schema.ts
+- [x] Run pnpm db:push migration
+- [x] Add Retail Price input to admin product create/edit form
+- [x] Update product card Power Drop savings badge to compare against retailPrice when set, fallback to regular price

@@ -66,6 +66,8 @@ export const products = mysqlTable("products", {
   description: text("description"),
   price: decimal("price", { precision: 10, scale: 2 }).notNull(),
   powerDropPrice: decimal("powerDropPrice", { precision: 10, scale: 2 }),
+  /** Retail / RRP price — used as the comparison baseline for Power Drop savings when set */
+  retailPrice: decimal("retailPrice", { precision: 10, scale: 2 }),
   unit: varchar("unit", { length: 64 }).notNull().default("/ kg"),
   badge: mysqlEnum("badge", ["LIMITED", "POPULAR", "NEW", "SOLD OUT"]),
   available: boolean("available").notNull().default(true),

@@ -42,6 +42,7 @@ import {
   ArrowUp,
   ArrowDown,
   Check,
+  Tag,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -171,6 +172,7 @@ interface ProductForm {
   description: string;
   price: string;
   powerDropPrice: string;
+  retailPrice: string;
   unit: string;
   badge: BadgeType;
   available: boolean;
@@ -185,6 +187,7 @@ const EMPTY_FORM: ProductForm = {
   description: "",
   price: "",
   powerDropPrice: "",
+  retailPrice: "",
   unit: "/ kg",
   badge: null,
   available: true,
@@ -632,6 +635,7 @@ function AdminContent() {
         description: p.description ?? "",
         price: p.price,
         powerDropPrice: p.powerDropPrice ?? "",
+        retailPrice: (p as { retailPrice?: string | null }).retailPrice ?? "",
         unit: p.unit,
         badge: p.badge as BadgeType,
         available: p.available,
@@ -656,6 +660,7 @@ function AdminContent() {
       description: editingProduct.description || undefined,
       price: editingProduct.price,
       powerDropPrice: editingProduct.powerDropPrice || undefined,
+      retailPrice: editingProduct.retailPrice || undefined,
       unit: editingProduct.unit,
       badge: editingProduct.badge,
       available: editingProduct.available,
@@ -1129,6 +1134,25 @@ function AdminContent() {
                     />
                   </div>
                 </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium flex items-center gap-1">
+                    <Tag className="h-3 w-3 text-muted-foreground" />
+                    RRP / Retail
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
+                    <Input
+                      value={editingProduct.retailPrice}
+                      onChange={(e) =>
+                        setEditingProduct((p) => ({ ...p, retailPrice: e.target.value }))
+                      }
+                      placeholder="55.00"
+                      className="pl-6"
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 gap-3">
                 <div className="space-y-1.5">
                   <label className="text-sm font-medium">Unit</label>
                   <Input

@@ -100,6 +100,7 @@ type Product = {
   cut: string;
   price: string;
   powerDropPrice?: string | null;
+  retailPrice?: string | null;
   unit: string;
   badge?: "LIMITED" | "POPULAR" | "NEW" | "SOLD OUT" | null;
   available: boolean;
@@ -451,9 +452,12 @@ export default function DealsSection({ onAddToCart, powerDropActive = false }: D
                 {filtered.map((product, i) => {
                   const regularPrice = parseFloat(product.price);
                   const pdPrice = product.powerDropPrice ? parseFloat(product.powerDropPrice) : null;
+                  const retailPrice = product.retailPrice ? parseFloat(product.retailPrice) : null;
+                  // Use retailPrice as the comparison baseline when set, otherwise fall back to regularPrice
+                  const comparisonPrice = retailPrice ?? regularPrice;
                   const showPowerDrop = powerDropActive && pdPrice != null;
-                  const savingsPct = (showPowerDrop && pdPrice != null && pdPrice < regularPrice)
-                    ? Math.round(((regularPrice - pdPrice) / regularPrice) * 100)
+                  const savingsPct = (showPowerDrop && pdPrice != null && pdPrice < comparisonPrice)
+                    ? Math.round(((comparisonPrice - pdPrice) / comparisonPrice) * 100)
                     : null;
 
                   return (
@@ -522,7 +526,7 @@ export default function DealsSection({ onAddToCart, powerDropActive = false }: D
                             {showPowerDrop ? (
                               <div className="flex flex-col gap-0.5">
                                 <span className="font-mono-brand text-[13px] text-[#8a857c] line-through">
-                                  ${regularPrice.toFixed(2)}
+                                  ${comparisonPrice.toFixed(2)}
                                 </span>
                                 <div className="flex items-baseline gap-1">
                                   <span className="font-mono-brand text-[16px] sm:text-[22px] font-bold text-[#c73e3a]">

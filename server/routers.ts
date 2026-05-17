@@ -79,6 +79,7 @@ const productInput = z.object({
   description: z.string().optional(),
   price: z.string().regex(/^\d+(\.\d{1,2})?$/),
   powerDropPrice: z.string().regex(/^\d+(\.\d{1,2})?$/).optional(),
+  retailPrice: z.string().regex(/^\d+(\.\d{1,2})?$/).optional(),
   unit: z.string().default("/ kg"),
   badge: z.enum(["LIMITED", "POPULAR", "NEW", "SOLD OUT"]).optional().nullable(),
   available: z.boolean().default(true),
@@ -267,6 +268,7 @@ export const appRouter = router({
           ...input,
           description: input.description ?? null,
           powerDropPrice: input.powerDropPrice ?? null,
+          retailPrice: input.retailPrice ?? null,
           badge: input.badge ?? null,
           img: input.img ?? null,
         });
