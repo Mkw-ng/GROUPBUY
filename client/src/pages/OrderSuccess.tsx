@@ -38,18 +38,18 @@ const LOCATION_LABELS: Record<string, string> = {
 const NEXT_STEPS = [
   {
     step: "01",
-    title: "Check WhatsApp",
-    body: "Your order message has been sent to our WhatsApp. If it didn't open automatically, use the button below to resend.",
+    title: "Order Received",
+    body: "Just letting you know that your order has been received by our team.",
   },
   {
     step: "02",
     title: "Receive Your Invoice",
-    body: "We'll send your invoice via WhatsApp within 24 hours. Check your messages and confirm the items.",
+    body: "You'll receive your invoice via WhatsApp on Thursday after the power-drop closes. Check your messages and confirm the items.",
   },
   {
     step: "03",
     title: "Pay Before Cut-Off",
-    body: "Send your bank transfer or card payment before the Saturday night cut-off to lock in your order.",
+    body: "You'll have until Saturday night cut-off to lock in your order. An invoice not settled will be cancelled. If you miss out wait for the next power-drop. It'll happen once a month.",
   },
   {
     step: "04",
