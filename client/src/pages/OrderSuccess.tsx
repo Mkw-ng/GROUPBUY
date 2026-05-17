@@ -80,11 +80,9 @@ export default function OrderSuccess() {
     <div className="min-h-screen bg-[#0a0a0a] flex flex-col">
       {/* Top bar */}
       <div className="border-b border-white/10 px-6 py-4 flex items-center gap-4">
-        <Link href="/">
-          <a className="flex items-center gap-2 font-display text-[10px] tracking-widest text-[#8a857c] hover:text-[#f5f2ec] transition-colors">
+        <Link href="/" className="flex items-center gap-2 font-display text-[10px] tracking-widest text-[#8a857c] hover:text-[#f5f2ec] transition-colors">
             <ArrowLeft size={12} />
             BACK TO DEALS
-          </a>
         </Link>
         <div className="flex-1" />
         <span className="font-display text-[10px] tracking-widest text-[#8a857c]">GROUPBUY</span>
@@ -214,11 +212,9 @@ export default function OrderSuccess() {
               OPEN IN WHATSAPP
             </a>
           ) : (
-            <Link href="/">
-              <a className="w-full flex items-center justify-center gap-2 font-display text-[11px] tracking-widest bg-[#c73e3a] text-[#f5f2ec] py-4 hover:bg-[#a83330] transition-colors mb-3">
+            <Link href="/" className="w-full flex items-center justify-center gap-2 font-display text-[11px] tracking-widest bg-[#c73e3a] text-[#f5f2ec] py-4 hover:bg-[#a83330] transition-colors mb-3">
                 <ArrowLeft size={14} strokeWidth={1.5} />
                 BACK TO DEALS
-              </a>
             </Link>
           )}
           <p className="font-mono-brand text-[10px] text-[#5a5550] text-center">
@@ -255,16 +251,12 @@ export default function OrderSuccess() {
           transition={{ duration: 0.4, delay: 0.5 }}
           className="mt-12 pt-8 border-t border-white/10 flex flex-col sm:flex-row gap-3"
         >
-          <Link href="/">
-            <a className="flex-1 flex items-center justify-center gap-2 font-display text-[11px] tracking-widest border border-[#f5f2ec]/20 text-[#f5f2ec]/60 py-3.5 hover:border-[#f5f2ec]/40 hover:text-[#f5f2ec] transition-colors">
+          <Link href="/" className="flex-1 flex items-center justify-center gap-2 font-display text-[11px] tracking-widest border border-[#f5f2ec]/20 text-[#f5f2ec]/60 py-3.5 hover:border-[#f5f2ec]/40 hover:text-[#f5f2ec] transition-colors">
               <ArrowLeft size={12} />
               BACK TO DEALS
-            </a>
           </Link>
-          <Link href="/my-stats">
-            <a className="flex-1 flex items-center justify-center gap-2 font-display text-[11px] tracking-widest border border-[#f5f2ec]/20 text-[#f5f2ec]/60 py-3.5 hover:border-[#f5f2ec]/40 hover:text-[#f5f2ec] transition-colors">
+          <Link href="/my-stats" className="flex-1 flex items-center justify-center gap-2 font-display text-[11px] tracking-widest border border-[#f5f2ec]/20 text-[#f5f2ec]/60 py-3.5 hover:border-[#f5f2ec]/40 hover:text-[#f5f2ec] transition-colors">
               CHECK MY STATS
-            </a>
           </Link>
         </motion.div>
       </div>
