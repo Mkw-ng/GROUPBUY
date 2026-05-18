@@ -442,14 +442,32 @@ export const appRouter = router({
 
     settings: router({
       set: adminProcedure
-        .input(z.object({ key: z.string(), value: z.string() }))
+        .input(z.object({
+          key: z.enum([
+            "powerDropActive",
+            "powerDropActivatedAt",
+            "announcementActive",
+            "announcementMessage",
+            "powerDropLabel",
+          ]),
+          value: z.string(),
+        }))
         .mutation(async ({ input }) => {
           await setSetting(input.key, input.value);
           return { success: true };
         }),
 
       setMultiple: adminProcedure
-        .input(z.array(z.object({ key: z.string(), value: z.string() })))
+        .input(z.array(z.object({
+          key: z.enum([
+            "powerDropActive",
+            "powerDropActivatedAt",
+            "announcementActive",
+            "announcementMessage",
+            "powerDropLabel",
+          ]),
+          value: z.string(),
+        })))
         .mutation(async ({ input }) => {
           await Promise.all(input.map(({ key, value }) => setSetting(key, value)));
           return { success: true };
