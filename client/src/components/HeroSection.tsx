@@ -124,7 +124,7 @@ export default function HeroSection({ powerDropActive = false, powerDropActivate
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.35 }}
-          className="font-body text-[16px] text-[#f5f2ec]/60 max-w-md mb-10 leading-relaxed"
+          className="font-body text-[16px] text-[#f5f2ec]/90 max-w-md mb-10 leading-relaxed"
         >
           {powerDropActive
             ? "Our monthly Power Drop event is live. Every product is showing its lowest price of the month — for a limited time only."
@@ -190,7 +190,7 @@ export default function HeroSection({ powerDropActive = false, powerDropActivate
           </a>
           <a
             href="/my-stats"
-            className="inline-flex items-center gap-2 font-display text-[11px] tracking-widest border border-[#f5f2ec]/20 text-[#f5f2ec]/60 px-6 py-3.5 hover:border-[#c73e3a]/60 hover:text-[#c73e3a] transition-colors"
+            className="inline-flex items-center gap-2 font-display text-[11px] tracking-widest border border-[#f5f2ec]/20 text-[#f5f2ec]/80 px-6 py-3.5 hover:border-[#c73e3a]/60 hover:text-[#c73e3a] transition-colors"
           >
             <BarChart2 size={14} strokeWidth={1.5} />
             Check My Stats
