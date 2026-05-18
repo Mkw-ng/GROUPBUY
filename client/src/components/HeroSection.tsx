@@ -34,6 +34,8 @@ export default function HeroSection({ powerDropActive = false, powerDropActivate
           alt=""
           className="w-full h-full object-cover opacity-30"
           style={{ objectPosition: "center 40%" }}
+          fetchPriority="high"
+          loading="eager"
         />
         {/* Gradient overlay — left side stays dark for text legibility */}
         <div className="absolute inset-0 bg-gradient-to-r from-[#0a0a0a] via-[#0a0a0a]/80 to-[#0a0a0a]/20" />
