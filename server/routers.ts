@@ -367,9 +367,11 @@ export const appRouter = router({
     }),
 
     orders: router({
-      list: adminProcedure.query(async () => {
-        return getAllOrders();
-      }),
+      list: adminProcedure
+        .input(z.object({ limit: z.number().int().max(200).default(100), offset: z.number().int().default(0) }).optional())
+        .query(async ({ input }) => {
+          return getAllOrders(input?.limit, input?.offset);
+        }),
 
       updateItems: adminProcedure
         .input(

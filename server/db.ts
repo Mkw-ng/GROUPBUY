@@ -180,10 +180,10 @@ export async function createOrder(data: InsertOrder): Promise<number> {
   return (result[0] as { insertId: number }).insertId;
 }
 
-export async function getAllOrders() {
+export async function getAllOrders(limit = 100, offset = 0) {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(orders).where(eq(orders.archived, false)).orderBy(desc(orders.createdAt));
+  return db.select().from(orders).where(eq(orders.archived, false)).orderBy(desc(orders.createdAt)).limit(limit).offset(offset);
 }
 
 export async function getArchivedOrders() {
