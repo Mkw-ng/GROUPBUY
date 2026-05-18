@@ -172,6 +172,17 @@ const customersRouter = router({
   getOrders: adminProcedure
     .input(z.object({ phone: z.string() }))
     .query(async ({ input }) => getCustomerOrders(input.phone)),
+  updateNotes: adminProcedure
+    .input(z.object({ phone: z.string(), notes: z.string().max(1000) }))
+    .mutation(async ({ input }) => {
+      const { getDb } = await import('./db');
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
+      const { customers: customersTable } = await import('../drizzle/schema');
+      const { eq } = await import('drizzle-orm');
+      await db.update(customersTable).set({ adminNotes: input.notes }).where(eq(customersTable.phone, input.phone));
+      return { success: true };
+    }),
   lookup: publicProcedure
     .input(z.object({ phone: z.string().min(8) }))
     .query(async ({ input }) => {

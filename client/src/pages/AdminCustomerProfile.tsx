@@ -3,6 +3,7 @@
  * Route: /admin/customers/:phone
  */
 import { Link, useParams } from "wouter";
+import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import {
   ArrowLeft,
@@ -62,6 +63,20 @@ function locationLabel(location: string, deliveryAddress: string | null) {
 export default function AdminCustomerProfile() {
   const params = useParams<{ phone: string }>();
   const phone = decodeURIComponent(params.phone ?? "");
+
+  const [editingNotes, setEditingNotes] = useState(false);
+  const [notesValue, setNotesValue] = useState("");
+  const [notesSaved, setNotesSaved] = useState(false);
+
+  const utils = trpc.useUtils();
+  const updateNotesMutation = trpc.customers.updateNotes.useMutation({
+    onSuccess: () => {
+      utils.customers.get.invalidate({ phone });
+      setEditingNotes(false);
+      setNotesSaved(true);
+      setTimeout(() => setNotesSaved(false), 2000);
+    },
+  });
 
   const { data: customer, isLoading } = trpc.customers.get.useQuery(
     { phone },
@@ -283,6 +298,62 @@ export default function AdminCustomerProfile() {
             </div>
           </div>
         )}
+
+        {/* Admin Notes */}
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <p className="font-display text-[10px] tracking-widest text-[#8a857c]">ADMIN NOTES</p>
+            <div className="flex items-center gap-2">
+              {notesSaved && (
+                <span className="font-mono-brand text-[10px] text-emerald-400">Saved</span>
+              )}
+              {!editingNotes && (
+                <button
+                  onClick={() => { setNotesValue(customer.adminNotes ?? ""); setEditingNotes(true); }}
+                  className="font-mono-brand text-[10px] text-[#8a857c] hover:text-[#f5f2ec] transition-colors"
+                >
+                  Edit
+                </button>
+              )}
+            </div>
+          </div>
+          {editingNotes ? (
+            <div className="border border-white/10 p-4 flex flex-col gap-3">
+              <textarea
+                value={notesValue}
+                onChange={(e) => setNotesValue(e.target.value)}
+                maxLength={1000}
+                rows={4}
+                className="w-full bg-transparent border border-white/15 p-2 font-mono-brand text-[12px] text-[#f5f2ec] placeholder-[#6b6560] resize-none focus:outline-none focus:border-white/30"
+                placeholder="Add notes about this customer…"
+              />
+              <div className="flex items-center justify-between">
+                <span className="font-mono-brand text-[10px] text-[#6b6560]">{notesValue.length}/1000</span>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setEditingNotes(false)}
+                    className="font-mono-brand text-[10px] text-[#8a857c] hover:text-[#f5f2ec] transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => updateNotesMutation.mutate({ phone, notes: notesValue })}
+                    disabled={updateNotesMutation.isPending}
+                    className="font-mono-brand text-[10px] text-[#c73e3a] hover:text-[#f5f2ec] transition-colors disabled:opacity-50"
+                  >
+                    {updateNotesMutation.isPending ? "Saving…" : "Save"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="border border-white/10 p-4">
+              <p className="font-mono-brand text-[12px] text-[#f5f2ec] whitespace-pre-wrap">
+                {customer.adminNotes || <span className="text-[#6b6560]">No notes yet</span>}
+              </p>
+            </div>
+          )}
+        </div>
 
         {/* Order history */}
         <div>

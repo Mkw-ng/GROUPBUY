@@ -205,6 +205,8 @@ export const customers = mysqlTable("customers", {
   biggestSingleItem: text("biggestSingleItem"),
   /** JSON: array of earned badge IDs e.g. ["first_drop","on_fire"] */
   badges: text("badges"),
+  /** Free-text notes visible only to admins */
+  adminNotes: text("admin_notes"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

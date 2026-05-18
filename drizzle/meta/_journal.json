@@ -71,6 +71,13 @@
       "when": 1778999204596,
       "tag": "0009_volatile_risque",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "5",
+      "when": 1779100041444,
+      "tag": "0010_nebulous_raider",
+      "breakpoints": true
     }
   ]
 }

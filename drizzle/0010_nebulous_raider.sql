@@ -1,0 +1,1 @@
+ALTER TABLE `customers` ADD `admin_notes` text;
