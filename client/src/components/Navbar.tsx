@@ -152,6 +152,13 @@ export default function Navbar({ cartCount = 0, onCartClick, powerDropActive = f
           </nav>
         </div>
       )}
+      <span
+        aria-live="polite"
+        aria-atomic="true"
+        className="sr-only"
+      >
+        {cartCount > 0 ? `${cartCount} item${cartCount !== 1 ? "s" : ""} in cart` : "Cart is empty"}
+      </span>
     </header>
   );
 }
