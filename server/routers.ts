@@ -42,6 +42,17 @@ import {
 } from "./customerDb";
 import { ALL_BADGES, RARITY_ORDER } from "../shared/badges";
 
+// ─── In-memory cache for Power Drop expiry check ────────────────────────────
+let lastExpireCheckAt = 0;
+const EXPIRE_CHECK_INTERVAL_MS = 60_000;
+
+async function checkAndExpirePowerDropCached(): Promise<boolean> {
+  const now = Date.now();
+  if (now - lastExpireCheckAt < EXPIRE_CHECK_INTERVAL_MS) return false;
+  lastExpireCheckAt = now;
+  return checkAndExpirePowerDrop();
+}
+
 // ─── In-memory rate limiter for order creation ──────────────────────────────
 // Max 5 attempts per phone number per 10 minutes
 const ORDER_RATE_LIMIT = 5;
@@ -248,9 +259,8 @@ export const appRouter = router({
 
   settings: router({
     getAll: publicProcedure.query(async () => {
-      // Auto-expire Power Drop on every settings fetch so the server stays in sync
-      // even if no browser triggers the explicit expiry mutation.
-      await checkAndExpirePowerDrop();
+      // Auto-expire Power Drop on settings fetch, throttled to once per 60 seconds.
+      await checkAndExpirePowerDropCached();
       return getAllSettings();
     }),
 
