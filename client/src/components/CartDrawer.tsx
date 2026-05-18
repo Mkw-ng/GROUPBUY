@@ -139,6 +139,15 @@ export default function CartDrawer({
     }
   }, [saved]);
 
+  // Move focus into calendar when it opens
+  useEffect(() => {
+    if (!calendarOpen) return;
+    const firstFocusable = calendarRef.current?.querySelector<HTMLElement>(
+      'button:not([disabled]), [href], input:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    );
+    firstFocusable?.focus();
+  }, [calendarOpen]);
+
   // Close calendar on outside click
   useEffect(() => {
     function handleClick(e: MouseEvent) {
