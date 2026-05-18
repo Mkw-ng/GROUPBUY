@@ -358,6 +358,176 @@ function generateScheduleListPDF(orders: PaidOrder[]): Promise<Buffer> {
   });
 }
 
+interface FlatLineItem {
+  name: string;
+  cut: string;
+  qty: number;
+  finalWeightKg?: string;
+  unit: string;
+  phone: string;
+  pickupDate: string;
+}
+
+function generateItemsOrderedPDF(orders: PaidOrder[]): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const doc = new PDFDocument({ margin: 50, size: "A4", bufferPages: true });
+    const chunks: Buffer[] = [];
+    doc.on("data", (chunk: Buffer) => chunks.push(chunk));
+    doc.on("end", () => resolve(Buffer.concat(chunks)));
+    doc.on("error", reject);
+
+    const dateGenerated = new Date().toLocaleDateString("en-AU", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+
+    // ── Document header ────────────────────────────────────────────────────────
+    doc
+      .font("Helvetica-Bold")
+      .fontSize(18)
+      .fillColor("#000000")
+      .text("GROUPBUY \u2014 Items Ordered List", { align: "left" });
+
+    doc
+      .font("Helvetica")
+      .fontSize(9)
+      .fillColor("#666666")
+      .text(`Generated: ${dateGenerated}`, { align: "left" })
+      .moveDown(0.8);
+
+    doc
+      .moveTo(50, doc.y)
+      .lineTo(545, doc.y)
+      .strokeColor("#000000")
+      .lineWidth(1)
+      .stroke();
+    doc.moveDown(0.8);
+
+    // ── Flatten all orders into line items ───────────────────────────────────────
+    const flatItems: FlatLineItem[] = [];
+    for (const order of orders) {
+      const items = parseItems(order.items);
+      for (const item of items) {
+        flatItems.push({
+          name: item.name,
+          cut: item.cut || "",
+          qty: item.qty,
+          finalWeightKg: item.finalWeightKg,
+          unit: item.unit || "",
+          phone: order.phone,
+          pickupDate: order.pickupDate,
+        });
+      }
+    }
+
+    // ── Group by pickupDate (sorted asc) ──────────────────────────────────────────
+    const byDate = new Map<string, FlatLineItem[]>();
+    for (const li of flatItems) {
+      if (!byDate.has(li.pickupDate)) byDate.set(li.pickupDate, []);
+      byDate.get(li.pickupDate)!.push(li);
+    }
+    const sortedDates = Array.from(byDate.entries()).sort(([a], [b]) => a.localeCompare(b));
+
+    // ── Render ────────────────────────────────────────────────────────────────────
+    for (const [pickupDate, dateItems] of sortedDates) {
+      // Date section header
+      doc
+        .font("Helvetica-Bold")
+        .fontSize(13)
+        .fillColor("#000000")
+        .text(pickupDate);
+
+      doc.moveDown(0.2);
+      doc
+        .moveTo(50, doc.y)
+        .lineTo(545, doc.y)
+        .strokeColor("#333333")
+        .lineWidth(0.75)
+        .stroke();
+      doc.moveDown(0.6);
+
+      // Group by name+cut key (alphabetically by name then cut)
+      const byProduct = new Map<string, FlatLineItem[]>();
+      for (const li of dateItems) {
+        const key = `${li.name}|||${li.cut}`;
+        if (!byProduct.has(key)) byProduct.set(key, []);
+        byProduct.get(key)!.push(li);
+      }
+      const sortedProducts = Array.from(byProduct.entries()).sort(([a], [b]) => a.localeCompare(b));
+
+      for (let pi = 0; pi < sortedProducts.length; pi++) {
+        const [productKey, productItems] = sortedProducts[pi];
+        const [productName, productCut] = productKey.split("|||");
+
+        // Product sub-header: bold name + regular cut on same line
+        const subHeaderText = productCut
+          ? `${productName} \u2014 ${productCut}`
+          : productName;
+        doc
+          .font("Helvetica-Bold")
+          .fontSize(10)
+          .fillColor("#000000")
+          .text(subHeaderText);
+        doc.moveDown(0.2);
+
+        // One line per customer
+        for (const li of productItems) {
+          const weight = parseFloat(li.finalWeightKg || "") || 0;
+          const isKg = (li.unit || "").toLowerCase().includes("kg");
+          let qtyStr: string;
+          if (weight > 0) {
+            qtyStr = `${weight.toFixed(1)} kg`;
+          } else if (isKg) {
+            qtyStr = `${li.qty} kg`;
+          } else {
+            // strip leading slash from unit if present
+            const unitLabel = li.unit.replace(/^\/\s*/, "") || "pc";
+            qtyStr = `${li.qty} ${unitLabel}`;
+          }
+          doc
+            .font("Helvetica")
+            .fontSize(9)
+            .fillColor("#000000")
+            .text(`${qtyStr} \u2014 ${li.phone}`, { indent: 10 });
+        }
+
+        // Thin divider between product groups (not after the last one in the date)
+        if (pi < sortedProducts.length - 1) {
+          doc.moveDown(0.4);
+          doc
+            .moveTo(50, doc.y)
+            .lineTo(545, doc.y)
+            .strokeColor("#cccccc")
+            .lineWidth(0.4)
+            .stroke();
+          doc.moveDown(0.4);
+        }
+      }
+
+      doc.moveDown(1.0);
+    }
+
+    // ── Page numbers ───────────────────────────────────────────────────────────
+    const totalPages = doc.bufferedPageRange().count + 1;
+    for (let p = 0; p < totalPages; p++) {
+      doc.switchToPage(p);
+      doc
+        .font("Helvetica")
+        .fontSize(8)
+        .fillColor("#aaaaaa")
+        .text(
+          `Page ${p + 1}`,
+          50,
+          doc.page.height - 40,
+          { align: "center", width: doc.page.width - 100 }
+        );
+    }
+
+    doc.end();
+  });
+}
+
 export function registerInvoiceRoutes(app: Application) {
   const router = Router();
 
@@ -441,6 +611,48 @@ export function registerInvoiceRoutes(app: Application) {
       console.error("[schedule-list] error:", err instanceof Error ? err.message : err);
       if (!res.headersSent) {
         res.status(500).json({ error: "Failed to generate schedule list" });
+      }
+    }
+  });
+
+  router.get("/api/admin/items/download", async (req, res) => {
+    try {
+      // Admin-only auth check
+      let user;
+      try {
+        user = await sdk.authenticateRequest(req as any);
+      } catch {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
+      if (!user || user.role !== "admin") {
+        res.status(403).json({ error: "Forbidden" });
+        return;
+      }
+
+      // Fetch all paid orders
+      const allOrders = await getAllOrders();
+      const paidOrders = allOrders.filter((o) => o.status === "paid") as PaidOrder[];
+
+      if (paidOrders.length === 0) {
+        res.status(404).json({ error: "No paid orders found" });
+        return;
+      }
+
+      const pdfBuffer = await generateItemsOrderedPDF(paidOrders);
+
+      const dateStr = new Date().toISOString().slice(0, 10);
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="items-ordered-${dateStr}.pdf"`
+      );
+      res.setHeader("Content-Length", pdfBuffer.length);
+      res.send(pdfBuffer);
+    } catch (err) {
+      console.error("[items-ordered] error:", err instanceof Error ? err.message : err);
+      if (!res.headersSent) {
+        res.status(500).json({ error: "Failed to generate items ordered list" });
       }
     }
   });
