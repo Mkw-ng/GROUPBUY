@@ -17,6 +17,7 @@ import {
   Calendar,
   TrendingUp,
   Zap,
+  Clock,
 } from "lucide-react";
 
 const TIER_COLORS: Record<string, string> = {
@@ -235,6 +236,19 @@ export default function AdminCustomerProfile() {
                 value={customer.powerDropsAttended}
               />
             )}
+            {(() => {
+              const daysSinceLastOrder = customer.lastOrderDate
+                ? Math.floor((Date.now() - new Date(customer.lastOrderDate).getTime()) / (1000 * 60 * 60 * 24))
+                : null;
+              return (
+                <StatCard
+                  icon={<Clock size={14} />}
+                  label="LAST SEEN"
+                  value={daysSinceLastOrder != null ? `${daysSinceLastOrder}d ago` : "—"}
+                  sub={customer.lastOrderDate ? new Date(customer.lastOrderDate).toLocaleDateString() : undefined}
+                />
+              );
+            })()}
           </div>
         </div>
 
