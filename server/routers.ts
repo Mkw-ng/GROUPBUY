@@ -42,6 +42,7 @@ import {
   getLoyaltyTier,
 } from "./customerDb";
 import { ALL_BADGES, RARITY_ORDER } from "../shared/badges";
+import { calcOrderTotal as calcOrderTotalUtil, calcLineItemTotal } from "../shared/orderUtils";
 
 // ─── In-memory cache for Power Drop expiry check ────────────────────────────
 let lastExpireCheckAt = 0;
@@ -150,13 +151,7 @@ const orderItemSchema = z.object({
 
 function calcOrderTotal(o: { items: string; deliveryCharge?: string | null }): number {
   const items: OrderItem[] = JSON.parse(o.items || "[]");
-  const sub = items.reduce((s, item) => {
-    const p = parseFloat(item.price) || 0;
-    const kg = item.unit?.toLowerCase().includes("kg");
-    const w = parseFloat(item.finalWeightKg || "") || (kg ? item.qty : 0);
-    return s + (kg ? p * w : p * item.qty);
-  }, 0);
-  return sub + (parseFloat(o.deliveryCharge ?? "0") || 0);
+  return calcOrderTotalUtil(items, o.deliveryCharge);
 }
 
 // ─── App Router ─────────────────────────────────────────────────────────────────
@@ -699,12 +694,7 @@ export const appRouter = router({
 
           const cancelledOrders = dropOrders.filter((o) => o.status === "cancelled").map((o) => {
             const items: OrderItem[] = JSON.parse(o.items || "[]");
-            const total = items.reduce((s, item) => {
-              const p = parseFloat(item.price) || 0;
-              const kg = item.unit?.toLowerCase().includes("kg");
-              const w = parseFloat(item.finalWeightKg || "") || (kg ? item.qty : 0);
-              return s + (kg ? p * w : p * item.qty);
-            }, 0);
+            const total = items.reduce((s, item) => s + calcLineItemTotal(item), 0);
             const topItem = items[0];
             return {
               phone: o.phone.replace(/(\d{4})(\d{3})(\d{3})/, "$1 \u2022\u2022\u2022 \u2022\u2022\u2022"),

@@ -12,6 +12,7 @@ import PDFDocument from "pdfkit";
 import archiver from "archiver";
 import { sdk } from "./_core/sdk";
 import { getAllOrders } from "./db";
+import { calcLineItemTotal } from "../shared/orderUtils";
 
 interface OrderItem {
   id: number;
@@ -29,13 +30,6 @@ function parseItems(raw: string): OrderItem[] {
   } catch {
     return [];
   }
-}
-
-function calcItemTotal(item: OrderItem): number {
-  const price = parseFloat(item.price) || 0;
-  const weight = parseFloat(item.finalWeightKg || "") || 0;
-  if (weight > 0) return price * weight;
-  return price * item.qty;
 }
 
 function locationLabel(location: string, address: string | null): string {
@@ -73,7 +67,7 @@ function generateInvoicePDF(order: {
     doc.on("error", reject);
 
     const items = parseItems(order.items);
-    const subtotal = items.reduce((sum, i) => sum + calcItemTotal(i), 0);
+    const subtotal = items.reduce((sum, i) => sum + calcLineItemTotal(i), 0);
     const delivery = parseFloat(order.deliveryCharge || "0") || 0;
     const grandTotal = subtotal + delivery;
 
@@ -177,7 +171,7 @@ function generateInvoicePDF(order: {
       const weight = parseFloat(item.finalWeightKg || "") || 0;
       const finalQty = weight > 0 ? weight : item.qty;
       const unit = stripUnit(item.unit);
-      const total = calcItemTotal(item);
+      const total = calcLineItemTotal(item);
       const rowY = doc.y;
 
       if (idx % 2 === 1) {

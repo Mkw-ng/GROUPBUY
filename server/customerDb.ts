@@ -7,6 +7,7 @@ import { getDb } from "./db";
 import { customers, orders, drops } from "../drizzle/schema";
 import type { Order, OrderItem } from "../drizzle/schema";
 import { ALL_BADGES } from "../shared/badges";
+import { calcLineItemTotal } from "../shared/orderUtils";
 
 // ─── Loyalty tier helper ────────────────────────────────────────────────────
 export function getLoyaltyTier(dropsAttended: number): {
@@ -158,9 +159,8 @@ export async function upsertCustomerFromOrder(orderId: number): Promise<void> {
     let orderKg = 0;
     for (const item of items) {
       const qty = Number(item.qty) || 0;
-      const price = parseFloat(String(item.price)) || 0;
       const finalKg = item.finalWeightKg ? parseFloat(String(item.finalWeightKg)) : qty;
-      orderTotal += price * finalKg;
+      orderTotal += calcLineItemTotal({ price: String(item.price), qty: item.qty, unit: item.unit || "", finalWeightKg: item.finalWeightKg });
       orderKg += finalKg;
 
       // Item frequency
