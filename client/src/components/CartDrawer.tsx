@@ -445,11 +445,18 @@ export default function CartDrawer({
                               <span className="font-mono-brand text-[14px] font-bold text-[#c73e3a]">
                                 {`$${item.price.toFixed(2)}/${item.unit.replace(/^\/\s*/, "")}`}
                               </span>
-                              {powerDropActive && item.regularPrice != null && item.regularPrice > item.price && (
-                                <span className="font-mono-brand text-[9px] font-bold text-emerald-400 bg-emerald-900/40 border border-emerald-700/50 px-1.5 py-0.5 rounded-full leading-none">
-                                  SAVE {Math.round(((item.regularPrice - item.price) / item.regularPrice) * 100)}%
-                                </span>
-                              )}
+                              {powerDropActive && (() => {
+                                const baseline = (item.retailPrice != null && item.retailPrice > 0)
+                                  ? item.retailPrice
+                                  : item.regularPrice;
+                                if (baseline == null || baseline <= item.price) return null;
+                                const pct = Math.round(((baseline - item.price) / baseline) * 100);
+                                return (
+                                  <span className="font-mono-brand text-[9px] font-bold text-emerald-400 bg-emerald-900/40 border border-emerald-700/50 px-1.5 py-0.5 rounded-full leading-none">
+                                    SAVE {pct}%
+                                  </span>
+                                );
+                              })()}
                             </div>
                           </div>
                         </div>
