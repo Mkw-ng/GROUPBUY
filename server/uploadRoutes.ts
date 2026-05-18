@@ -42,7 +42,14 @@ export function registerUploadRoutes(app: Application) {
           return;
         }
 
-        const ext = req.file.originalname.split(".").pop() ?? "jpg";
+        const MIME_TO_EXT: Record<string, string> = {
+          "image/jpeg": "jpg",
+          "image/png": "png",
+          "image/webp": "webp",
+          "image/gif": "gif",
+          "image/avif": "avif",
+        };
+        const ext = MIME_TO_EXT[req.file.mimetype] ?? "jpg";
         const key = `products/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
         const { url } = await storagePut(key, req.file.buffer, req.file.mimetype);
 
