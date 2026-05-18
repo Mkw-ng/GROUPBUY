@@ -42,6 +42,41 @@ import {
 } from "./customerDb";
 import { ALL_BADGES, RARITY_ORDER } from "../shared/badges";
 
+// ─── In-memory rate limiter for order creation ──────────────────────────────
+// Max 5 attempts per phone number per 10 minutes
+const ORDER_RATE_LIMIT = 5;
+const ORDER_RATE_WINDOW_MS = 10 * 60 * 1000;
+const orderAttempts = new Map<string, { count: number; windowStart: number }>();
+
+function checkOrderRateLimit(phone: string): void {
+  const now = Date.now();
+  const entry = orderAttempts.get(phone);
+  if (!entry || now - entry.windowStart > ORDER_RATE_WINDOW_MS) {
+    orderAttempts.set(phone, { count: 1, windowStart: now });
+    return;
+  }
+  if (entry.count >= ORDER_RATE_LIMIT) {
+    throw new TRPCError({
+      code: "TOO_MANY_REQUESTS",
+      message: "Too many order attempts. Please wait 10 minutes before trying again.",
+    });
+  }
+  entry.count += 1;
+}
+
+// ─── Order item validation schema ────────────────────────────────────────────
+const orderItemValidationSchema = z.array(
+  z.object({
+    id: z.number().int().positive(),
+    name: z.string(),
+    cut: z.string(),
+    qty: z.number().positive().max(999),
+    price: z.string().regex(/^\d+(\.\d{1,2})?$/, "Invalid price format"),
+    unit: z.string(),
+    finalWeightKg: z.string().optional(),
+  })
+);
+
 // ─── Admin guard middleware ─────────────────────────────────────────────────────────────────
 
 const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
@@ -242,13 +277,33 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ input }) => {
+        // Rate limit: max 5 attempts per phone per 10 minutes
+        checkOrderRateLimit(input.phone);
+
+        // Validate and parse items JSON
+        let parsedItems: z.infer<typeof orderItemValidationSchema>;
+        try {
+          const raw = JSON.parse(input.items);
+          const result = orderItemValidationSchema.safeParse(raw);
+          if (!result.success) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: "Invalid order items: " + result.error.issues.map((i) => i.message).join(", "),
+            });
+          }
+          parsedItems = result.data;
+        } catch (err) {
+          if (err instanceof TRPCError) throw err;
+          throw new TRPCError({ code: "BAD_REQUEST", message: "items must be valid JSON" });
+        }
+
         const activeDrop = await getActiveDrop();
         const id = await createOrder({
           phone: input.phone,
           pickupDate: input.pickupDate,
           location: input.location,
           deliveryAddress: input.deliveryAddress ?? null,
-          items: input.items,
+          items: JSON.stringify(parsedItems),
           specialInstructions: input.specialInstructions ?? null,
           isPowerDrop: input.isPowerDrop,
           status: "pending",
