@@ -226,6 +226,138 @@ function generatePackingSheetPDF(orders: PaidOrder[]): Promise<Buffer> {
   });
 }
 
+function generateScheduleListPDF(orders: PaidOrder[]): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const doc = new PDFDocument({ margin: 50, size: "A4", bufferPages: true });
+    const chunks: Buffer[] = [];
+    doc.on("data", (chunk: Buffer) => chunks.push(chunk));
+    doc.on("end", () => resolve(Buffer.concat(chunks)));
+    doc.on("error", reject);
+
+    const dateGenerated = new Date().toLocaleDateString("en-AU", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+
+    // ── Document header ────────────────────────────────────────────────────────
+    doc
+      .font("Helvetica-Bold")
+      .fontSize(18)
+      .fillColor("#000000")
+      .text("GROUPBUY \u2014 Schedule List", { align: "left" });
+
+    doc
+      .font("Helvetica")
+      .fontSize(9)
+      .fillColor("#666666")
+      .text(`Generated: ${dateGenerated}`, { align: "left" })
+      .moveDown(0.8);
+
+    doc
+      .moveTo(50, doc.y)
+      .lineTo(545, doc.y)
+      .strokeColor("#000000")
+      .lineWidth(1)
+      .stroke();
+    doc.moveDown(0.8);
+
+    // ── Group and sort orders ──────────────────────────────────────────────────
+    const groups = new Map<string, PaidOrder[]>();
+    for (const o of orders) {
+      const key = o.location.toLowerCase();
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(o);
+    }
+
+    const sortedGroups = Array.from(groups.entries()).sort(
+      ([a], [b]) => locationSortKey(a) - locationSortKey(b)
+    );
+
+    // Within each group: sort by pickupDate asc, then phone asc
+    for (const [, groupOrders] of sortedGroups) {
+      groupOrders.sort((a, b) => {
+        const dateCmp = a.pickupDate.localeCompare(b.pickupDate);
+        if (dateCmp !== 0) return dateCmp;
+        return a.phone.localeCompare(b.phone);
+      });
+    }
+
+    // ── Render each location group ─────────────────────────────────────────────
+    for (const [location, groupOrders] of sortedGroups) {
+      const groupLabel = locationLabel(location, null);
+
+      // Section header
+      doc
+        .font("Helvetica-Bold")
+        .fontSize(13)
+        .fillColor("#000000")
+        .text(groupLabel.toUpperCase());
+
+      doc.moveDown(0.2);
+      doc
+        .moveTo(50, doc.y)
+        .lineTo(545, doc.y)
+        .strokeColor("#333333")
+        .lineWidth(0.75)
+        .stroke();
+      doc.moveDown(0.6);
+
+      // Group by pickupDate within this location
+      const dateGroups = new Map<string, PaidOrder[]>();
+      for (const o of groupOrders) {
+        if (!dateGroups.has(o.pickupDate)) dateGroups.set(o.pickupDate, []);
+        dateGroups.get(o.pickupDate)!.push(o);
+      }
+
+      for (const [pickupDate, dateOrders] of Array.from(dateGroups.entries())) {
+        // Date sub-header
+        doc
+          .font("Helvetica-Bold")
+          .fontSize(10)
+          .fillColor("#000000")
+          .text(pickupDate);
+        doc.moveDown(0.2);
+
+        // One line per order
+        for (const order of dateOrders) {
+          const addressPart =
+            order.location.toLowerCase() === "delivery" && order.deliveryAddress
+              ? ` (${order.deliveryAddress})`
+              : "";
+          doc
+            .font("Helvetica")
+            .fontSize(9)
+            .fillColor("#000000")
+            .text(`${order.phone}${addressPart}`, { indent: 10 });
+        }
+
+        doc.moveDown(0.5);
+      }
+
+      doc.moveDown(0.8);
+    }
+
+    // ── Page numbers ───────────────────────────────────────────────────────────
+    const totalPages = doc.bufferedPageRange().count + 1;
+    for (let p = 0; p < totalPages; p++) {
+      doc.switchToPage(p);
+      doc
+        .font("Helvetica")
+        .fontSize(8)
+        .fillColor("#aaaaaa")
+        .text(
+          `Page ${p + 1}`,
+          50,
+          doc.page.height - 40,
+          { align: "center", width: doc.page.width - 100 }
+        );
+    }
+
+    doc.end();
+  });
+}
+
 export function registerInvoiceRoutes(app: Application) {
   const router = Router();
 
@@ -267,6 +399,48 @@ export function registerInvoiceRoutes(app: Application) {
       console.error("[packing-sheet] error:", err instanceof Error ? err.message : err);
       if (!res.headersSent) {
         res.status(500).json({ error: "Failed to generate packing sheet" });
+      }
+    }
+  });
+
+  router.get("/api/admin/schedule/download", async (req, res) => {
+    try {
+      // Admin-only auth check
+      let user;
+      try {
+        user = await sdk.authenticateRequest(req as any);
+      } catch {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
+      if (!user || user.role !== "admin") {
+        res.status(403).json({ error: "Forbidden" });
+        return;
+      }
+
+      // Fetch all paid orders
+      const allOrders = await getAllOrders();
+      const paidOrders = allOrders.filter((o) => o.status === "paid") as PaidOrder[];
+
+      if (paidOrders.length === 0) {
+        res.status(404).json({ error: "No paid orders found" });
+        return;
+      }
+
+      const pdfBuffer = await generateScheduleListPDF(paidOrders);
+
+      const dateStr = new Date().toISOString().slice(0, 10);
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="schedule-list-${dateStr}.pdf"`
+      );
+      res.setHeader("Content-Length", pdfBuffer.length);
+      res.send(pdfBuffer);
+    } catch (err) {
+      console.error("[schedule-list] error:", err instanceof Error ? err.message : err);
+      if (!res.headersSent) {
+        res.status(500).json({ error: "Failed to generate schedule list" });
       }
     }
   });
