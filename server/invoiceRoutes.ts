@@ -1,18 +1,16 @@
 /**
- * Invoice Download Routes
+ * Packing Sheet Download Route
  * GET /api/admin/invoices/download
  *   - Admin-only
  *   - Fetches all paid orders from the DB
- *   - Generates one PDF per order using PDFKit
- *   - Streams a ZIP archive containing all PDFs back to the client
+ *   - Generates a single PDF packing sheet grouped by location, sorted by pickupDate
+ *   - Returns the PDF directly (not zipped)
  */
 import { Router } from "express";
 import type { Application } from "express";
 import PDFDocument from "pdfkit";
-import archiver from "archiver";
 import { sdk } from "./_core/sdk";
 import { getAllOrders } from "./db";
-import { calcLineItemTotal } from "../shared/orderUtils";
 
 interface OrderItem {
   id: number;
@@ -39,14 +37,18 @@ function locationLabel(location: string, address: string | null): string {
   return location;
 }
 
-function stripUnit(unit: string): string {
-  return unit.replace(/^\/\s*/, "");
+// Location group order: Cranbourne first, then Clayton, then Delivery, then others
+const LOCATION_ORDER: Record<string, number> = {
+  cranbourne: 0,
+  clayton: 1,
+  delivery: 2,
+};
+
+function locationSortKey(location: string): number {
+  return LOCATION_ORDER[location.toLowerCase()] ?? 3;
 }
 
-/**
- * Generate a PDF invoice for a single order and return it as a Buffer.
- */
-function generateInvoicePDF(order: {
+type PaidOrder = {
   id: number;
   phone: string;
   pickupDate: string;
@@ -58,7 +60,9 @@ function generateInvoicePDF(order: {
   isPowerDrop: boolean;
   createdAt: Date;
   status: string;
-}, bankDetails: string): Promise<Buffer> {
+};
+
+function generatePackingSheetPDF(orders: PaidOrder[]): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ margin: 50, size: "A4" });
     const chunks: Buffer[] = [];
@@ -66,218 +70,138 @@ function generateInvoicePDF(order: {
     doc.on("end", () => resolve(Buffer.concat(chunks)));
     doc.on("error", reject);
 
-    const items = parseItems(order.items);
-    const subtotal = items.reduce((sum, i) => sum + calcLineItemTotal(i), 0);
-    const delivery = parseFloat(order.deliveryCharge || "0") || 0;
-    const grandTotal = subtotal + delivery;
+    const dateGenerated = new Date().toLocaleDateString("en-AU", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
 
-    // ── Header ──────────────────────────────────────────────────────────────
+    // ── Document header ────────────────────────────────────────────────────────
     doc
       .font("Helvetica-Bold")
-      .fontSize(20)
-      .text("GROUPBUY", { align: "left" });
-
-    doc
-      .font("Helvetica")
-      .fontSize(10)
-      .fillColor("#666666")
-      .text("Mitchells Quality Meat", { align: "left" })
-      .moveDown(0.3);
-
-    if (order.isPowerDrop) {
-      doc
-        .font("Helvetica-Bold")
-        .fontSize(9)
-        .fillColor("#c73e3a")
-        .text("⚡ POWER DROP ORDER", { align: "left" });
-    }
-
-    // Horizontal rule
-    doc.moveDown(0.5);
-    doc
-      .moveTo(50, doc.y)
-      .lineTo(545, doc.y)
-      .strokeColor("#cccccc")
-      .lineWidth(0.5)
-      .stroke();
-    doc.moveDown(0.5);
-
-    // ── Invoice meta ────────────────────────────────────────────────────────
-    doc.fillColor("#000000");
-    const metaY = doc.y;
-
-    doc
-      .font("Helvetica-Bold")
-      .fontSize(16)
-      .text(`INVOICE #${order.id}`, 50, metaY);
-
-    doc
-      .font("Helvetica")
-      .fontSize(9)
-      .fillColor("#666666")
-      .text(`Status: PAID`, 50, metaY + 22)
-      .text(`Issued: ${new Date(order.createdAt).toLocaleDateString("en-AU", { day: "2-digit", month: "short", year: "numeric" })}`, 50, metaY + 35);
-
-    // Right-side customer info
-    doc
-      .font("Helvetica-Bold")
-      .fontSize(9)
+      .fontSize(18)
       .fillColor("#000000")
-      .text("BILL TO", 350, metaY, { width: 195, align: "right" });
+      .text("GROUPBUY — Packing Sheet", { align: "left" });
 
     doc
       .font("Helvetica")
       .fontSize(9)
-      .fillColor("#333333")
-      .text(order.phone, 350, metaY + 14, { width: 195, align: "right" })
-      .text(`Pickup: ${order.pickupDate}`, 350, metaY + 27, { width: 195, align: "right" })
-      .text(locationLabel(order.location, order.deliveryAddress), 350, metaY + 40, { width: 195, align: "right" });
+      .fillColor("#666666")
+      .text(`Generated: ${dateGenerated}`, { align: "left" })
+      .moveDown(0.8);
 
-    doc.y = metaY + 70;
-    doc.moveDown(0.5);
-
-    // Horizontal rule
     doc
       .moveTo(50, doc.y)
       .lineTo(545, doc.y)
-      .strokeColor("#cccccc")
-      .lineWidth(0.5)
+      .strokeColor("#000000")
+      .lineWidth(1)
       .stroke();
     doc.moveDown(0.8);
 
-    // ── Items table header ───────────────────────────────────────────────────
-    const col = { item: 50, cut: 210, qty: 330, rate: 390, total: 470 };
-    const tableHeaderY = doc.y;
-
-    doc
-      .rect(50, tableHeaderY - 4, 495, 18)
-      .fill("#f0f0f0");
-
-    doc
-      .font("Helvetica-Bold")
-      .fontSize(8)
-      .fillColor("#000000")
-      .text("ITEM", col.item, tableHeaderY, { width: 155 })
-      .text("CUT / SPEC", col.cut, tableHeaderY, { width: 115 })
-      .text("QTY", col.qty, tableHeaderY, { width: 55, align: "right" })
-      .text("RATE", col.rate, tableHeaderY, { width: 75, align: "right" })
-      .text("TOTAL", col.total, tableHeaderY, { width: 75, align: "right" });
-
-    doc.y = tableHeaderY + 20;
-
-    // ── Items rows ───────────────────────────────────────────────────────────
-    items.forEach((item, idx) => {
-      const price = parseFloat(item.price) || 0;
-      const weight = parseFloat(item.finalWeightKg || "") || 0;
-      const finalQty = weight > 0 ? weight : item.qty;
-      const unit = stripUnit(item.unit);
-      const total = calcLineItemTotal(item);
-      const rowY = doc.y;
-
-      if (idx % 2 === 1) {
-        doc.rect(50, rowY - 2, 495, 16).fill("#fafafa");
-      }
-
-      doc
-        .font("Helvetica")
-        .fontSize(8)
-        .fillColor("#000000")
-        .text(item.name, col.item, rowY, { width: 155 })
-        .text(item.cut || "—", col.cut, rowY, { width: 115 })
-        .text(`${finalQty}${unit ? " " + unit : ""}`, col.qty, rowY, { width: 55, align: "right" })
-        .text(`$${price.toFixed(2)}/${unit || "unit"}`, col.rate, rowY, { width: 75, align: "right" })
-        .text(`$${total.toFixed(2)}`, col.total, rowY, { width: 75, align: "right" });
-
-      doc.y = rowY + 16;
-    });
-
-    // ── Totals ───────────────────────────────────────────────────────────────
-    doc.moveDown(0.5);
-    doc
-      .moveTo(50, doc.y)
-      .lineTo(545, doc.y)
-      .strokeColor("#cccccc")
-      .lineWidth(0.5)
-      .stroke();
-    doc.moveDown(0.5);
-
-    if (delivery > 0) {
-      doc
-        .font("Helvetica")
-        .fontSize(9)
-        .fillColor("#333333")
-        .text(`Subtotal`, 350, doc.y, { width: 120, align: "right" })
-        .text(`$${subtotal.toFixed(2)}`, col.total, doc.y - 9, { width: 75, align: "right" });
-      doc.moveDown(0.3);
-      doc
-        .text(`Delivery`, 350, doc.y, { width: 120, align: "right" })
-        .text(`$${delivery.toFixed(2)}`, col.total, doc.y - 9, { width: 75, align: "right" });
-      doc.moveDown(0.3);
-      doc
-        .moveTo(350, doc.y)
-        .lineTo(545, doc.y)
-        .strokeColor("#cccccc")
-        .lineWidth(0.5)
-        .stroke();
-      doc.moveDown(0.3);
+    // ── Group orders by location, sort by pickupDate within each group ─────────
+    const groups = new Map<string, PaidOrder[]>();
+    for (const o of orders) {
+      const key = o.location.toLowerCase();
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(o);
     }
 
-    doc
-      .font("Helvetica-Bold")
-      .fontSize(11)
-      .fillColor("#000000")
-      .text(`TOTAL DUE`, 350, doc.y, { width: 120, align: "right" })
-      .text(`$${grandTotal.toFixed(2)}`, col.total, doc.y - 11, { width: 75, align: "right" });
+    // Sort groups by location order
+    const sortedGroups = Array.from(groups.entries()).sort(
+      ([a], [b]) => locationSortKey(a) - locationSortKey(b)
+    );
 
-    // ── Special instructions ─────────────────────────────────────────────────
-    if (order.specialInstructions) {
-      doc.moveDown(1.5);
+    // Sort orders within each group by pickupDate ascending
+    for (const [, groupOrders] of sortedGroups) {
+      groupOrders.sort((a, b) => a.pickupDate.localeCompare(b.pickupDate));
+    }
+
+    // ── Render each location group ─────────────────────────────────────────────
+    for (const [location, groupOrders] of sortedGroups) {
+      const groupLabel = locationLabel(location, null);
+
+      // Section header
       doc
         .font("Helvetica-Bold")
-        .fontSize(8)
-        .fillColor("#666666")
-        .text("SPECIAL INSTRUCTIONS");
-      doc
-        .font("Helvetica")
-        .fontSize(8)
-        .fillColor("#333333")
-        .text(order.specialInstructions);
-    }
+        .fontSize(13)
+        .fillColor("#000000")
+        .text(groupLabel.toUpperCase());
 
-    // ── Payment details ──────────────────────────────────────────────────────
-    if (bankDetails.trim()) {
-      doc.moveDown(1.5);
+      doc.moveDown(0.2);
       doc
         .moveTo(50, doc.y)
         .lineTo(545, doc.y)
-        .strokeColor("#cccccc")
-        .lineWidth(0.5)
+        .strokeColor("#333333")
+        .lineWidth(0.75)
         .stroke();
-      doc.moveDown(0.8);
+      doc.moveDown(0.6);
 
-      doc
-        .font("Helvetica-Bold")
-        .fontSize(8)
-        .fillColor("#666666")
-        .text("PAYMENT DETAILS");
-      doc
-        .font("Helvetica")
-        .fontSize(9)
-        .fillColor("#000000")
-        .text(bankDetails.trim());
+      // ── Render each order in this group ───────────────────────────────────────
+      for (let i = 0; i < groupOrders.length; i++) {
+        const order = groupOrders[i];
+        const items = parseItems(order.items);
+
+        // Phone (bold, larger)
+        doc
+          .font("Helvetica-Bold")
+          .fontSize(12)
+          .fillColor("#000000")
+          .text(order.phone);
+
+        // Pickup date
+        doc
+          .font("Helvetica")
+          .fontSize(9)
+          .fillColor("#333333")
+          .text(`Pickup: ${order.pickupDate}`);
+
+        // Delivery address (only for delivery orders)
+        if (order.location.toLowerCase() === "delivery" && order.deliveryAddress) {
+          doc.text(`Address: ${order.deliveryAddress}`);
+        }
+
+        // Special instructions
+        if (order.specialInstructions) {
+          doc
+            .font("Helvetica-Bold")
+            .fontSize(9)
+            .fillColor("#333333")
+            .text(`Notes: `, { continued: true })
+            .font("Helvetica")
+            .text(order.specialInstructions);
+        }
+
+        doc.moveDown(0.3);
+
+        // Items list
+        for (const item of items) {
+          const weightStr =
+            item.finalWeightKg && parseFloat(item.finalWeightKg) > 0
+              ? ` (${parseFloat(item.finalWeightKg).toFixed(1)} kg)`
+              : "";
+          const line = `${item.qty} x ${item.name} — ${item.cut}${weightStr}`;
+          doc
+            .font("Helvetica")
+            .fontSize(9)
+            .fillColor("#000000")
+            .text(line, { indent: 10 });
+        }
+
+        // Thin divider between customer blocks (not after the last one in the group)
+        if (i < groupOrders.length - 1) {
+          doc.moveDown(0.5);
+          doc
+            .moveTo(50, doc.y)
+            .lineTo(545, doc.y)
+            .strokeColor("#cccccc")
+            .lineWidth(0.4)
+            .stroke();
+          doc.moveDown(0.5);
+        }
+      }
+
+      doc.moveDown(1.2);
     }
-
-    // ── Footer ───────────────────────────────────────────────────────────────
-    doc
-      .font("Helvetica")
-      .fontSize(7)
-      .fillColor("#aaaaaa")
-      .text(
-        "Thank you for your order — GROUPBUY / Mitchells Quality Meat",
-        50,
-        doc.page.height - 60,
-        { align: "center", width: 495 }
-      );
 
     doc.end();
   });
@@ -303,47 +227,27 @@ export function registerInvoiceRoutes(app: Application) {
 
       // Fetch all paid orders
       const allOrders = await getAllOrders();
-      const paidOrders = allOrders.filter((o) => o.status === "paid");
+      const paidOrders = allOrders.filter((o) => o.status === "paid") as PaidOrder[];
 
       if (paidOrders.length === 0) {
         res.status(404).json({ error: "No paid orders found" });
         return;
       }
 
-      // Read bank details from query param (passed from frontend) or use default
-      const bankDetails = (req.query.bankDetails as string) ||
-        "BSB: 182-888\nAccount: 001 052 935\nAccount Name: BEST QUALITY BUTCHER";
+      const pdfBuffer = await generatePackingSheetPDF(paidOrders);
 
-      // Set response headers for ZIP download
-      const timestamp = new Date().toISOString().slice(0, 10);
-      res.setHeader("Content-Type", "application/zip");
+      const dateStr = new Date().toISOString().slice(0, 10);
+      res.setHeader("Content-Type", "application/pdf");
       res.setHeader(
         "Content-Disposition",
-        `attachment; filename="groupbuy-paid-invoices-${timestamp}.zip"`
+        `attachment; filename="packing-sheet-${dateStr}.pdf"`
       );
-
-      // Create ZIP archive and pipe to response
-      const archive = archiver("zip", { zlib: { level: 6 } });
-      archive.on("error", (err) => {
-        console.error("[invoices] archive error:", err);
-        if (!res.headersSent) {
-          res.status(500).json({ error: "Archive failed" });
-        }
-      });
-      archive.pipe(res);
-
-      // Generate each PDF and append to archive
-      for (const order of paidOrders) {
-        const pdfBuffer = await generateInvoicePDF(order, bankDetails);
-        const filename = `invoice-order-${order.id}-${order.phone}.pdf`;
-        archive.append(pdfBuffer, { name: filename });
-      }
-
-      await archive.finalize();
+      res.setHeader("Content-Length", pdfBuffer.length);
+      res.send(pdfBuffer);
     } catch (err) {
-      console.error("[invoices] error:", err);
+      console.error("[packing-sheet] error:", err instanceof Error ? err.message : err);
       if (!res.headersSent) {
-        res.status(500).json({ error: "Failed to generate invoices" });
+        res.status(500).json({ error: "Failed to generate packing sheet" });
       }
     }
   });
