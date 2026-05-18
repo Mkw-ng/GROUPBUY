@@ -141,10 +141,13 @@ function generatePackingSheetPDF(orders: PaidOrder[]): Promise<Buffer> {
         const order = groupOrders[i];
         const items = parseItems(order.items);
 
-        // Phone (bold, larger)
+        // 8pt space above each customer block
+        doc.moveDown(0.6);
+
+        // Phone (bold, 14pt)
         doc
           .font("Helvetica-Bold")
-          .fontSize(12)
+          .fontSize(14)
           .fillColor("#000000")
           .text(order.phone);
 
@@ -179,7 +182,8 @@ function generatePackingSheetPDF(orders: PaidOrder[]): Promise<Buffer> {
             item.finalWeightKg && parseFloat(item.finalWeightKg) > 0
               ? ` (${parseFloat(item.finalWeightKg).toFixed(1)} kg)`
               : "";
-          const line = `${item.qty} x ${item.name} — ${item.cut}${weightStr}`;
+          const cleanCut = (item.cut || "").replace(/·/g, "—");
+          const line = `${item.qty} x ${item.name} — ${cleanCut}${weightStr}`;
           doc
             .font("Helvetica")
             .fontSize(9)
@@ -187,21 +191,39 @@ function generatePackingSheetPDF(orders: PaidOrder[]): Promise<Buffer> {
             .text(line, { indent: 10 });
         }
 
-        // Thin divider between customer blocks (not after the last one in the group)
-        if (i < groupOrders.length - 1) {
-          doc.moveDown(0.5);
-          doc
-            .moveTo(50, doc.y)
-            .lineTo(545, doc.y)
-            .strokeColor("#cccccc")
-            .lineWidth(0.4)
-            .stroke();
-          doc.moveDown(0.5);
-        }
+        // Full-width rule after every customer block
+        doc.moveDown(0.5);
+        doc
+          .moveTo(50, doc.y)
+          .lineTo(545, doc.y)
+          .strokeColor("#cccccc")
+          .lineWidth(0.5)
+          .stroke();
+        doc.moveDown(0.8);
       }
 
       doc.moveDown(1.2);
     }
+
+    // Page numbers: rendered on each page via the 'pageAdded' event
+    let pageNumber = 0;
+    const addPageNumber = () => {
+      pageNumber++;
+      doc
+        .font("Helvetica")
+        .fontSize(8)
+        .fillColor("#aaaaaa")
+        .text(
+          `Page ${pageNumber}`,
+          50,
+          doc.page.height - 40,
+          { align: "center", width: doc.page.width - 100 }
+        );
+    };
+
+    doc.on("pageAdded", addPageNumber);
+    // Number the first page before ending
+    addPageNumber();
 
     doc.end();
   });
