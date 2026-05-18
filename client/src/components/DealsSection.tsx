@@ -118,6 +118,7 @@ interface DealsProps {
     cut: string;
     price: number;
     powerDropPrice?: number | null;
+    retailPrice?: number | null;
     unit: string;
   }) => void;
   powerDropActive?: boolean;
@@ -570,6 +571,7 @@ export default function DealsSection({ onAddToCart, powerDropActive = false }: D
                                   cut: product.cut,
                                   price: regularPrice,
                                   powerDropPrice: pdPrice,
+                                  retailPrice: retailPrice,
                                   unit: product.unit,
                                 });
                                 toast.success(`${product.name} added to cart`);

@@ -30,6 +30,7 @@ export interface CartItem {
   cut: string;
   price: number;
   regularPrice?: number; // original non-power-drop price, for savings display
+  retailPrice?: number | null; // RRP, used as savings comparison baseline when set
   unit: string;
   qty: number;
 }
@@ -716,14 +717,18 @@ export default function CartDrawer({
                     </span>
                     {powerDropActive && (() => {
                       const saving = items.reduce((s, i) => {
-                        if (i.regularPrice != null && i.regularPrice > i.price) {
-                          return s + (i.regularPrice - i.price) * i.qty;
+                        // Use retailPrice (RRP) as baseline when set, otherwise fall back to regularPrice
+                        const baseline = (i.retailPrice != null && i.retailPrice > 0)
+                          ? i.retailPrice
+                          : i.regularPrice;
+                        if (baseline != null && baseline > i.price) {
+                          return s + (baseline - i.price) * i.qty;
                         }
                         return s;
                       }, 0);
                       return saving > 0 ? (
                         <span className="font-mono-brand text-[10px] font-bold text-emerald-400 mt-1">
-                          ⚡ Approx saving: ${saving.toFixed(2)}
+                          ⚡ Approx saving vs RRP: ${saving.toFixed(2)}
                         </span>
                       ) : null;
                     })()}

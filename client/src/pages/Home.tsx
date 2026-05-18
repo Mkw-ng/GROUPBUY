@@ -57,6 +57,7 @@ export default function Home() {
     cut: string;
     price: number;
     powerDropPrice?: number | null;
+    retailPrice?: number | null;
     unit: string;
   }) => {
     setCartItems((prev) => {
@@ -77,6 +78,7 @@ export default function Home() {
           cut: product.cut,
           price: effectivePrice,
           regularPrice: product.price, // always store the base price for savings calc
+          retailPrice: product.retailPrice ?? null, // RRP for savings comparison
           unit: product.unit,
           qty: 1,
         },
