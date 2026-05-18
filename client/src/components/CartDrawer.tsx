@@ -68,6 +68,54 @@ export default function CartDrawer({
 
   const createOrder = trpc.orders.create.useMutation();
 
+  // ─── Focus trap ────────────────────────────────────────────────────────────
+  const drawerRef = useRef<HTMLDivElement>(null);
+  const previousFocusRef = useRef<Element | null>(null);
+
+  const FOCUSABLE_SELECTORS =
+    'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
+
+  // Save focus and move into drawer when opened; restore when closed
+  useEffect(() => {
+    if (open) {
+      previousFocusRef.current = document.activeElement;
+      // Defer so the drawer is mounted and visible before focusing
+      const raf = requestAnimationFrame(() => {
+        const first = drawerRef.current?.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTORS)[0];
+        first?.focus();
+      });
+      return () => cancelAnimationFrame(raf);
+    } else {
+      (previousFocusRef.current as HTMLElement | null)?.focus();
+    }
+  }, [open]);
+
+  function handleDrawerKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      onClose();
+      return;
+    }
+    if (e.key !== "Tab") return;
+    const focusable = Array.from(
+      drawerRef.current?.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTORS) ?? []
+    ).filter((el) => !el.closest('[inert]') && el.offsetParent !== null);
+    if (focusable.length === 0) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (e.shiftKey) {
+      if (document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      }
+    } else {
+      if (document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
+  }
+
   // ─── Order details state ────────────────────────────────────────────────────
   const [phone, setPhone] = useState("");
   const [pickupDate, setPickupDate] = useState<Date | undefined>(undefined);
@@ -271,11 +319,16 @@ export default function CartDrawer({
 
           {/* Drawer */}
           <motion.div
+            ref={drawerRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Your cart"
             initial={{ x: "100%" }}
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
             transition={{ type: "tween", duration: 0.25 }}
             className="fixed right-0 top-0 bottom-0 z-50 w-full max-w-sm section-ink border-l border-white/10 flex flex-col"
+            onKeyDown={handleDrawerKeyDown}
           >
             {/* Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 shrink-0">
