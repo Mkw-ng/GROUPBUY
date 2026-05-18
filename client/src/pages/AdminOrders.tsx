@@ -983,7 +983,7 @@ export default function AdminOrders() {
       const a = document.createElement("a");
       const timestamp = new Date().toISOString().slice(0, 10);
       a.href = url;
-      a.download = `groupbuy-paid-invoices-${timestamp}.zip`;
+      a.download = `packing-sheet-${timestamp}.pdf`;
       a.click();
       URL.revokeObjectURL(url);
     } catch (err) {
@@ -1093,11 +1093,10 @@ export default function AdminOrders() {
             onClick={handleDownloadInvoices}
             disabled={downloadingInvoices || counts.paid === 0}
             className="flex items-center gap-1.5 font-mono-brand text-[10px] text-[#8a857c] hover:text-[#f5f2ec] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-            title={counts.paid === 0 ? "No paid orders to download" : `Download ${counts.paid} paid invoice${counts.paid !== 1 ? "s" : ""} as ZIP`}
+            title={counts.paid === 0 ? "No paid orders to download" : `Download packing sheet for ${counts.paid} paid order${counts.paid !== 1 ? "s" : ""}`}
           >
             <FileDown size={13} />
-            {downloadingInvoices ? "Generating…" : `Invoices ZIP (${counts.paid})`}
-          </button>
+            {downloadingInvoices ? "Generating…" : `Packing Sheet (${counts.paid})`}          </button>
           <div className="w-px h-4 bg-white/10" />
           <button
             onClick={() => setPickupSort(s => s === "none" ? "asc" : s === "asc" ? "desc" : "none")}
