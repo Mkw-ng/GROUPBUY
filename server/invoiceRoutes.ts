@@ -64,7 +64,7 @@ type PaidOrder = {
 
 function generatePackingSheetPDF(orders: PaidOrder[]): Promise<Buffer> {
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ margin: 50, size: "A4" });
+    const doc = new PDFDocument({ margin: 50, size: "A4", bufferPages: true });
     const chunks: Buffer[] = [];
     doc.on("data", (chunk: Buffer) => chunks.push(chunk));
     doc.on("end", () => resolve(Buffer.concat(chunks)));
@@ -205,25 +205,22 @@ function generatePackingSheetPDF(orders: PaidOrder[]): Promise<Buffer> {
       doc.moveDown(1.2);
     }
 
-    // Page numbers: rendered on each page via the 'pageAdded' event
-    let pageNumber = 0;
-    const addPageNumber = () => {
-      pageNumber++;
+    // Page numbers: go back through each page after all content is written
+    // to avoid triggering pageAdded recursively during text rendering.
+    const totalPages = doc.bufferedPageRange().count + 1; // +1 for current page
+    for (let p = 0; p < totalPages; p++) {
+      doc.switchToPage(p);
       doc
         .font("Helvetica")
         .fontSize(8)
         .fillColor("#aaaaaa")
         .text(
-          `Page ${pageNumber}`,
+          `Page ${p + 1}`,
           50,
           doc.page.height - 40,
           { align: "center", width: doc.page.width - 100 }
         );
-    };
-
-    doc.on("pageAdded", addPageNumber);
-    // Number the first page before ending
-    addPageNumber();
+    }
 
     doc.end();
   });
