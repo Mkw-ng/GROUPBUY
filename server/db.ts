@@ -186,6 +186,12 @@ export async function getAllOrders(limit = 100, offset = 0) {
   return db.select().from(orders).where(eq(orders.archived, false)).orderBy(desc(orders.createdAt)).limit(limit).offset(offset);
 }
 
+export async function getAllOrdersForDrops(): Promise<(typeof orders.$inferSelect)[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(orders).orderBy(desc(orders.createdAt));
+}
+
 export async function getArchivedOrders() {
   const db = await getDb();
   if (!db) return [];

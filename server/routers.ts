@@ -31,6 +31,7 @@ import {
   archiveOrder,
   unarchiveOrder,
   getArchivedOrders,
+  getAllOrdersForDrops,
 } from "./db";
 import { OrderItem } from "../drizzle/schema";
 import {
@@ -516,20 +517,28 @@ export const appRouter = router({
     // ─── Admin: Analytics ─────────────────────────────────────────────────────
     analytics: router({
       allDropsSummary: adminProcedure.query(async () => {
-        const allDropsList = await getAllDrops();
-        return Promise.all(
-          allDropsList.map(async (drop) => {
-            const dropOrders = await getOrdersByDrop(drop.id);
-            const placed = dropOrders.length;
-            const paid = dropOrders.filter((o) => o.status === "paid").length;
-            const conversionRate = placed > 0 ? Math.round((paid / placed) * 100) : 0;
-            const revenue = dropOrders
-              .filter((o) => o.status === "paid")
-              .reduce((sum, o) => sum + calcOrderTotal(o), 0);
-            const avgOrderValue = paid > 0 ? revenue / paid : 0;
-            return { ...drop, placed, paid, conversionRate, revenue, avgOrderValue };
-          })
-        );
+        const [allDropsList, allOrdersList] = await Promise.all([
+          getAllDrops(),
+          getAllOrdersForDrops(),
+        ]);
+        // Group orders by dropId in memory — avoids N+1 DB queries
+        const ordersByDrop = new Map<number | null, typeof allOrdersList>();
+        for (const o of allOrdersList) {
+          const key = o.dropId ?? null;
+          if (!ordersByDrop.has(key)) ordersByDrop.set(key, []);
+          ordersByDrop.get(key)!.push(o);
+        }
+        return allDropsList.map((drop) => {
+          const dropOrders = ordersByDrop.get(drop.id) ?? [];
+          const placed = dropOrders.length;
+          const paid = dropOrders.filter((o) => o.status === "paid").length;
+          const conversionRate = placed > 0 ? Math.round((paid / placed) * 100) : 0;
+          const revenue = dropOrders
+            .filter((o) => o.status === "paid")
+            .reduce((sum, o) => sum + calcOrderTotal(o), 0);
+          const avgOrderValue = paid > 0 ? revenue / paid : 0;
+          return { ...drop, placed, paid, conversionRate, revenue, avgOrderValue };
+        });
       }),
 
       dropStats: adminProcedure
