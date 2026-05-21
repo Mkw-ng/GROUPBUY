@@ -190,15 +190,21 @@ function OrderCard({
   const [confirmPrep, setConfirmPrep] = useState(false);
   const [confirmFinalCall, setConfirmFinalCall] = useState(false);
   const [confirmDayOf, setConfirmDayOf] = useState(false);
-  const defaultOpening = `We got your GroupBuy Power-Drop order!
+  const defaultOpening = order.isPowerDrop
+    ? `We got your GroupBuy Power-Drop order!
 
 Here's how to lock it in:
-1. Pay here (Details below)
-2. Send me a photo remittance
+1. Invoice and payment details are down below
+2. Send me a photo remittance before this Saturday
 
-* Ensure payment is made by Saturday to avoid cancellation
+* Ensure payment is made by this Saturday to avoid cancellation
 * From there you'll be set for your pick up or delivery date the next week
-* You'll get another message from me to let you know its all on track`;
+* You'll get another message from me to let you know its all on track`
+    : `We got your casual order!
+
+1. Its scheduled in for pick up at *${locationLabel(order.location, order.deliveryAddress)}* on *${order.pickupDate}*
+2. Payments can be sorted in store.
+* If it is a delivery you'll receive an invoice. This needs to be sorted before delivery can take place. Send me the remittance`;
   const [openingSentence, setOpeningSentence] = useState(defaultOpening);
 
   const updateItems = trpc.admin.orders.updateItems.useMutation({
