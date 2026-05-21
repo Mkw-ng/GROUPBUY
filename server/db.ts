@@ -1,4 +1,4 @@
-import { desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { InsertUser, InsertProduct, InsertOrder, orders, products, settings, users, OrderItem, drops, Drop } from "../drizzle/schema";
 import { ENV } from './_core/env';
@@ -190,6 +190,16 @@ export async function getAllOrdersForDrops(): Promise<(typeof orders.$inferSelec
   const db = await getDb();
   if (!db) return [];
   return db.select().from(orders).orderBy(desc(orders.createdAt));
+}
+
+export async function getAllPaidActiveOrders(): Promise<(typeof orders.$inferSelect)[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(orders)
+    .where(and(eq(orders.archived, false), eq(orders.status, "paid")))
+    .orderBy(asc(orders.createdAt));
 }
 
 export async function getArchivedOrders() {

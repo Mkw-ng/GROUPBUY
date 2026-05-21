@@ -46,6 +46,22 @@ vi.mock("./db", () => ({
   batchReorderProducts: vi.fn().mockResolvedValue(undefined),
   upsertUser: vi.fn().mockResolvedValue(undefined),
   getUserByOpenId: vi.fn().mockResolvedValue(undefined),
+  getAllPaidActiveOrders: vi.fn().mockResolvedValue(
+    Array.from({ length: 150 }, (_, i) => ({
+      id: i + 1,
+      phone: `04${String(i).padStart(8, "0")}`,
+      pickupDate: "Monday, 1 January 2026",
+      location: "cranbourne",
+      deliveryAddress: null,
+      items: JSON.stringify([{ id: 1, name: "Wagyu Ribeye", cut: "MS9", qty: 1, price: "42.00", unit: "/ steak" }]),
+      specialInstructions: null,
+      status: "paid",
+      isPowerDrop: true,
+      archived: false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }))
+  ),
 }));
 
 import {
@@ -57,6 +73,7 @@ import {
   deleteProduct,
   setProductAvailability,
   batchReorderProducts,
+  getAllPaidActiveOrders,
 } from "./db";
 
 // ─── Settings tests ───────────────────────────────────────────────────────────
@@ -140,6 +157,29 @@ describe("Products helpers", () => {
     ];
     await batchReorderProducts(updates);
     expect(batchReorderProducts).toHaveBeenCalledWith(updates);
+  });
+});
+
+// ─── Export helper tests ─────────────────────────────────────────────────────
+
+describe("getAllPaidActiveOrders export helper", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("returns all paid orders without a 100-row cap", async () => {
+    const result = await getAllPaidActiveOrders();
+    expect(Array.isArray(result)).toBe(true);
+    expect(result.length).toBe(150);
+    expect(result.length).toBeGreaterThan(100);
+  });
+
+  it("every returned order has status paid", async () => {
+    const result = await getAllPaidActiveOrders();
+    result.forEach((o) => expect(o.status).toBe("paid"));
+  });
+
+  it("every returned order has archived false", async () => {
+    const result = await getAllPaidActiveOrders();
+    result.forEach((o) => expect(o.archived).toBe(false));
   });
 });
 

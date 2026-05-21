@@ -10,7 +10,7 @@ import { Router } from "express";
 import type { Application } from "express";
 import PDFDocument from "pdfkit";
 import { sdk } from "./_core/sdk";
-import { getAllOrders } from "./db";
+import { getAllPaidActiveOrders } from "./db";
 
 interface OrderItem {
   id: number;
@@ -547,8 +547,7 @@ export function registerInvoiceRoutes(app: Application) {
       }
 
       // Fetch all paid orders
-      const allOrders = await getAllOrders();
-      const paidOrders = allOrders.filter((o) => o.status === "paid") as PaidOrder[];
+      const paidOrders = (await getAllPaidActiveOrders()) as PaidOrder[];
 
       if (paidOrders.length === 0) {
         res.status(404).json({ error: "No paid orders found" });
@@ -589,8 +588,7 @@ export function registerInvoiceRoutes(app: Application) {
       }
 
       // Fetch all paid orders
-      const allOrders = await getAllOrders();
-      const paidOrders = allOrders.filter((o) => o.status === "paid") as PaidOrder[];
+      const paidOrders = (await getAllPaidActiveOrders()) as PaidOrder[];
 
       if (paidOrders.length === 0) {
         res.status(404).json({ error: "No paid orders found" });
@@ -631,8 +629,7 @@ export function registerInvoiceRoutes(app: Application) {
       }
 
       // Fetch all paid orders
-      const allOrders = await getAllOrders();
-      const paidOrders = allOrders.filter((o) => o.status === "paid") as PaidOrder[];
+      const paidOrders = (await getAllPaidActiveOrders()) as PaidOrder[];
 
       if (paidOrders.length === 0) {
         res.status(404).json({ error: "No paid orders found" });
