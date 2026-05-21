@@ -7,6 +7,7 @@
  * Power Drop: indicator in header + note in WhatsApp checkout message
  */
 import { useState, useRef, useEffect } from "react";
+import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   X,
@@ -261,12 +262,36 @@ export default function CartDrawer({
     return `https://wa.me/61407249272?text=${encodeURIComponent(parts.join("\n"))}`;
   }
 
-  function handleCheckout(e: React.MouseEvent<HTMLAnchorElement>) {
-    if (!validate()) {
-      e.preventDefault();
+  async function handleCheckout() {
+    if (!validate()) return;
+    if (createOrder.isPending) return;
+
+    const dateStr = pickupDate ? format(pickupDate, "EEEE, d MMMM yyyy") : "";
+    const orderItems = items.map((i) => ({
+      id: i.id,
+      name: i.name,
+      cut: i.cut,
+      qty: i.qty,
+      price: i.price.toFixed(2),
+      unit: i.unit,
+    }));
+
+    try {
+      await createOrder.mutateAsync({
+        phone: normalisePhone(phone),
+        pickupDate: dateStr,
+        location,
+        deliveryAddress: location === "delivery" ? deliveryAddress.trim() : undefined,
+        items: JSON.stringify(orderItems),
+        specialInstructions: instructions.trim() || undefined,
+        isPowerDrop: powerDropActive,
+      });
+    } catch {
+      toast.error("Failed to save your order. Please try again.");
       return;
     }
-    // Persist details if checkbox is ticked
+
+    // DB write succeeded — persist details if checkbox is ticked
     if (saveDetails && phone.trim()) {
       save({
         phone: phone.trim(),
@@ -279,28 +304,14 @@ export default function CartDrawer({
       clear();
     }
 
-    // Save order to database only for Power Drop orders
-    if (powerDropActive) {
-      const dateStr = pickupDate ? format(pickupDate, "EEEE, d MMMM yyyy") : "";
-      const orderItems = items.map((i) => ({
-        id: i.id,
-        name: i.name,
-        cut: i.cut,
-        qty: i.qty,
-        price: i.price.toFixed(2),
-        unit: i.unit,
-      }));
-      createOrder.mutate({
-        phone: normalisePhone(phone),
-        pickupDate: dateStr,
-        location,
-        deliveryAddress: location === "delivery" ? deliveryAddress.trim() : undefined,
-        items: JSON.stringify(orderItems),
-        specialInstructions: instructions.trim() || undefined,
-        isPowerDrop: true,
-      });
+    // Open WhatsApp programmatically after successful DB save
+    const waUrl = buildWhatsAppUrl();
+    const opened = window.open(waUrl, "_blank", "noopener,noreferrer");
+    if (!opened) {
+      window.location.href = waUrl;
     }
-    // Clear the cart after checkout
+
+    // Clear the cart
     onCheckoutSuccess?.();
   }
 
@@ -744,16 +755,15 @@ export default function CartDrawer({
                     ${total.toFixed(2)}
                   </span>
                 </div>
-                <a
-                  href={buildWhatsAppUrl()}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <button
+                  type="button"
                   onClick={handleCheckout}
-                  className="w-full flex items-center justify-center gap-2 font-display text-[11px] tracking-widest bg-[#c73e3a] text-[#f5f2ec] py-4 hover:bg-[#a83330] transition-colors mb-2"
+                  disabled={createOrder.isPending}
+                  className="w-full flex items-center justify-center gap-2 font-display text-[11px] tracking-widest bg-[#c73e3a] text-[#f5f2ec] py-4 hover:bg-[#a83330] transition-colors mb-2 disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                   <MessageCircle size={14} strokeWidth={1.5} />
-                  Checkout via WhatsApp
-                </a>
+                  {createOrder.isPending ? "Saving order…" : "Checkout via WhatsApp"}
+                </button>
                 <p className="font-mono-brand text-[10px] text-[#8a857c] text-center">
                   Payment by bank transfer or card on confirmation
                 </p>
