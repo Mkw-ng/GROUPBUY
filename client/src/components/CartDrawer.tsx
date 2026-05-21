@@ -239,7 +239,6 @@ export default function CartDrawer({
       location === "delivery"
         ? `Delivery — ${deliveryAddress}`
         : LOCATION_LABELS[location];
-    const powerDropNote = powerDropActive ? "\n⚡ *POWER DROP PRICING APPLIED*" : "";
 
     const itemLines = items.map((i) => {
       const qtyStr = i.qty % 1 === 0 ? String(i.qty) : i.qty.toFixed(1);
@@ -247,36 +246,55 @@ export default function CartDrawer({
       return `${qtyStr}/${cleanUnit} x ${i.name} — $${i.price.toFixed(2)}/${cleanUnit}`;
     });
 
-    const preamble = powerDropActive ? [
-      "Incoming GroupBuy Power-Drop Order",
-      "",
-      "Here\'s how it works:",
-      "",
-      "1. Orders close Wednesday night",
-      "2. You\'ll receive your invoice right here on WhatsApp",
-      "3. Send remittance before Saturday night cut-off to lock it in",
-      "4. Collect next week at your selected time",
-      "",
-      "---",
-      "",
-    ] : [];
-    const parts: string[] = [
-      ...preamble,
-      `*Order Number:* ${normalisePhone(phone)}`,
-      `*Pick up Date:* ${dateStr}`,
-      `*Pick up Location:* ${locationStr}`,
-      "",
-      ...itemLines,
-    ];
+    let parts: string[];
+
+    if (powerDropActive) {
+      // — Power Drop message —
+      parts = [
+        "INCOMING GROUPBUY MESSAGE",
+        "",
+        "We got your GroupBuy Power-Drop order!",
+        "",
+        "Here\'s how to lock it in:",
+        "1. Invoice and payment details are down below",
+        "2. Send me a photo remittance before this Saturday",
+        "",
+        "* Ensure payment is made by this Saturday to avoid cancellation",
+        "* From there you\'ll be set for your pick up or delivery date the next week",
+        "* You\'ll get another message from me to let you know its all on track",
+        "",
+        "---",
+        "",
+        `*Order Number:* ${normalisePhone(phone)}`,
+        `*Pick up Date:* ${dateStr}`,
+        `*Pick up Location:* ${locationStr}`,
+        "",
+        ...itemLines,
+      ];
+    } else {
+      // — Casual Order message —
+      parts = [
+        "INCOMING GROUPBUY MESSAGE",
+        "",
+        "We got your casual order!",
+        "",
+        `1. Its scheduled in for pick up at *${locationStr}* on *${dateStr}*`,
+        "2. Payments can be sorted in store.",
+        "* If it is a delivery you\'ll receive an invoice. This needs to be sorted before delivery can take place. Send me the remittance",
+        "",
+        "---",
+        "",
+        `*Order Number:* ${normalisePhone(phone)}`,
+        `*Pick up Date:* ${dateStr}`,
+        `*Pick up Location:* ${locationStr}`,
+        "",
+        ...itemLines,
+      ];
+    }
 
     if (instructions.trim()) {
       parts.push("");
       parts.push(`*Special Instructions:* ${instructions.trim()}`);
-    }
-
-    if (powerDropNote) {
-      parts.push("");
-      parts.push("⚡ POWER DROP PRICING APPLIED");
     }
 
     return `https://wa.me/61407249272?text=${encodeURIComponent(parts.join("\n"))}`;
