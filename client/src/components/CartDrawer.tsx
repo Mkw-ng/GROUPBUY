@@ -18,6 +18,7 @@ import {
   ChevronDown,
   BookmarkCheck,
   Bookmark,
+  CheckCircle,
 } from "lucide-react";
 import { format, isToday, isBefore, startOfDay } from "date-fns";
 import { DayPicker } from "react-day-picker";
@@ -69,6 +70,25 @@ export default function CartDrawer({
   const { saved, save, clear } = useSavedOrderDetails();
 
   const createOrder = trpc.orders.create.useMutation();
+
+  // ─── Order success state ────────────────────────────────────────────────────
+  const [orderSuccess, setOrderSuccess] = useState(false);
+  const [savedWaUrl, setSavedWaUrl] = useState("");
+  interface OrderSummary {
+    dateStr: string;
+    locationLabel: string;
+    items: { qty: number; name: string; cut: string }[];
+  }
+  const [savedSummary, setSavedSummary] = useState<OrderSummary | null>(null);
+
+  // Reset success screen when drawer closes
+  useEffect(() => {
+    if (!open) {
+      setOrderSuccess(false);
+      setSavedWaUrl("");
+      setSavedSummary(null);
+    }
+  }, [open]);
 
   // ─── Focus trap ────────────────────────────────────────────────────────────
   const drawerRef = useRef<HTMLDivElement>(null);
@@ -304,15 +324,28 @@ export default function CartDrawer({
       clear();
     }
 
-    // Open WhatsApp programmatically after successful DB save
+    // Capture WhatsApp URL and order summary before clearing the cart
     const waUrl = buildWhatsAppUrl();
-    const opened = window.open(waUrl, "_blank", "noopener,noreferrer");
-    if (!opened) {
-      window.location.href = waUrl;
-    }
+    const locationLabel =
+      location === "delivery"
+        ? `Delivery — ${deliveryAddress.trim()}`
+        : location === "cranbourne"
+        ? "Cranbourne Park"
+        : location === "clayton"
+        ? "Clayton South"
+        : LOCATION_LABELS[location];
+    setSavedWaUrl(waUrl);
+    setSavedSummary({
+      dateStr,
+      locationLabel,
+      items: items.map((i) => ({ qty: i.qty, name: i.name, cut: i.cut })),
+    });
 
     // Clear the cart
     onCheckoutSuccess?.();
+
+    // Show success screen
+    setOrderSuccess(true);
   }
 
   // ─── Shared input styles ────────────────────────────────────────────────────
@@ -722,8 +755,54 @@ export default function CartDrawer({
               )}
             </div>
 
-            {/* Footer */}
-            {items.length > 0 && (
+            {/* Success screen — shown after successful DB persistence */}
+            {orderSuccess && savedSummary && (
+              <div className="flex-1 flex flex-col items-center justify-center px-6 py-10 gap-4">
+                <CheckCircle size={40} color="#22c55e" strokeWidth={1.5} />
+                <p className="font-display tracking-widest text-[#f5f2ec] text-[18px] text-center">
+                  Order Placed!
+                </p>
+                <p className="font-mono-brand text-[12px] text-[#8a857c] text-center max-w-xs mx-auto">
+                  Your order has been successfully saved. Click below to send to WhatsApp.
+                </p>
+                <div className="border border-white/10 p-4 w-full mt-2">
+                  <p className="font-mono-brand text-[11px] text-[#8a857c] mb-1">
+                    {savedSummary.dateStr}
+                  </p>
+                  <p className="font-mono-brand text-[11px] text-[#8a857c] mb-3">
+                    {savedSummary.locationLabel}
+                  </p>
+                  {savedSummary.items.map((item, idx) => (
+                    <p key={idx} className="font-mono-brand text-[12px] text-[#f5f2ec] leading-relaxed">
+                      {item.qty % 1 === 0 ? item.qty : item.qty.toFixed(1)} × {item.name} — {item.cut}
+                    </p>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const opened = window.open(savedWaUrl, "_blank", "noopener,noreferrer");
+                    if (!opened) window.location.href = savedWaUrl;
+                  }}
+                  className="bg-[#25D366] text-white w-full py-3 font-display text-[11px] tracking-widest hover:bg-[#1ebe5a] transition-colors mt-2"
+                >
+                  Send via WhatsApp →
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOrderSuccess(false);
+                    onClose();
+                  }}
+                  className="border border-white/10 text-[#8a857c] hover:text-[#f5f2ec] w-full py-3 font-display text-[11px] tracking-widest transition-colors"
+                >
+                  Close
+                </button>
+              </div>
+            )}
+
+            {/* Footer — hidden when success screen is shown */}
+            {items.length > 0 && !orderSuccess && (
               <div className="px-6 py-5 border-t border-white/10 shrink-0">
                 <div className="flex items-end justify-between mb-4">
                   <div className="flex flex-col gap-0.5">
