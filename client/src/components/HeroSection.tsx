@@ -171,7 +171,7 @@ export default function HeroSection({ powerDropActive = false, powerDropActivate
             Join WhatsApp
           </a>
           <a
-            href="https://metavore-432233841783.us-central1.run.app/"
+            href="https://www.metavore-x.com"
             target="_blank"
             rel="noopener noreferrer"
             className="metavore-btn inline-flex items-center gap-2 font-display text-[11px] tracking-widest px-6 py-3.5 transition-all"
