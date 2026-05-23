@@ -76,7 +76,7 @@
 
 /// <reference types="@types/google.maps" />
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePersistFn } from "@/hooks/usePersistFn";
 import { cn } from "@/lib/utils";
 
@@ -92,21 +92,30 @@ const FORGE_BASE_URL =
   "https://forge.butterfly-effect.dev";
 const MAPS_PROXY_URL = `${FORGE_BASE_URL}/v1/maps/proxy`;
 
-function loadMapScript() {
-  return new Promise(resolve => {
+let mapScriptPromise: Promise<boolean> | null = null;
+
+function loadMapScript(): Promise<boolean> {
+  if (mapScriptPromise) return mapScriptPromise;
+  if (window.google?.maps) {
+    mapScriptPromise = Promise.resolve(true);
+    return mapScriptPromise;
+  }
+  mapScriptPromise = new Promise<boolean>(resolve => {
     const script = document.createElement("script");
     script.src = `${MAPS_PROXY_URL}/maps/api/js?key=${API_KEY}&v=weekly&libraries=marker,places,geocoding,geometry`;
     script.async = true;
     script.crossOrigin = "anonymous";
     script.onload = () => {
-      resolve(null);
-      script.remove(); // Clean up immediately
+      resolve(true);
     };
     script.onerror = () => {
-      console.error("Failed to load Google Maps script");
+      // Resolve false so callers can show a fallback — avoids unhandled rejection
+      mapScriptPromise = null;
+      resolve(false);
     };
     document.head.appendChild(script);
   });
+  return mapScriptPromise;
 }
 
 interface MapViewProps {
@@ -124,14 +133,16 @@ export function MapView({
 }: MapViewProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<google.maps.Map | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
 
   const init = usePersistFn(async () => {
-    await loadMapScript();
-    if (!mapContainer.current) {
-      console.error("Map container not found");
+    const ok = await loadMapScript();
+    if (!ok) {
+      setLoadFailed(true);
       return;
     }
-    map.current = new window.google.maps.Map(mapContainer.current, {
+    if (!mapContainer.current) return;
+    map.current = new window.google!.maps.Map(mapContainer.current, {
       zoom: initialZoom,
       center: initialCenter,
       mapTypeControl: true,
@@ -148,6 +159,20 @@ export function MapView({
   useEffect(() => {
     init();
   }, [init]);
+
+  if (loadFailed) {
+    return (
+      <div
+        className={cn(
+          "w-full h-[500px] flex flex-col items-center justify-center border border-white/10 bg-white/5 text-[#8a857c]",
+          className
+        )}
+      >
+        <span className="font-mono-brand text-[12px] tracking-widest uppercase">Map unavailable</span>
+        <span className="font-body text-[11px] mt-1 opacity-60">Check pickup locations above</span>
+      </div>
+    );
+  }
 
   return (
     <div ref={mapContainer} className={cn("w-full h-[500px]", className)} />
