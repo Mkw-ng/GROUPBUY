@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, isNull, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, isNull } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { InsertUser, InsertProduct, InsertOrder, orders, products, settings, users, OrderItem, drops, Drop } from "../drizzle/schema";
 import { ENV } from './_core/env';

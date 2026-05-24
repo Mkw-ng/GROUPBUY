@@ -177,8 +177,8 @@ function OrderCard({
   const updateCustomerName = trpc.admin.orders.updateCustomerName.useMutation({
     onSuccess: () => {
       toast.success("Customer name saved");
-      utils.admin.orders.list.invalidate();
       setEditingName(false);
+      onRefresh();
     },
     onError: () => toast.error("Failed to save name"),
   });
@@ -210,7 +210,7 @@ Here's how to lock it in:
   const updateItems = trpc.admin.orders.updateItems.useMutation({
     onSuccess: () => {
       toast.success("Weights saved");
-      utils.admin.orders.list.invalidate();
+      onRefresh();
     },
     onError: () => toast.error("Failed to save weights"),
   });
@@ -218,7 +218,7 @@ Here's how to lock it in:
   const setDeliveryChargeMut = trpc.admin.orders.setDeliveryCharge.useMutation({
     onSuccess: () => {
       toast.success("Delivery charge updated");
-      utils.admin.orders.list.invalidate();
+      onRefresh();
     },
     onError: () => toast.error("Failed to update delivery charge"),
   });
@@ -227,7 +227,7 @@ Here's how to lock it in:
   const markPaid = trpc.admin.orders.markPaid.useMutation({
     onSuccess: () => {
       toast.success("Order marked as paid ✓");
-      utils.admin.orders.list.invalidate();
+      onRefresh();
       if (pendingPaidOrder) {
         const locStr = locationLabel(pendingPaidOrder.location, pendingPaidOrder.deliveryAddress);
         const msg = `Your payment for the GroupBuy Power-Drop order has been received and is now locked-in.\nSee you next week (${pendingPaidOrder.pickupDate}) at (${locStr})`;
@@ -242,7 +242,7 @@ Here's how to lock it in:
   const cancelOrder = trpc.admin.orders.cancel.useMutation({
     onSuccess: () => {
       toast.success("Order cancelled");
-      utils.admin.orders.list.invalidate();
+      onRefresh();
     },
     onError: () => toast.error("Failed to cancel order"),
   });
@@ -250,23 +250,25 @@ Here's how to lock it in:
   const deleteOrder = trpc.admin.orders.delete.useMutation({
     onSuccess: () => {
       toast.success("Order deleted");
-      utils.admin.orders.list.invalidate();
+      onRefresh();
     },
     onError: () => toast.error("Failed to delete order"),
   });
   const archiveOrder = trpc.admin.orders.archive.useMutation({
     onSuccess: () => {
       toast.success("Order archived");
-      utils.admin.orders.list.invalidate();
       utils.admin.orders.listArchived.invalidate();
+      utils.admin.orders.counts.invalidate();
+      onRefresh();
     },
     onError: () => toast.error("Failed to archive order"),
   });
   const unarchiveOrder = trpc.admin.orders.unarchive.useMutation({
     onSuccess: () => {
       toast.success("Order restored");
-      utils.admin.orders.list.invalidate();
       utils.admin.orders.listArchived.invalidate();
+      utils.admin.orders.counts.invalidate();
+      onRefresh();
     },
     onError: () => toast.error("Failed to restore order"),
   });
