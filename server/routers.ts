@@ -10,6 +10,7 @@ import {
   checkAndExpirePowerDrop,
   createOrder,
   getAllOrders,
+  getOrdersPage,
   updateOrderItems,
   updateOrderDeliveryCharge,
   updateOrderStatus,
@@ -375,9 +376,9 @@ export const appRouter = router({
 
     orders: router({
       list: adminProcedure
-        .input(z.object({ limit: z.number().int().max(200).default(100), offset: z.number().int().default(0) }).optional())
+        .input(z.object({ limit: z.number().int().max(100).default(100), offset: z.number().int().default(0) }).optional())
         .query(async ({ input }) => {
-          return getAllOrders(input?.limit, input?.offset);
+          return getOrdersPage(input?.limit ?? 100, input?.offset ?? 0);
         }),
 
       updateItems: adminProcedure
@@ -682,7 +683,7 @@ export const appRouter = router({
           const maxOrderValue = sorted.length > 0 ? sorted[sorted.length - 1] : 0;
           const minOrderValue = sorted.length > 0 ? sorted[0] : 0;
 
-          const allOrders = await getAllOrders();
+          const allOrders = await getAllOrdersForDrops();
           const phoneDropMap: Record<string, Set<number | null>> = {};
           for (const o of allOrders) {
             if (!phoneDropMap[o.phone]) phoneDropMap[o.phone] = new Set();

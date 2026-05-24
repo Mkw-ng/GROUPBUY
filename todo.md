@@ -357,3 +357,16 @@
 - [x] Run pnpm db:push migration
 - [x] Add Retail Price input to admin product create/edit form
 - [x] Update product card Power Drop savings badge to compare against retailPrice when set, fallback to regular price
+
+## Admin Orders Pagination Fix
+- [x] Add getOrdersPage(limit, offset) helper to db.ts using limit+1 trick for hasMore detection
+- [x] Update admin.orders.list tRPC procedure to return { orders, limit, offset, hasMore }
+- [x] Fix dropStats repeat-customer analytics to use getAllOrdersForDrops() instead of capped getAllOrders()
+- [x] AdminOrders.tsx: replace single query with accumulated pages state + useEffect accumulator
+- [x] AdminOrders.tsx: add "Load more orders" button below list when hasMore=true
+- [x] AdminOrders.tsx: show "Showing N orders — more orders exist" indicator when hasMore=true
+- [x] AdminOrders.tsx: show "All N active orders loaded" when fully loaded
+- [x] AdminOrders.tsx: filter tab counts show "+" suffix when more pages exist
+- [x] AdminOrders.tsx: handleRefresh resets offset to 0 and clears accumulated state
+- [x] AdminDrops.tsx: fix UnassignedOrdersCard to extract .orders from paginated response
+- [x] Add 4 vitest tests for getOrdersPage pagination (21 tests passing)

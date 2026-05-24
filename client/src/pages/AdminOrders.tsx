@@ -4,7 +4,7 @@
  * Admin can: enter final weights per item, set delivery charge,
  * issue a WhatsApp invoice, mark as paid, or cancel/delete the order.
  */
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Link } from "wouter";
@@ -1057,11 +1057,57 @@ export default function AdminOrders() {
     }
   }
 
-  const { data: orders, isLoading, refetch } = trpc.admin.orders.list.useQuery(undefined, {
-    enabled: user?.role === "admin",
-    refetchInterval: 30_000, // auto-refresh every 30s
-  });
-  const { data: archivedOrders, isLoading: isLoadingArchived, refetch: refetchArchived } = trpc.admin.orders.listArchived.useQuery(undefined, {
+  // ─── Pagination state ──────────────────────────────────────────────────────
+  const PAGE_SIZE = 100;
+  const [offset, setOffset] = useState(0);
+  const [accumulatedOrders, setAccumulatedOrders] = useState<Order[]>([]);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const isFirstLoad = useRef(true);
+
+  const { data: pageData, isLoading, refetch } = trpc.admin.orders.list.useQuery(
+    { limit: PAGE_SIZE, offset },
+    {
+      enabled: user?.role === "admin",
+      refetchInterval: offset === 0 ? 30_000 : false, // only auto-refresh first page
+    }
+  );
+
+  // Accumulate pages: on first page replace, on subsequent pages append
+  useEffect(() => {
+    if (!pageData) return;
+    const incoming = (pageData.orders ?? []) as Order[];
+    if (offset === 0) {
+      setAccumulatedOrders(incoming);
+      isFirstLoad.current = false;
+    } else {
+      setAccumulatedOrders((prev) => {
+        // Deduplicate by id in case a 30s refresh races with a load-more
+        const existingIds = new Set(prev.map((o) => o.id));
+        const newOnes = incoming.filter((o) => !existingIds.has(o.id));
+        return [...prev, ...newOnes];
+      });
+    }
+    setHasMore(pageData.hasMore ?? false);
+    setLoadingMore(false);
+  }, [pageData, offset]);
+
+  // When a mutation invalidates the list, reset to page 0 so the list refreshes cleanly
+  // (invalidate triggers a refetch of the current query key; we also reset offset to 0)
+  function handleRefresh() {
+    setOffset(0);
+    setAccumulatedOrders([]);
+    isFirstLoad.current = true;
+    refetch();
+  }
+
+  function handleLoadMore() {
+    if (loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    setOffset((prev) => prev + PAGE_SIZE);
+  }
+
+  const { data: archivedOrders, isLoading: isLoadingArchived } = trpc.admin.orders.listArchived.useQuery(undefined, {
     enabled: user?.role === "admin",
   });
 
@@ -1089,7 +1135,7 @@ export default function AdminOrders() {
     );
   }
 
-  const allOrders = (orders as Order[] | undefined) ?? [];
+  const allOrders = accumulatedOrders;
   const allArchived = (archivedOrders as Order[] | undefined) ?? [];
   const filtered =
     statusFilter === "archived"
@@ -1098,6 +1144,7 @@ export default function AdminOrders() {
       ? allOrders
       : allOrders.filter((o) => o.status === statusFilter);
 
+  // Counts reflect loaded orders; append "+" when more pages exist so admins know they're partial
   const counts = {
     all: allOrders.length,
     pending: allOrders.filter((o) => o.status === "pending").length,
@@ -1105,6 +1152,7 @@ export default function AdminOrders() {
     cancelled: allOrders.filter((o) => o.status === "cancelled").length,
     archived: allArchived.length,
   };
+  const countSuffix = hasMore ? "+" : "";
 
   const filterTabs: { key: StatusFilter; label: string }[] = [
     { key: "all", label: "All" },
@@ -1201,7 +1249,7 @@ export default function AdminOrders() {
           </button>
           <div className="w-px h-4 bg-white/10" />
           <button
-            onClick={() => refetch()}
+            onClick={() => handleRefresh()}
             className="font-mono-brand text-[10px] text-[#8a857c] hover:text-[#f5f2ec] transition-colors"
           >
             Refresh
@@ -1263,7 +1311,7 @@ export default function AdminOrders() {
             >
               {tab.label}
               <span className="ml-1.5 font-mono-brand text-[9px] opacity-60">
-                ({counts[tab.key]})
+                ({counts[tab.key]}{tab.key !== "archived" ? countSuffix : ""})
               </span>
             </button>
           ))}
@@ -1295,9 +1343,33 @@ export default function AdminOrders() {
                 key={order.id}
                 order={order as Order}
                 bankDetails={bankDetails}
-                onRefresh={refetch}
+                onRefresh={handleRefresh}
               />
             ))}
+          </div>
+        )}
+
+        {/* Load More — only shown for non-archived views */}
+        {statusFilter !== "archived" && (
+          <div className="flex flex-col items-center gap-2 py-4">
+            {hasMore ? (
+              <>
+                <p className="font-mono-brand text-[10px] text-[#8a857c]">
+                  Showing {allOrders.length} orders — more orders exist
+                </p>
+                <button
+                  onClick={handleLoadMore}
+                  disabled={loadingMore}
+                  className="font-display text-[10px] tracking-widest px-5 py-2 border border-white/20 text-[#f5f2ec] hover:border-[#c73e3a]/60 hover:text-[#c73e3a] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {loadingMore ? "Loading…" : "Load more orders"}
+                </button>
+              </>
+            ) : allOrders.length > 0 ? (
+              <p className="font-mono-brand text-[10px] text-[#8a857c]/50">
+                All {allOrders.length} active orders loaded
+              </p>
+            ) : null}
           </div>
         )}
       </div>

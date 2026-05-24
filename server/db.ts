@@ -186,6 +186,29 @@ export async function getAllOrders(limit = 100, offset = 0) {
   return db.select().from(orders).where(eq(orders.archived, false)).orderBy(desc(orders.createdAt)).limit(limit).offset(offset);
 }
 
+/**
+ * Paginated orders with hasMore flag (uses limit+1 trick — no extra COUNT query).
+ * Returns at most `limit` rows; `hasMore` is true when there are more rows beyond this page.
+ */
+export async function getOrdersPage(limit = 100, offset = 0): Promise<{
+  orders: (typeof orders.$inferSelect)[];
+  limit: number;
+  offset: number;
+  hasMore: boolean;
+}> {
+  const db = await getDb();
+  if (!db) return { orders: [], limit, offset, hasMore: false };
+  const rows = await db
+    .select()
+    .from(orders)
+    .where(eq(orders.archived, false))
+    .orderBy(desc(orders.createdAt))
+    .limit(limit + 1)
+    .offset(offset);
+  const hasMore = rows.length > limit;
+  return { orders: hasMore ? rows.slice(0, limit) : rows, limit, offset, hasMore };
+}
+
 export async function getAllOrdersForDrops(): Promise<(typeof orders.$inferSelect)[]> {
   const db = await getDb();
   if (!db) return [];

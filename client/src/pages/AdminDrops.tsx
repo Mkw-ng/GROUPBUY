@@ -435,7 +435,8 @@ function DropsContent({ onNavigate }: { onNavigate: (path: string) => void }) {
 // ─── Unassigned Orders Card ───────────────────────────────────────────────────
 function UnassignedOrdersCard({ drops }: { drops: { id: number; name: string; isActive: boolean }[] }) {
   const utils = trpc.useUtils();
-  const { data: allOrders } = trpc.admin.orders.list.useQuery();
+  const { data: ordersPage } = trpc.admin.orders.list.useQuery();
+  const allOrders = ordersPage?.orders ?? [];
   const assignOrder = trpc.admin.drops.assignOrder.useMutation({
     onSuccess: () => {
       toast.success("Order assigned");
@@ -444,7 +445,7 @@ function UnassignedOrdersCard({ drops }: { drops: { id: number; name: string; is
     onError: () => toast.error("Failed to assign order"),
   });
 
-  const unassigned = (allOrders ?? []).filter(o => o.dropId == null);
+  const unassigned = allOrders.filter(o => o.dropId == null);
   if (unassigned.length === 0) return null;
 
   return (

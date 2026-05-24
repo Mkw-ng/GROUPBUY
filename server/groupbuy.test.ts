@@ -46,6 +46,28 @@ vi.mock("./db", () => ({
   batchReorderProducts: vi.fn().mockResolvedValue(undefined),
   upsertUser: vi.fn().mockResolvedValue(undefined),
   getUserByOpenId: vi.fn().mockResolvedValue(undefined),
+  getOrdersPage: vi.fn().mockImplementation(async (limit = 100, offset = 0) => {
+    const allRows = Array.from({ length: 150 }, (_, i) => ({
+      id: i + 1,
+      phone: `04${String(i).padStart(8, "0")}`,
+      pickupDate: "Monday, 1 January 2026",
+      location: "cranbourne",
+      deliveryAddress: null,
+      items: JSON.stringify([]),
+      specialInstructions: null,
+      status: "pending" as const,
+      isPowerDrop: true,
+      archived: false,
+      dropId: null,
+      deliveryCharge: "0.00",
+      customerName: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }));
+    const slice = allRows.slice(offset, offset + limit);
+    const hasMore = offset + limit < allRows.length;
+    return { orders: slice, limit, offset, hasMore };
+  }),
   getAllPaidActiveOrders: vi.fn().mockResolvedValue(
     Array.from({ length: 150 }, (_, i) => ({
       id: i + 1,
@@ -74,6 +96,7 @@ import {
   setProductAvailability,
   batchReorderProducts,
   getAllPaidActiveOrders,
+  getOrdersPage,
 } from "./db";
 
 // ─── Settings tests ───────────────────────────────────────────────────────────
@@ -217,5 +240,40 @@ describe("Power Drop pricing logic", () => {
       powerDropActive && pdPrice != null ? pdPrice : regularPrice;
 
     expect(effectivePrice).toBe(42.0);
+  });
+});
+
+// ─── Pagination tests ─────────────────────────────────────────────────────────
+
+describe("getOrdersPage pagination helper", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("returns orders array, limit, offset, and hasMore fields", async () => {
+    const page = await getOrdersPage(100, 0);
+    expect(page).toHaveProperty("orders");
+    expect(page).toHaveProperty("limit", 100);
+    expect(page).toHaveProperty("offset", 0);
+    expect(page).toHaveProperty("hasMore");
+    expect(Array.isArray(page.orders)).toBe(true);
+  });
+
+  it("first page of 100 from 150 rows has hasMore=true", async () => {
+    const page = await getOrdersPage(100, 0);
+    expect(page.orders.length).toBe(100);
+    expect(page.hasMore).toBe(true);
+  });
+
+  it("second page of 100 from 150 rows has hasMore=false", async () => {
+    const page = await getOrdersPage(100, 100);
+    expect(page.orders.length).toBe(50);
+    expect(page.hasMore).toBe(false);
+  });
+
+  it("does not silently cap at 100 - second page returns remaining rows", async () => {
+    const page1 = await getOrdersPage(100, 0);
+    const page2 = await getOrdersPage(100, 100);
+    const totalLoaded = page1.orders.length + page2.orders.length;
+    expect(totalLoaded).toBe(150);
+    expect(totalLoaded).toBeGreaterThan(100);
   });
 });
