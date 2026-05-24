@@ -180,6 +180,11 @@ export async function createOrder(data: InsertOrder): Promise<number> {
   return (result[0] as { insertId: number }).insertId;
 }
 
+/**
+ * Paginated active-orders helper (legacy UI use). Defaults to limit=100.
+ * Do NOT use where a complete uncapped list is required — use getOrdersPage(),
+ * getAllOrdersForDrops(), or getUnassignedOrders() instead.
+ */
 export async function getAllOrders(limit = 100, offset = 0) {
   const db = await getDb();
   if (!db) return [];
@@ -202,13 +207,18 @@ export async function getOrdersPage(limit = 100, offset = 0): Promise<{
     .select()
     .from(orders)
     .where(eq(orders.archived, false))
-    .orderBy(desc(orders.createdAt))
+    .orderBy(desc(orders.createdAt), desc(orders.id))
     .limit(limit + 1)
     .offset(offset);
   const hasMore = rows.length > limit;
   return { orders: hasMore ? rows.slice(0, limit) : rows, limit, offset, hasMore };
 }
 
+/**
+ * Returns all orders (including archived) for drop analytics.
+ * Archived orders are intentionally included so historical analytics
+ * (repeat-customer rates, drop revenue) remain accurate after archiving.
+ */
 export async function getAllOrdersForDrops(): Promise<(typeof orders.$inferSelect)[]> {
   const db = await getDb();
   if (!db) return [];
@@ -377,7 +387,7 @@ export async function getOrdersByDrop(dropId: number | null) {
   const db = await getDb();
   if (!db) return [];
   if (dropId === null) {
-    const { isNull } = await import("drizzle-orm");
+    // isNull is already imported at the top of this file — no dynamic import needed
     return db.select().from(orders).where(isNull(orders.dropId)).orderBy(desc(orders.createdAt));
   }
   return db.select().from(orders).where(eq(orders.dropId, dropId)).orderBy(desc(orders.createdAt));
