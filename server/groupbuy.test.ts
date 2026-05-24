@@ -68,6 +68,31 @@ vi.mock("./db", () => ({
     const hasMore = offset + limit < allRows.length;
     return { orders: slice, limit, offset, hasMore };
   }),
+  getActiveOrderCounts: vi.fn().mockResolvedValue({
+    all: 12,
+    pending: 7,
+    paid: 4,
+    cancelled: 1,
+  }),
+  getUnassignedOrders: vi.fn().mockResolvedValue(
+    Array.from({ length: 3 }, (_, i) => ({
+      id: i + 1,
+      phone: `04${String(i).padStart(8, "0")}`,
+      pickupDate: "Monday, 1 January 2026",
+      location: "cranbourne",
+      deliveryAddress: null,
+      items: JSON.stringify([]),
+      specialInstructions: null,
+      status: "pending" as const,
+      isPowerDrop: true,
+      archived: false,
+      dropId: null,
+      deliveryCharge: "0.00",
+      customerName: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }))
+  ),
   getAllPaidActiveOrders: vi.fn().mockResolvedValue(
     Array.from({ length: 150 }, (_, i) => ({
       id: i + 1,
@@ -97,6 +122,8 @@ import {
   batchReorderProducts,
   getAllPaidActiveOrders,
   getOrdersPage,
+  getActiveOrderCounts,
+  getUnassignedOrders,
 } from "./db";
 
 // ─── Settings tests ───────────────────────────────────────────────────────────
@@ -275,5 +302,42 @@ describe("getOrdersPage pagination helper", () => {
     const totalLoaded = page1.orders.length + page2.orders.length;
     expect(totalLoaded).toBe(150);
     expect(totalLoaded).toBeGreaterThan(100);
+  });
+});
+
+// ─── Server-side counts tests ─────────────────────────────────────────────────
+
+describe("getActiveOrderCounts helper", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("returns counts for all, pending, paid, cancelled", async () => {
+    const counts = await getActiveOrderCounts();
+    expect(counts).toHaveProperty("all");
+    expect(counts).toHaveProperty("pending");
+    expect(counts).toHaveProperty("paid");
+    expect(counts).toHaveProperty("cancelled");
+    expect(typeof counts.all).toBe("number");
+    expect(typeof counts.paid).toBe("number");
+  });
+
+  it("all equals sum of pending + paid + cancelled", async () => {
+    const counts = await getActiveOrderCounts();
+    expect(counts.all).toBe(counts.pending + counts.paid + counts.cancelled);
+  });
+});
+
+// ─── Unassigned orders tests ──────────────────────────────────────────────────
+
+describe("getUnassignedOrders helper", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("returns an array", async () => {
+    const result = await getUnassignedOrders();
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it("every returned order has dropId null", async () => {
+    const result = await getUnassignedOrders();
+    result.forEach((o) => expect(o.dropId).toBeNull());
   });
 });

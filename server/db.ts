@@ -1,4 +1,4 @@
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, count, desc, eq, isNull, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { InsertUser, InsertProduct, InsertOrder, orders, products, settings, users, OrderItem, drops, Drop } from "../drizzle/schema";
 import { ENV } from './_core/env';
@@ -222,6 +222,47 @@ export async function getAllPaidActiveOrders(): Promise<(typeof orders.$inferSel
     .select()
     .from(orders)
     .where(and(eq(orders.archived, false), eq(orders.status, "paid")))
+    .orderBy(asc(orders.createdAt));
+}
+
+/**
+ * Returns accurate counts for active (non-archived) orders by status.
+ * Used by the admin UI so filter tab counts are never capped by pagination.
+ */
+export async function getActiveOrderCounts(): Promise<{
+  all: number;
+  pending: number;
+  paid: number;
+  cancelled: number;
+}> {
+  const db = await getDb();
+  if (!db) return { all: 0, pending: 0, paid: 0, cancelled: 0 };
+  const rows = await db
+    .select({ status: orders.status, cnt: count() })
+    .from(orders)
+    .where(eq(orders.archived, false))
+    .groupBy(orders.status);
+  const map: Record<string, number> = {};
+  for (const r of rows) map[r.status] = Number(r.cnt);
+  return {
+    all: Object.values(map).reduce((a, b) => a + b, 0),
+    pending: map["pending"] ?? 0,
+    paid: map["paid"] ?? 0,
+    cancelled: map["cancelled"] ?? 0,
+  };
+}
+
+/**
+ * Returns all active non-archived orders that have no dropId assigned.
+ * Used by AdminDrops UnassignedOrdersCard — not capped.
+ */
+export async function getUnassignedOrders(): Promise<(typeof orders.$inferSelect)[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(orders)
+    .where(and(eq(orders.archived, false), isNull(orders.dropId)))
     .orderBy(asc(orders.createdAt));
 }
 

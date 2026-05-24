@@ -33,6 +33,8 @@ import {
   unarchiveOrder,
   getArchivedOrders,
   getAllOrdersForDrops,
+  getActiveOrderCounts,
+  getUnassignedOrders,
 } from "./db";
 import { OrderItem } from "../drizzle/schema";
 import {
@@ -446,6 +448,18 @@ export const appRouter = router({
           return { success: true };
         }),
       listArchived: adminProcedure.query(async () => getArchivedOrders()),
+
+      /**
+       * Returns accurate per-status counts for all active (non-archived) orders.
+       * Not capped by pagination — safe to use for filter tab labels and export buttons.
+       */
+      counts: adminProcedure.query(async () => getActiveOrderCounts()),
+
+      /**
+       * Returns all active orders with no dropId assigned.
+       * Not capped — used by AdminDrops UnassignedOrdersCard.
+       */
+      listUnassigned: adminProcedure.query(async () => getUnassignedOrders()),
     }),
 
     settings: router({

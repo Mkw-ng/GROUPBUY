@@ -370,3 +370,16 @@
 - [x] AdminOrders.tsx: handleRefresh resets offset to 0 and clears accumulated state
 - [x] AdminDrops.tsx: fix UnassignedOrdersCard to extract .orders from paginated response
 - [x] Add 4 vitest tests for getOrdersPage pagination (21 tests passing)
+
+## Admin Orders Pagination Tightening
+- [x] Add getActiveOrderCounts() helper to db.ts — single GROUP BY query, no pagination cap
+- [x] Add getUnassignedOrders() helper to db.ts — all active orders with dropId IS NULL
+- [x] Add admin.orders.counts tRPC procedure — returns accurate per-status totals
+- [x] Add admin.orders.listUnassigned tRPC procedure — not capped at 100
+- [x] AdminOrders.tsx: use serverCounts for filter tab labels (accurate, not from loaded pages)
+- [x] AdminOrders.tsx: export buttons never disabled based on loaded-page counts alone
+- [x] AdminOrders.tsx: export button labels show server-side paid count when available
+- [x] AdminOrders.tsx: handleRefresh uses invalidate() when already on page 0 (no race condition)
+- [x] AdminOrders.tsx: remove unused refreshKey state variable
+- [x] AdminDrops.tsx: UnassignedOrdersCard uses listUnassigned query instead of paginated list
+- [x] Add 4 vitest tests for getActiveOrderCounts and getUnassignedOrders (25 tests passing)

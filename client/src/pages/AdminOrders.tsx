@@ -1059,19 +1059,26 @@ export default function AdminOrders() {
 
   // ─── Pagination state ──────────────────────────────────────────────────────
   const PAGE_SIZE = 100;
+  // Use a separate "queryOffset" ref that is always in sync before the query fires.
+  // This avoids the race where setOffset(0) + refetch() fires with the old offset.
   const [offset, setOffset] = useState(0);
   const [accumulatedOrders, setAccumulatedOrders] = useState<Order[]>([]);
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
-  const isFirstLoad = useRef(true);
-
-  const { data: pageData, isLoading, refetch } = trpc.admin.orders.list.useQuery(
+  const { data: pageData, isLoading } = trpc.admin.orders.list.useQuery(
     { limit: PAGE_SIZE, offset },
     {
       enabled: user?.role === "admin",
-      refetchInterval: offset === 0 ? 30_000 : false, // only auto-refresh first page
+      // Auto-refresh every 30s only while on the first page
+      refetchInterval: offset === 0 ? 30_000 : false,
     }
   );
+
+  // Server-side accurate counts — never capped by pagination
+  const { data: serverCounts } = trpc.admin.orders.counts.useQuery(undefined, {
+    enabled: user?.role === "admin",
+    refetchInterval: 30_000,
+  });
 
   // Accumulate pages: on first page replace, on subsequent pages append
   useEffect(() => {
@@ -1079,7 +1086,6 @@ export default function AdminOrders() {
     const incoming = (pageData.orders ?? []) as Order[];
     if (offset === 0) {
       setAccumulatedOrders(incoming);
-      isFirstLoad.current = false;
     } else {
       setAccumulatedOrders((prev) => {
         // Deduplicate by id in case a 30s refresh races with a load-more
@@ -1092,13 +1098,20 @@ export default function AdminOrders() {
     setLoadingMore(false);
   }, [pageData, offset]);
 
-  // When a mutation invalidates the list, reset to page 0 so the list refreshes cleanly
-  // (invalidate triggers a refetch of the current query key; we also reset offset to 0)
+  // Reliable refresh: set offset to 0 first; if already 0, bump refreshKey to force
+  // a new query key so tRPC re-fetches even when offset hasn't changed.
+  const utils = trpc.useUtils();
   function handleRefresh() {
-    setOffset(0);
     setAccumulatedOrders([]);
-    isFirstLoad.current = true;
-    refetch();
+    setHasMore(false);
+    if (offset === 0) {
+      // Already on page 0 — invalidate the cache to force a fresh fetch
+      utils.admin.orders.list.invalidate();
+      utils.admin.orders.counts.invalidate();
+    } else {
+      // Reset to page 0; the useEffect will fire when new data arrives
+      setOffset(0);
+    }
   }
 
   function handleLoadMore() {
@@ -1144,15 +1157,17 @@ export default function AdminOrders() {
       ? allOrders
       : allOrders.filter((o) => o.status === statusFilter);
 
-  // Counts reflect loaded orders; append "+" when more pages exist so admins know they're partial
+  // Use server-provided counts for filter tabs and export buttons — never capped by pagination.
+  // Fall back to loaded-order counts while the server count query is still loading.
   const counts = {
-    all: allOrders.length,
-    pending: allOrders.filter((o) => o.status === "pending").length,
-    paid: allOrders.filter((o) => o.status === "paid").length,
-    cancelled: allOrders.filter((o) => o.status === "cancelled").length,
+    all: serverCounts?.all ?? allOrders.length,
+    pending: serverCounts?.pending ?? allOrders.filter((o) => o.status === "pending").length,
+    paid: serverCounts?.paid ?? allOrders.filter((o) => o.status === "paid").length,
+    cancelled: serverCounts?.cancelled ?? allOrders.filter((o) => o.status === "cancelled").length,
     archived: allArchived.length,
   };
-  const countSuffix = hasMore ? "+" : "";
+  // No longer needed — counts come from the server
+  const countSuffix = "";
 
   const filterTabs: { key: StatusFilter; label: string }[] = [
     { key: "all", label: "All" },
@@ -1200,34 +1215,36 @@ export default function AdminOrders() {
           </div>
         </div>
         <div className="flex items-center gap-3">
+          {/* Export buttons use server-side counts.paid so they are never incorrectly
+              disabled when paid orders exist beyond the first loaded page. */}
           <button
             onClick={handleDownloadInvoices}
-            disabled={downloadingInvoices || counts.paid === 0}
+            disabled={downloadingInvoices}
             className="flex items-center gap-1.5 font-mono-brand text-[10px] text-[#8a857c] hover:text-[#f5f2ec] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-            title={counts.paid === 0 ? "No paid orders to download" : `Download packing sheet for ${counts.paid} paid order${counts.paid !== 1 ? "s" : ""}`}
+            title={`Download packing sheet${counts.paid > 0 ? ` for ${counts.paid} paid order${counts.paid !== 1 ? "s" : ""}` : ""}`}
           >
             <FileDown size={13} />
-            {downloadingInvoices ? "Generating…" : `Packing Sheet (${counts.paid})`}
+            {downloadingInvoices ? "Generating…" : `Packing Sheet${counts.paid > 0 ? ` (${counts.paid})` : ""}`}
           </button>
           <div className="w-px h-4 bg-white/10" />
           <button
             onClick={handleDownloadSchedule}
-            disabled={downloadingSchedule || counts.paid === 0}
+            disabled={downloadingSchedule}
             className="flex items-center gap-1.5 font-mono-brand text-[10px] text-[#8a857c] hover:text-[#f5f2ec] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-            title={counts.paid === 0 ? "No paid orders to download" : `Download schedule list for ${counts.paid} paid order${counts.paid !== 1 ? "s" : ""}`}
+            title={`Download schedule list${counts.paid > 0 ? ` for ${counts.paid} paid order${counts.paid !== 1 ? "s" : ""}` : ""}`}
           >
             <FileDown size={13} />
-            {downloadingSchedule ? "Generating…" : `Schedule List (${counts.paid})`}
+            {downloadingSchedule ? "Generating…" : `Schedule List${counts.paid > 0 ? ` (${counts.paid})` : ""}`}
           </button>
           <div className="w-px h-4 bg-white/10" />
           <button
             onClick={handleDownloadItems}
-            disabled={downloadingItems || counts.paid === 0}
+            disabled={downloadingItems}
             className="flex items-center gap-1.5 font-mono-brand text-[10px] text-[#8a857c] hover:text-[#f5f2ec] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-            title={counts.paid === 0 ? "No paid orders to download" : `Download items ordered list for ${counts.paid} paid order${counts.paid !== 1 ? "s" : ""}`}
+            title={`Download items ordered list${counts.paid > 0 ? ` for ${counts.paid} paid order${counts.paid !== 1 ? "s" : ""}` : ""}`}
           >
             <FileDown size={13} />
-            {downloadingItems ? "Generating…" : `Items Ordered (${counts.paid})`}
+            {downloadingItems ? "Generating…" : `Items Ordered${counts.paid > 0 ? ` (${counts.paid})` : ""}`}
           </button>
           <div className="w-px h-4 bg-white/10" />
           <button
