@@ -36,6 +36,8 @@ import {
   getActiveOrderCounts,
   getUnassignedOrders,
   updateOrderSpecialInstructions,
+  searchActiveOrdersByPhone,
+  searchArchivedOrdersByPhone,
 } from "./db";
 import { OrderItem } from "../drizzle/schema";
 import {
@@ -470,6 +472,21 @@ export const appRouter = router({
         .mutation(async ({ input }) => {
           await updateOrderSpecialInstructions(input.id, input.specialInstructions);
           return { success: true };
+        }),
+
+      /**
+       * Server-side phone search across the full database (not capped to loaded pages).
+       * Normalises stored phone numbers in SQL before matching.
+       */
+      searchByPhone: adminProcedure
+        .input(z.object({
+          phoneQuery: z.string().min(1),
+          archived: z.boolean().default(false),
+        }))
+        .query(async ({ input }) => {
+          return input.archived
+            ? searchArchivedOrdersByPhone(input.phoneQuery)
+            : searchActiveOrdersByPhone(input.phoneQuery);
         }),
     }),
 

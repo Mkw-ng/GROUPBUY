@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, isNull } from "drizzle-orm";
+import { and, asc, count, desc, eq, isNull, like, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { InsertUser, InsertProduct, InsertOrder, orders, products, settings, users, OrderItem, drops, Drop } from "../drizzle/schema";
 import { ENV } from './_core/env';
@@ -229,6 +229,53 @@ export async function updateOrderSpecialInstructions(id: number, specialInstruct
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   await db.update(orders).set({ specialInstructions }).where(eq(orders.id, id));
+}
+
+/**
+ * Search active (non-archived) orders by phone number.
+ * Strips non-digit characters from both the query and the stored phone before matching.
+ */
+export async function searchActiveOrdersByPhone(phoneQuery: string): Promise<(typeof orders.$inferSelect)[]> {
+  const db = await getDb();
+  if (!db) return [];
+  const cleaned = phoneQuery.replace(/\D/g, "");
+  if (!cleaned) return [];
+  // Normalize stored phone in SQL: remove spaces, dashes, brackets, plus signs
+  const normalizedPhone = sql`REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(${orders.phone}, ' ', ''), '-', ''), '(', ''), ')', ''), '+', '')`;
+  return db
+    .select()
+    .from(orders)
+    .where(
+      and(
+        eq(orders.archived, false),
+        sql`${normalizedPhone} LIKE ${`%${cleaned}%`}`
+      )
+    )
+    .orderBy(desc(orders.createdAt), desc(orders.id))
+    .limit(100);
+}
+
+/**
+ * Search archived orders by phone number.
+ * Same normalisation logic as searchActiveOrdersByPhone.
+ */
+export async function searchArchivedOrdersByPhone(phoneQuery: string): Promise<(typeof orders.$inferSelect)[]> {
+  const db = await getDb();
+  if (!db) return [];
+  const cleaned = phoneQuery.replace(/\D/g, "");
+  if (!cleaned) return [];
+  const normalizedPhone = sql`REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(${orders.phone}, ' ', ''), '-', ''), '(', ''), ')', ''), '+', '')`;
+  return db
+    .select()
+    .from(orders)
+    .where(
+      and(
+        eq(orders.archived, true),
+        sql`${normalizedPhone} LIKE ${`%${cleaned}%`}`
+      )
+    )
+    .orderBy(desc(orders.createdAt), desc(orders.id))
+    .limit(100);
 }
 
 export async function getAllPaidActiveOrders(): Promise<(typeof orders.$inferSelect)[]> {

@@ -25,6 +25,8 @@ import {
   Clock,
   Ban,
   FileDown,
+  Search,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -1130,6 +1132,25 @@ export default function AdminOrders() {
     }
   }
 
+  // ─── Phone search state ─────────────────────────────────────────────────────
+  const [phoneSearch, setPhoneSearch] = useState("");
+  const [debouncedPhoneSearch, setDebouncedPhoneSearch] = useState("");
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedPhoneSearch(phoneSearch.trim());
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [phoneSearch]);
+
+  const isSearchingPhone = debouncedPhoneSearch.replace(/\D/g, "").length > 0;
+
+  const { data: phoneSearchResults, isLoading: isPhoneSearchLoading } =
+    trpc.admin.orders.searchByPhone.useQuery(
+      { phoneQuery: debouncedPhoneSearch, archived: statusFilter === "archived" },
+      { enabled: user?.role === "admin" && isSearchingPhone }
+    );
+
   // ─── Pagination state ──────────────────────────────────────────────────────
   const PAGE_SIZE = 100;
   // Use a separate "queryOffset" ref that is always in sync before the query fires.
@@ -1223,8 +1244,17 @@ export default function AdminOrders() {
 
   const allOrders = accumulatedOrders;
   const allArchived = (archivedOrders as Order[] | undefined) ?? [];
-  const filtered =
-    statusFilter === "archived"
+
+  // When searching by phone, use server search results instead of paginated list.
+  // Status filter still applies to search results (except archived which is handled server-side).
+  const searchResults = (phoneSearchResults as Order[] | undefined) ?? [];
+  const filtered = isSearchingPhone
+    ? statusFilter === "archived"
+      ? searchResults
+      : statusFilter === "all"
+      ? searchResults
+      : searchResults.filter((o) => o.status === statusFilter)
+    : statusFilter === "archived"
       ? allArchived
       : statusFilter === "all"
       ? allOrders
@@ -1387,6 +1417,27 @@ export default function AdminOrders() {
           )}
         </div>
 
+        {/* Phone search */}
+        <div className="flex items-center gap-2 border border-white/10 px-3 py-2">
+          <Search size={13} className="text-[#8a857c] shrink-0" />
+          <input
+            type="text"
+            value={phoneSearch}
+            onChange={(e) => setPhoneSearch(e.target.value)}
+            placeholder="Search phone…"
+            className="flex-1 bg-transparent text-[#f5f2ec] font-mono-brand text-[12px] placeholder-[#8a857c] focus:outline-none"
+          />
+          {phoneSearch && (
+            <button
+              onClick={() => setPhoneSearch("")}
+              className="text-[#8a857c] hover:text-[#f5f2ec] transition-colors"
+              aria-label="Clear search"
+            >
+              <X size={13} />
+            </button>
+          )}
+        </div>
+
         {/* Status filter tabs */}
         <div className="flex gap-1 border-b border-white/10 pb-0">
           {filterTabs.map((tab) => (
@@ -1408,7 +1459,14 @@ export default function AdminOrders() {
         </div>
 
         {/* Orders list */}
-        {(isLoading || (statusFilter === "archived" && isLoadingArchived)) ? (
+        {isSearchingPhone && (
+          <p className="font-mono-brand text-[10px] text-[#8a857c]">
+            {isPhoneSearchLoading
+              ? "Searching…"
+              : `Showing phone search results for “${debouncedPhoneSearch.replace(/\D/g, "")}”`}
+          </p>
+        )}
+        {((!isSearchingPhone && isLoading) || (!isSearchingPhone && statusFilter === "archived" && isLoadingArchived) || (isSearchingPhone && isPhoneSearchLoading)) ? (
           <div className="space-y-3">
             {[1, 2, 3].map((i) => (
               <div key={i} className="h-16 border border-white/10 animate-pulse bg-white/3" />
@@ -1439,8 +1497,8 @@ export default function AdminOrders() {
           </div>
         )}
 
-        {/* Load More — only shown for non-archived views */}
-        {statusFilter !== "archived" && (
+        {/* Load More — only shown for non-archived views and when not searching */}
+        {statusFilter !== "archived" && !isSearchingPhone && (
           <div className="flex flex-col items-center gap-2 py-4">
             {hasMore ? (
               <>
