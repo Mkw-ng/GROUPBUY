@@ -35,6 +35,7 @@ import {
   getAllOrdersForDrops,
   getActiveOrderCounts,
   getUnassignedOrders,
+  updateOrderSpecialInstructions,
 } from "./db";
 import { OrderItem } from "../drizzle/schema";
 import {
@@ -460,6 +461,16 @@ export const appRouter = router({
        * Not capped — used by AdminDrops UnassignedOrdersCard.
        */
       listUnassigned: adminProcedure.query(async () => getUnassignedOrders()),
+
+      updateSpecialInstructions: adminProcedure
+        .input(z.object({
+          id: z.number(),
+          specialInstructions: z.string().max(1000).nullable(),
+        }))
+        .mutation(async ({ input }) => {
+          await updateOrderSpecialInstructions(input.id, input.specialInstructions);
+          return { success: true };
+        }),
     }),
 
     settings: router({

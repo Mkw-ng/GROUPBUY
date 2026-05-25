@@ -225,6 +225,12 @@ export async function getAllOrdersForDrops(): Promise<(typeof orders.$inferSelec
   return db.select().from(orders).orderBy(desc(orders.createdAt));
 }
 
+export async function updateOrderSpecialInstructions(id: number, specialInstructions: string | null): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(orders).set({ specialInstructions }).where(eq(orders.id, id));
+}
+
 export async function getAllPaidActiveOrders(): Promise<(typeof orders.$inferSelect)[]> {
   const db = await getDb();
   if (!db) return [];

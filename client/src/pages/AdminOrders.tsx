@@ -174,6 +174,17 @@ function OrderCard({
   const [deliveryCharge, setDeliveryCharge] = useState(order.deliveryCharge ?? "0");
   const [customerName, setCustomerName] = useState(order.customerName ?? "");
   const [editingName, setEditingName] = useState(false);
+  const [specialInstructions, setSpecialInstructions] = useState(order.specialInstructions ?? "");
+  const [editingInstructions, setEditingInstructions] = useState(false);
+  const updateSpecialInstructions = trpc.admin.orders.updateSpecialInstructions.useMutation({
+    onSuccess: () => {
+      toast.success("Special instructions saved");
+      setEditingInstructions(false);
+      onRefresh();
+    },
+    onError: () => toast.error("Failed to save special instructions"),
+  });
+
   const updateCustomerName = trpc.admin.orders.updateCustomerName.useMutation({
     onSuccess: () => {
       toast.success("Customer name saved");
@@ -297,7 +308,8 @@ Here's how to lock it in:
   }
 
   function handleIssueInvoice() {
-    const msg = buildInvoiceMessage(order, items, deliveryCharge, bankDetails, openingSentence);
+    // Pass the locally edited specialInstructions so the invoice reflects unsaved edits too
+    const msg = buildInvoiceMessage({ ...order, specialInstructions: specialInstructions.trim() || null }, items, deliveryCharge, bankDetails, openingSentence);
     const phone = order.phone.replace(/\D/g, "");
     const intlPhone = phone.startsWith("0") ? `61${phone.slice(1)}` : phone;
     window.open(`https://wa.me/${intlPhone}?text=${encodeURIComponent(msg)}`, "_blank");
@@ -464,17 +476,76 @@ Here's how to lock it in:
             </AlertDialog>
           </div>
 
-          {/* Special instructions */}
-          {order.specialInstructions && (
-            <div>
-              <p className="font-display text-[10px] tracking-widest text-[#8a857c] mb-1">
-                SPECIAL INSTRUCTIONS
-              </p>
-              <p className="font-mono-brand text-[12px] text-[#f5f2ec]/80">
-                {order.specialInstructions}
-              </p>
-            </div>
-          )}
+          {/* Special instructions — always shown, editable */}
+          <div>
+            <p className="font-display text-[10px] tracking-widest text-[#8a857c] mb-2">
+              SPECIAL INSTRUCTIONS
+            </p>
+            {editingInstructions ? (
+              <div className="flex flex-col gap-2">
+                <textarea
+                  value={specialInstructions}
+                  onChange={(e) => setSpecialInstructions(e.target.value)}
+                  placeholder="Add special instructions…"
+                  rows={3}
+                  maxLength={1000}
+                  className="w-full bg-transparent border border-white/15 text-[#f5f2ec] font-mono-brand text-[12px] px-3 py-2 focus:outline-none focus:border-[#c73e3a]/60 resize-none"
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === "Escape") {
+                      setSpecialInstructions(order.specialInstructions ?? "");
+                      setEditingInstructions(false);
+                    }
+                    if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+                      updateSpecialInstructions.mutate({
+                        id: order.id,
+                        specialInstructions: specialInstructions.trim() || null,
+                      });
+                    }
+                  }}
+                />
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="font-display text-[10px] tracking-widest border-white/20 text-[#f5f2ec] hover:bg-white/10"
+                    disabled={updateSpecialInstructions.isPending}
+                    onClick={() =>
+                      updateSpecialInstructions.mutate({
+                        id: order.id,
+                        specialInstructions: specialInstructions.trim() || null,
+                      })
+                    }
+                  >
+                    {updateSpecialInstructions.isPending ? "Saving…" : "Save"}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="font-display text-[10px] tracking-widest text-[#8a857c] hover:text-[#f5f2ec]"
+                    onClick={() => {
+                      setSpecialInstructions(order.specialInstructions ?? "");
+                      setEditingInstructions(false);
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div
+                className="flex items-start gap-2 cursor-pointer group"
+                onClick={() => setEditingInstructions(true)}
+              >
+                <span className="font-mono-brand text-[12px] text-[#f5f2ec]/80 group-hover:text-[#f5f2ec] whitespace-pre-wrap">
+                  {specialInstructions || (
+                    <span className="text-[#8a857c] italic">Add special instructions…</span>
+                  )}
+                </span>
+                <span className="font-mono-brand text-[10px] text-[#8a857c] group-hover:text-[#c73e3a] shrink-0">✎</span>
+              </div>
+            )}
+          </div>
 
           {/* Customer name */}
           <div>
