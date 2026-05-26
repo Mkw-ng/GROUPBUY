@@ -51,6 +51,7 @@ function locationSortKey(location: string): number {
 type PaidOrder = {
   id: number;
   phone: string;
+  customerName: string | null;
   pickupDate: string;
   location: string;
   deliveryAddress: string | null;
@@ -507,6 +508,89 @@ function generateItemsOrderedPDF(orders: PaidOrder[]): Promise<Buffer> {
 
       doc.moveDown(1.0);
     }
+
+    // ── Customer Special Instructions section ─────────────────────────────────
+    const ordersWithNotes = orders.filter(
+      (o) => o.specialInstructions && o.specialInstructions.trim().length > 0
+    );
+
+    // Add a page break if we are close to the bottom of the page
+    if (doc.y > doc.page.height - 160) {
+      doc.addPage();
+    } else {
+      doc.moveDown(1.0);
+    }
+
+    doc
+      .moveTo(50, doc.y)
+      .lineTo(545, doc.y)
+      .strokeColor('#000000')
+      .lineWidth(1)
+      .stroke();
+    doc.moveDown(0.8);
+
+    doc
+      .font('Helvetica-Bold')
+      .fontSize(13)
+      .fillColor('#000000')
+      .text('Customer Special Instructions');
+    doc.moveDown(0.6);
+
+    if (ordersWithNotes.length === 0) {
+      doc
+        .font('Helvetica')
+        .fontSize(9)
+        .fillColor('#666666')
+        .text('No customer special instructions.');
+    } else {
+      for (let ni = 0; ni < ordersWithNotes.length; ni++) {
+        const order = ordersWithNotes[ni];
+        const note = (order.specialInstructions ?? '').trim();
+        const locLabel = locationLabel(order.location, order.deliveryAddress);
+
+        // Estimate height needed: 2 header lines + note lines + padding
+        const estimatedHeight = 14 + 12 + Math.ceil(note.length / 70) * 12 + 20;
+        if (doc.y + estimatedHeight > doc.page.height - 60) {
+          doc.addPage();
+        }
+
+        // Name · phone header (show both if name is available)
+        const headerLine = order.customerName?.trim()
+          ? `${order.customerName.trim()} · ${order.phone}`
+          : order.phone;
+
+        doc
+          .font('Helvetica-Bold')
+          .fontSize(9)
+          .fillColor('#000000')
+          .text(headerLine, { width: 495 });
+
+        doc
+          .font('Helvetica')
+          .fontSize(9)
+          .fillColor('#444444')
+          .text(`Pickup: ${order.pickupDate} · ${locLabel}`, { width: 495 });
+
+        doc
+          .font('Helvetica')
+          .fontSize(9)
+          .fillColor('#000000')
+          .text(note, { width: 495 });
+
+        // Thin divider between entries (not after last)
+        if (ni < ordersWithNotes.length - 1) {
+          doc.moveDown(0.5);
+          doc
+            .moveTo(50, doc.y)
+            .lineTo(545, doc.y)
+            .strokeColor('#dddddd')
+            .lineWidth(0.4)
+            .stroke();
+          doc.moveDown(0.5);
+        }
+      }
+    }
+
 
     // ── Page numbers ───────────────────────────────────────────────────────────
     const totalPages = doc.bufferedPageRange().count + 1;
