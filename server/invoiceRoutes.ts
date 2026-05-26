@@ -367,6 +367,7 @@ interface FlatLineItem {
   unit: string;
   phone: string;
   pickupDate: string;
+  specialInstructions: string | null;
 }
 
 function generateItemsOrderedPDF(orders: PaidOrder[]): Promise<Buffer> {
@@ -418,6 +419,7 @@ function generateItemsOrderedPDF(orders: PaidOrder[]): Promise<Buffer> {
           unit: item.unit || "",
           phone: order.phone,
           pickupDate: order.pickupDate,
+          specialInstructions: order.specialInstructions ?? null,
         });
       }
     }
@@ -472,7 +474,7 @@ function generateItemsOrderedPDF(orders: PaidOrder[]): Promise<Buffer> {
           .text(subHeaderText);
         doc.moveDown(0.2);
 
-        // One line per customer
+        // One line per customer — includes special instructions when present
         for (const li of productItems) {
           const weight = parseFloat(li.finalWeightKg || "") || 0;
           const isKg = (li.unit || "").toLowerCase().includes("kg");
@@ -486,11 +488,15 @@ function generateItemsOrderedPDF(orders: PaidOrder[]): Promise<Buffer> {
             const unitLabel = li.unit.replace(/^\/\s*/, "") || "pc";
             qtyStr = `${li.qty} ${unitLabel}`;
           }
+          const specialRequest = li.specialInstructions?.trim();
+          const customerLine = specialRequest
+            ? `${qtyStr} \u2014 ${li.phone} \u2014 ${specialRequest}`
+            : `${qtyStr} \u2014 ${li.phone}`;
           doc
             .font("Helvetica")
             .fontSize(9)
             .fillColor("#000000")
-            .text(`${qtyStr} \u2014 ${li.phone}`, { indent: 10 });
+            .text(customerLine, { indent: 10, width: 485 });
         }
 
         // Thin divider between product groups (not after the last one in the date)
@@ -507,88 +513,6 @@ function generateItemsOrderedPDF(orders: PaidOrder[]): Promise<Buffer> {
       }
 
       doc.moveDown(1.0);
-    }
-
-    // ── Customer Special Instructions section ─────────────────────────────────
-    const ordersWithNotes = orders.filter(
-      (o) => o.specialInstructions && o.specialInstructions.trim().length > 0
-    );
-
-    // Add a page break if we are close to the bottom of the page
-    if (doc.y > doc.page.height - 160) {
-      doc.addPage();
-    } else {
-      doc.moveDown(1.0);
-    }
-
-    doc
-      .moveTo(50, doc.y)
-      .lineTo(545, doc.y)
-      .strokeColor('#000000')
-      .lineWidth(1)
-      .stroke();
-    doc.moveDown(0.8);
-
-    doc
-      .font('Helvetica-Bold')
-      .fontSize(13)
-      .fillColor('#000000')
-      .text('Customer Special Instructions');
-    doc.moveDown(0.6);
-
-    if (ordersWithNotes.length === 0) {
-      doc
-        .font('Helvetica')
-        .fontSize(9)
-        .fillColor('#666666')
-        .text('No customer special instructions.');
-    } else {
-      for (let ni = 0; ni < ordersWithNotes.length; ni++) {
-        const order = ordersWithNotes[ni];
-        const note = (order.specialInstructions ?? '').trim();
-        const locLabel = locationLabel(order.location, order.deliveryAddress);
-
-        // Estimate height needed: 2 header lines + note lines + padding
-        const estimatedHeight = 14 + 12 + Math.ceil(note.length / 70) * 12 + 20;
-        if (doc.y + estimatedHeight > doc.page.height - 60) {
-          doc.addPage();
-        }
-
-        // Name · phone header (show both if name is available)
-        const headerLine = order.customerName?.trim()
-          ? `${order.customerName.trim()} · ${order.phone}`
-          : order.phone;
-
-        doc
-          .font('Helvetica-Bold')
-          .fontSize(9)
-          .fillColor('#000000')
-          .text(headerLine, { width: 495 });
-
-        doc
-          .font('Helvetica')
-          .fontSize(9)
-          .fillColor('#444444')
-          .text(`Pickup: ${order.pickupDate} · ${locLabel}`, { width: 495 });
-
-        doc
-          .font('Helvetica')
-          .fontSize(9)
-          .fillColor('#000000')
-          .text(note, { width: 495 });
-
-        // Thin divider between entries (not after last)
-        if (ni < ordersWithNotes.length - 1) {
-          doc.moveDown(0.5);
-          doc
-            .moveTo(50, doc.y)
-            .lineTo(545, doc.y)
-            .strokeColor('#dddddd')
-            .lineWidth(0.4)
-            .stroke();
-          doc.moveDown(0.5);
-        }
-      }
     }
 
 
