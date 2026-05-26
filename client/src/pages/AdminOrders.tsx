@@ -98,6 +98,10 @@ function calcItemTotal(item: OrderItem): number {
   return price * item.qty;
 }
 
+function formatInvoiceNumber(orderId: number): string {
+  return `GB-${String(orderId).padStart(5, "0")}`;
+}
+
 function buildInvoiceMessage(
   order: Order,
   items: OrderItem[],
@@ -125,7 +129,8 @@ function buildInvoiceMessage(
   const parts: string[] = [
     openingSentence,
     ``,
-    `*Order #:* ${order.phone}`,
+    `*Invoice #:* ${formatInvoiceNumber(order.id)}`,
+    `*Phone:* ${order.phone}`,
     `*Pick-up Date:* ${order.pickupDate}`,
     `*Location:* ${locationStr}`,
     ``,
