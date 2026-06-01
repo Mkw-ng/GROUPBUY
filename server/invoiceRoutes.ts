@@ -242,19 +242,34 @@ function generateScheduleListPDF(orders: PaidOrder[]): Promise<Buffer> {
       year: "numeric",
     });
 
-    // ── Column layout ─────────────────────────────────────────────────────────
+    // ── Column layout (5 columns, 495pt total) ────────────────────────────────
     const LEFT = 50;
     const PAGE_WIDTH = 595; // A4 points
     const CONTENT_WIDTH = PAGE_WIDTH - LEFT * 2; // 495
-    const COL_LOCATION = 100;
-    const COL_PHONE = 100;
-    const COL_ADDRESS = 190;
-    const COL_RECEIVE = CONTENT_WIDTH - COL_LOCATION - COL_PHONE - COL_ADDRESS; // ~105
+    const COL_LOCATION = 70;
+    const COL_DATE = 95;
+    const COL_PHONE = 90;
+    const COL_ADDRESS = 145;
+    const COL_RECEIVE = CONTENT_WIDTH - COL_LOCATION - COL_DATE - COL_PHONE - COL_ADDRESS; // 95
     const ROW_MIN_HEIGHT = 30;
     const HEADER_ROW_HEIGHT = 18;
     const BOTTOM_MARGIN = 50;
     const PAGE_HEIGHT = 841; // A4 points
     const USABLE_BOTTOM = PAGE_HEIGHT - BOTTOM_MARGIN;
+
+    // ── Short location label (used inside table cells) ────────────────────────
+    function shortLocationLabel(loc: string): string {
+      if (loc === "clayton") return "Clayton";
+      if (loc === "cranbourne") return "Cranbourne";
+      if (loc === "delivery") return "Delivery";
+      return loc;
+    }
+
+    // ── Chronological date sort helper ────────────────────────────────────────
+    function pickupDateTimestamp(value: string): number {
+      const ts = new Date(value).getTime();
+      return Number.isNaN(ts) ? Number.MAX_SAFE_INTEGER : ts;
+    }
 
     // ── Group and sort orders ──────────────────────────────────────────────────
     const groups = new Map<string, PaidOrder[]>();
@@ -268,10 +283,10 @@ function generateScheduleListPDF(orders: PaidOrder[]): Promise<Buffer> {
       ([a], [b]) => locationSortKey(a) - locationSortKey(b)
     );
 
-    // Within each group: sort by pickupDate asc, then phone asc
+    // Within each group: sort by date chronologically, then phone asc
     for (const [, groupOrders] of sortedGroups) {
       groupOrders.sort((a, b) => {
-        const dateCmp = a.pickupDate.localeCompare(b.pickupDate);
+        const dateCmp = pickupDateTimestamp(a.pickupDate) - pickupDateTimestamp(b.pickupDate);
         if (dateCmp !== 0) return dateCmp;
         return a.phone.localeCompare(b.phone);
       });
@@ -279,66 +294,77 @@ function generateScheduleListPDF(orders: PaidOrder[]): Promise<Buffer> {
 
     // ── Helpers ───────────────────────────────────────────────────────────────
     /**
-     * Draw the table header row at the current doc.y position.
-     * Returns the y position after the header row.
+     * Draw the 5-column table header row. Returns y after the row.
      */
     function drawTableHeader(y: number): number {
       const x = LEFT;
       const h = HEADER_ROW_HEIGHT;
       // Background
       doc.rect(x, y, CONTENT_WIDTH, h).fillColor("#eeeeee").fill();
-      // Border
+      // Outer border
       doc.rect(x, y, CONTENT_WIDTH, h).strokeColor("#000000").lineWidth(0.5).stroke();
       // Column dividers
-      doc.moveTo(x + COL_LOCATION, y).lineTo(x + COL_LOCATION, y + h).stroke();
-      doc.moveTo(x + COL_LOCATION + COL_PHONE, y).lineTo(x + COL_LOCATION + COL_PHONE, y + h).stroke();
-      doc.moveTo(x + COL_LOCATION + COL_PHONE + COL_ADDRESS, y).lineTo(x + COL_LOCATION + COL_PHONE + COL_ADDRESS, y + h).stroke();
+      let cx = x;
+      for (const w of [COL_LOCATION, COL_DATE, COL_PHONE, COL_ADDRESS]) {
+        cx += w;
+        doc.moveTo(cx, y).lineTo(cx, y + h).strokeColor("#000000").lineWidth(0.5).stroke();
+      }
       // Header text
       const textY = y + 4;
       doc.font("Helvetica-Bold").fontSize(8).fillColor("#000000");
-      doc.text("Location", x + 3, textY, { width: COL_LOCATION - 6, lineBreak: false });
-      doc.text("Phone Number", x + COL_LOCATION + 3, textY, { width: COL_PHONE - 6, lineBreak: false });
-      doc.text("Delivery Address", x + COL_LOCATION + COL_PHONE + 3, textY, { width: COL_ADDRESS - 6, lineBreak: false });
-      doc.text("To Receive", x + COL_LOCATION + COL_PHONE + COL_ADDRESS + 3, textY, { width: COL_RECEIVE - 6, lineBreak: false });
+      doc.text("Location",         x + 3,                                        textY, { width: COL_LOCATION - 6, lineBreak: false });
+      doc.text("Date",             x + COL_LOCATION + 3,                         textY, { width: COL_DATE - 6,     lineBreak: false });
+      doc.text("Phone Number",     x + COL_LOCATION + COL_DATE + 3,              textY, { width: COL_PHONE - 6,    lineBreak: false });
+      doc.text("Delivery Address", x + COL_LOCATION + COL_DATE + COL_PHONE + 3,  textY, { width: COL_ADDRESS - 6,  lineBreak: false });
+      doc.text("To Receive",       x + COL_LOCATION + COL_DATE + COL_PHONE + COL_ADDRESS + 3, textY, { width: COL_RECEIVE - 6, lineBreak: false });
       return y + h;
     }
 
     /**
-     * Estimate the height needed for a data row (address may wrap).
+     * Calculate row height using PDFKit's heightOfString for accurate wrapping.
      */
-    function estimateRowHeight(address: string): number {
+    function calcRowHeight(address: string): number {
       if (!address) return ROW_MIN_HEIGHT;
-      // Rough estimate: ~15 chars per line at 8pt in COL_ADDRESS-6 width
-      const lines = Math.ceil(address.length / 28);
-      return Math.max(ROW_MIN_HEIGHT, lines * 12 + 10);
+      doc.font("Helvetica").fontSize(8);
+      const addrH = doc.heightOfString(address, { width: COL_ADDRESS - 6 });
+      return Math.max(ROW_MIN_HEIGHT, addrH + 12);
     }
 
     /**
-     * Draw a single data row. Returns the y after the row.
+     * Draw a single 5-column data row. Returns y after the row.
      */
-    function drawDataRow(y: number, locLabel: string, phone: string, address: string, rowHeight: number): number {
+    function drawDataRow(
+      y: number,
+      locShort: string,
+      pickupDate: string,
+      phone: string,
+      address: string,
+      rowHeight: number
+    ): number {
       const x = LEFT;
-      // Row border
+      // Outer border
       doc.rect(x, y, CONTENT_WIDTH, rowHeight).strokeColor("#000000").lineWidth(0.5).stroke();
       // Column dividers
-      doc.moveTo(x + COL_LOCATION, y).lineTo(x + COL_LOCATION, y + rowHeight).stroke();
-      doc.moveTo(x + COL_LOCATION + COL_PHONE, y).lineTo(x + COL_LOCATION + COL_PHONE, y + rowHeight).stroke();
-      doc.moveTo(x + COL_LOCATION + COL_PHONE + COL_ADDRESS, y).lineTo(x + COL_LOCATION + COL_PHONE + COL_ADDRESS, y + rowHeight).stroke();
+      let cx = x;
+      for (const w of [COL_LOCATION, COL_DATE, COL_PHONE, COL_ADDRESS]) {
+        cx += w;
+        doc.moveTo(cx, y).lineTo(cx, y + rowHeight).strokeColor("#000000").lineWidth(0.5).stroke();
+      }
       // Cell text
       const textY = y + 6;
       doc.font("Helvetica").fontSize(8).fillColor("#000000");
-      doc.text(locLabel, x + 3, textY, { width: COL_LOCATION - 6, lineBreak: false });
-      doc.text(phone, x + COL_LOCATION + 3, textY, { width: COL_PHONE - 6, lineBreak: false });
+      doc.text(locShort,    x + 3,                                       textY, { width: COL_LOCATION - 6, lineBreak: false });
+      doc.text(pickupDate,  x + COL_LOCATION + 3,                        textY, { width: COL_DATE - 6,     lineBreak: false });
+      doc.text(phone,       x + COL_LOCATION + COL_DATE + 3,             textY, { width: COL_PHONE - 6,    lineBreak: false });
       if (address) {
-        doc.text(address, x + COL_LOCATION + COL_PHONE + 3, textY, { width: COL_ADDRESS - 6 });
+        doc.text(address,   x + COL_LOCATION + COL_DATE + COL_PHONE + 3, textY, { width: COL_ADDRESS - 6 });
       }
-      // To Receive cell is intentionally empty
+      // To Receive cell is intentionally empty (staff writes here)
       return y + rowHeight;
     }
 
     /**
-     * Add a page-level header (title + location label + date).
-     * Returns the y position after the header block.
+     * Draw the page-level header block. Returns y after the divider line.
      */
     function drawPageHeader(groupLabel: string): number {
       doc
@@ -367,7 +393,8 @@ function generateScheduleListPDF(orders: PaidOrder[]): Promise<Buffer> {
 
     // ── Render each location group on its own page(s) ─────────────────────────
     for (const [location, groupOrders] of sortedGroups) {
-      const groupLabel = locationLabel(location, null);
+      const groupLabel = locationLabel(location, null); // full label for heading
+      const locShort = shortLocationLabel(location);    // short label for cells
       const isDelivery = location.toLowerCase() === "delivery";
 
       // Each location always starts on a new page
@@ -377,7 +404,7 @@ function generateScheduleListPDF(orders: PaidOrder[]): Promise<Buffer> {
 
       for (const order of groupOrders) {
         const address = isDelivery && order.deliveryAddress ? order.deliveryAddress : "";
-        const rowH = estimateRowHeight(address);
+        const rowH = calcRowHeight(address);
 
         // If this row won't fit, start a new page and repeat header
         if (curY + rowH > USABLE_BOTTOM) {
@@ -386,8 +413,7 @@ function generateScheduleListPDF(orders: PaidOrder[]): Promise<Buffer> {
           curY = drawTableHeader(curY);
         }
 
-        const locLabel = locationLabel(location, null);
-        curY = drawDataRow(curY, locLabel, order.phone, address, rowH);
+        curY = drawDataRow(curY, locShort, order.pickupDate, order.phone, address, rowH);
       }
     }
 
