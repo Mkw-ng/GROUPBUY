@@ -229,7 +229,8 @@ function generatePackingSheetPDF(orders: PaidOrder[]): Promise<Buffer> {
 
 function generateScheduleListPDF(orders: PaidOrder[]): Promise<Buffer> {
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ margin: 50, size: "A4", bufferPages: true });
+    // bufferPages: true so we can add page numbers without triggering new pages
+    const doc = new PDFDocument({ margin: 50, size: "A4", bufferPages: true, autoFirstPage: false });
     const chunks: Buffer[] = [];
     doc.on("data", (chunk: Buffer) => chunks.push(chunk));
     doc.on("end", () => resolve(Buffer.concat(chunks)));
@@ -241,27 +242,19 @@ function generateScheduleListPDF(orders: PaidOrder[]): Promise<Buffer> {
       year: "numeric",
     });
 
-    // ── Document header ────────────────────────────────────────────────────────
-    doc
-      .font("Helvetica-Bold")
-      .fontSize(18)
-      .fillColor("#000000")
-      .text("GROUPBUY \u2014 Schedule List", { align: "left" });
-
-    doc
-      .font("Helvetica")
-      .fontSize(9)
-      .fillColor("#666666")
-      .text(`Generated: ${dateGenerated}`, { align: "left" })
-      .moveDown(0.8);
-
-    doc
-      .moveTo(50, doc.y)
-      .lineTo(545, doc.y)
-      .strokeColor("#000000")
-      .lineWidth(1)
-      .stroke();
-    doc.moveDown(0.8);
+    // ── Column layout ─────────────────────────────────────────────────────────
+    const LEFT = 50;
+    const PAGE_WIDTH = 595; // A4 points
+    const CONTENT_WIDTH = PAGE_WIDTH - LEFT * 2; // 495
+    const COL_LOCATION = 100;
+    const COL_PHONE = 100;
+    const COL_ADDRESS = 190;
+    const COL_RECEIVE = CONTENT_WIDTH - COL_LOCATION - COL_PHONE - COL_ADDRESS; // ~105
+    const ROW_MIN_HEIGHT = 30;
+    const HEADER_ROW_HEIGHT = 18;
+    const BOTTOM_MARGIN = 50;
+    const PAGE_HEIGHT = 841; // A4 points
+    const USABLE_BOTTOM = PAGE_HEIGHT - BOTTOM_MARGIN;
 
     // ── Group and sort orders ──────────────────────────────────────────────────
     const groups = new Map<string, PaidOrder[]>();
@@ -284,74 +277,133 @@ function generateScheduleListPDF(orders: PaidOrder[]): Promise<Buffer> {
       });
     }
 
-    // ── Render each location group ─────────────────────────────────────────────
-    for (const [location, groupOrders] of sortedGroups) {
-      const groupLabel = locationLabel(location, null);
-
-      // Section header
-      doc
-        .font("Helvetica-Bold")
-        .fontSize(13)
-        .fillColor("#000000")
-        .text(groupLabel.toUpperCase());
-
-      doc.moveDown(0.2);
-      doc
-        .moveTo(50, doc.y)
-        .lineTo(545, doc.y)
-        .strokeColor("#333333")
-        .lineWidth(0.75)
-        .stroke();
-      doc.moveDown(0.6);
-
-      // Group by pickupDate within this location
-      const dateGroups = new Map<string, PaidOrder[]>();
-      for (const o of groupOrders) {
-        if (!dateGroups.has(o.pickupDate)) dateGroups.set(o.pickupDate, []);
-        dateGroups.get(o.pickupDate)!.push(o);
-      }
-
-      for (const [pickupDate, dateOrders] of Array.from(dateGroups.entries())) {
-        // Date sub-header
-        doc
-          .font("Helvetica-Bold")
-          .fontSize(10)
-          .fillColor("#000000")
-          .text(pickupDate);
-        doc.moveDown(0.2);
-
-        // One line per order
-        for (const order of dateOrders) {
-          const addressPart =
-            order.location.toLowerCase() === "delivery" && order.deliveryAddress
-              ? ` (${order.deliveryAddress})`
-              : "";
-          doc
-            .font("Helvetica")
-            .fontSize(9)
-            .fillColor("#000000")
-            .text(`${order.phone}${addressPart}`, { indent: 10 });
-        }
-
-        doc.moveDown(0.5);
-      }
-
-      doc.moveDown(0.8);
+    // ── Helpers ───────────────────────────────────────────────────────────────
+    /**
+     * Draw the table header row at the current doc.y position.
+     * Returns the y position after the header row.
+     */
+    function drawTableHeader(y: number): number {
+      const x = LEFT;
+      const h = HEADER_ROW_HEIGHT;
+      // Background
+      doc.rect(x, y, CONTENT_WIDTH, h).fillColor("#eeeeee").fill();
+      // Border
+      doc.rect(x, y, CONTENT_WIDTH, h).strokeColor("#000000").lineWidth(0.5).stroke();
+      // Column dividers
+      doc.moveTo(x + COL_LOCATION, y).lineTo(x + COL_LOCATION, y + h).stroke();
+      doc.moveTo(x + COL_LOCATION + COL_PHONE, y).lineTo(x + COL_LOCATION + COL_PHONE, y + h).stroke();
+      doc.moveTo(x + COL_LOCATION + COL_PHONE + COL_ADDRESS, y).lineTo(x + COL_LOCATION + COL_PHONE + COL_ADDRESS, y + h).stroke();
+      // Header text
+      const textY = y + 4;
+      doc.font("Helvetica-Bold").fontSize(8).fillColor("#000000");
+      doc.text("Location", x + 3, textY, { width: COL_LOCATION - 6, lineBreak: false });
+      doc.text("Phone Number", x + COL_LOCATION + 3, textY, { width: COL_PHONE - 6, lineBreak: false });
+      doc.text("Delivery Address", x + COL_LOCATION + COL_PHONE + 3, textY, { width: COL_ADDRESS - 6, lineBreak: false });
+      doc.text("To Receive", x + COL_LOCATION + COL_PHONE + COL_ADDRESS + 3, textY, { width: COL_RECEIVE - 6, lineBreak: false });
+      return y + h;
     }
 
-    // ── Page numbers ───────────────────────────────────────────────────────────
-    const totalPages = doc.bufferedPageRange().count + 1;
-    for (let p = 0; p < totalPages; p++) {
-      doc.switchToPage(p);
+    /**
+     * Estimate the height needed for a data row (address may wrap).
+     */
+    function estimateRowHeight(address: string): number {
+      if (!address) return ROW_MIN_HEIGHT;
+      // Rough estimate: ~15 chars per line at 8pt in COL_ADDRESS-6 width
+      const lines = Math.ceil(address.length / 28);
+      return Math.max(ROW_MIN_HEIGHT, lines * 12 + 10);
+    }
+
+    /**
+     * Draw a single data row. Returns the y after the row.
+     */
+    function drawDataRow(y: number, locLabel: string, phone: string, address: string, rowHeight: number): number {
+      const x = LEFT;
+      // Row border
+      doc.rect(x, y, CONTENT_WIDTH, rowHeight).strokeColor("#000000").lineWidth(0.5).stroke();
+      // Column dividers
+      doc.moveTo(x + COL_LOCATION, y).lineTo(x + COL_LOCATION, y + rowHeight).stroke();
+      doc.moveTo(x + COL_LOCATION + COL_PHONE, y).lineTo(x + COL_LOCATION + COL_PHONE, y + rowHeight).stroke();
+      doc.moveTo(x + COL_LOCATION + COL_PHONE + COL_ADDRESS, y).lineTo(x + COL_LOCATION + COL_PHONE + COL_ADDRESS, y + rowHeight).stroke();
+      // Cell text
+      const textY = y + 6;
+      doc.font("Helvetica").fontSize(8).fillColor("#000000");
+      doc.text(locLabel, x + 3, textY, { width: COL_LOCATION - 6, lineBreak: false });
+      doc.text(phone, x + COL_LOCATION + 3, textY, { width: COL_PHONE - 6, lineBreak: false });
+      if (address) {
+        doc.text(address, x + COL_LOCATION + COL_PHONE + 3, textY, { width: COL_ADDRESS - 6 });
+      }
+      // To Receive cell is intentionally empty
+      return y + rowHeight;
+    }
+
+    /**
+     * Add a page-level header (title + location label + date).
+     * Returns the y position after the header block.
+     */
+    function drawPageHeader(groupLabel: string): number {
+      doc
+        .font("Helvetica-Bold")
+        .fontSize(16)
+        .fillColor("#000000")
+        .text("GROUPBUY \u2014 Schedule List", LEFT, 50, { align: "left" });
+      doc
+        .font("Helvetica")
+        .fontSize(10)
+        .fillColor("#000000")
+        .text(`Location: ${groupLabel}`, LEFT, doc.y + 2);
+      doc
+        .font("Helvetica")
+        .fontSize(9)
+        .fillColor("#666666")
+        .text(`Generated: ${dateGenerated}`, LEFT, doc.y + 2);
+      doc
+        .moveTo(LEFT, doc.y + 4)
+        .lineTo(PAGE_WIDTH - LEFT, doc.y + 4)
+        .strokeColor("#000000")
+        .lineWidth(1)
+        .stroke();
+      return doc.y + 12;
+    }
+
+    // ── Render each location group on its own page(s) ─────────────────────────
+    for (const [location, groupOrders] of sortedGroups) {
+      const groupLabel = locationLabel(location, null);
+      const isDelivery = location.toLowerCase() === "delivery";
+
+      // Each location always starts on a new page
+      doc.addPage();
+      let curY = drawPageHeader(groupLabel);
+      curY = drawTableHeader(curY);
+
+      for (const order of groupOrders) {
+        const address = isDelivery && order.deliveryAddress ? order.deliveryAddress : "";
+        const rowH = estimateRowHeight(address);
+
+        // If this row won't fit, start a new page and repeat header
+        if (curY + rowH > USABLE_BOTTOM) {
+          doc.addPage();
+          curY = drawPageHeader(groupLabel);
+          curY = drawTableHeader(curY);
+        }
+
+        const locLabel = locationLabel(location, null);
+        curY = drawDataRow(curY, locLabel, order.phone, address, rowH);
+      }
+    }
+
+    // ── Page numbers (drawn inside bottom margin — no new pages created) ───────
+    const range = doc.bufferedPageRange();
+    for (let i = 0; i < range.count; i++) {
+      doc.switchToPage(range.start + i);
       doc
         .font("Helvetica")
         .fontSize(8)
         .fillColor("#aaaaaa")
         .text(
-          `Page ${p + 1}`,
-          50,
-          doc.page.height - 40,
-          { align: "center", width: doc.page.width - 100 }
+          `Page ${i + 1} of ${range.count}`,
+          LEFT,
+          PAGE_HEIGHT - BOTTOM_MARGIN + 10,
+          { align: "center", width: CONTENT_WIDTH, lineBreak: false }
         );
     }
 
