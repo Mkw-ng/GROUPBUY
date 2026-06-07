@@ -1242,17 +1242,18 @@ function AdminContent() {
                     setEditingProduct((p) => ({ ...p, stockLimit: e.target.value }))
                   }
                 />
-                {(() => {
-                  const existing = (editingProduct as { id?: number; orderedQty?: number; remainingQty?: number | null }).id
-                    ? (trpc.products.list.useQuery(undefined, { enabled: false }).data ?? []).find(
-                        (p) => p.id === (editingProduct as { id?: number }).id
-                      )
+{(() => {
+                  // Use already-fetched products list — no hook call inside JSX
+                  const editingId = (editingProduct as { id?: number }).id;
+                  const existing = editingId
+                    ? (products ?? []).find((p) => p.id === editingId)
                     : null;
-                  if (!existing || existing.stockLimit == null) return null;
+                  const sl = existing ? (existing as { stockLimit?: string | null }).stockLimit : null;
+                  if (!existing || sl == null) return null;
                   return (
                     <p className="text-xs text-muted-foreground">
-                      Ordered: <strong>{(existing.orderedQty ?? 0).toFixed(1)}</strong> ·
-                      Remaining: <strong>{(existing.remainingQty ?? 0).toFixed(1)}</strong>
+                      Ordered: <strong>{((existing as { orderedQty?: number }).orderedQty ?? 0).toFixed(1)}</strong> ·
+                      Remaining: <strong>{((existing as { remainingQty?: number | null }).remainingQty ?? 0).toFixed(1)}</strong>
                     </p>
                   );
                 })()}
