@@ -324,8 +324,13 @@ export default function CartDrawer({
         specialInstructions: instructions.trim() || undefined,
         isPowerDrop: powerDropActive,
       });
-    } catch {
-      toast.error("Failed to save your order. Please try again.");
+    } catch (err: unknown) {
+      // Surface the actual server error (e.g. stock limit exceeded) instead of a generic message
+      const msg =
+        err instanceof Error && err.message
+          ? err.message
+          : "Failed to save your order. Please try again.";
+      toast.error(msg);
       return;
     }
 

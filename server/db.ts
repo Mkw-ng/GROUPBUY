@@ -499,3 +499,50 @@ export async function unarchiveOrder(id: number): Promise<void> {
   if (!db) throw new Error("Database not available");
   await db.update(orders).set({ archived: false }).where(eq(orders.id, id));
 }
+
+/**
+ * Calculates total ordered quantity per product ID from active (non-archived)
+ * pending and paid orders. Cancelled and archived orders are excluded.
+ *
+ * For kg-based products (unit contains "kg"):
+ *   - Uses finalWeightKg if set and > 0, otherwise uses qty.
+ * For non-kg products:
+ *   - Uses qty.
+ *
+ * Returns a Map<productId, totalQty>.
+ *
+ * NOTE: This reads from the orders.items JSON column. A future order_items
+ * table with row-level locking would make stock validation stronger under
+ * concurrent load.
+ */
+export async function getOrderedQtyByProduct(): Promise<Map<number, number>> {
+  const db = await getDb();
+  const result = new Map<number, number>();
+  if (!db) return result;
+
+  const activeOrders = await db
+    .select({ items: orders.items })
+    .from(orders)
+    .where(
+      and(
+        eq(orders.archived, false),
+        sql`${orders.status} IN ('pending', 'paid')`
+      )
+    );
+
+  for (const row of activeOrders) {
+    let items: OrderItem[] = [];
+    try {
+      items = JSON.parse(row.items ?? "[]");
+    } catch {
+      continue;
+    }
+    for (const item of items) {
+      const isKg = (item.unit ?? "").toLowerCase().includes("kg");
+      const finalW = item.finalWeightKg ? parseFloat(item.finalWeightKg) : 0;
+      const qty = isKg && finalW > 0 ? finalW : (item.qty ?? 0);
+      result.set(item.id, (result.get(item.id) ?? 0) + qty);
+    }
+  }
+  return result;
+}

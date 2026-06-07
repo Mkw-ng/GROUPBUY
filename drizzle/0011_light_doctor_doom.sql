@@ -1,0 +1,1 @@
+ALTER TABLE `products` ADD `stockLimit` decimal(10,3);

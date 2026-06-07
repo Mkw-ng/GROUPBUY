@@ -73,6 +73,12 @@ export const products = mysqlTable("products", {
   available: boolean("available").notNull().default(true),
   img: text("img"),
   sortOrder: int("sortOrder").notNull().default(0),
+  /**
+   * Optional maximum quantity available for this product.
+   * null = unlimited. When set, pending+paid active orders are counted against this limit.
+   * Unit matches the product's unit (kg for weight-based, count for others).
+   */
+  stockLimit: decimal("stockLimit", { precision: 10, scale: 3 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

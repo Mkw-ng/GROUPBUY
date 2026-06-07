@@ -109,6 +109,11 @@ type Product = {
   description?: string | null;
   createdAt: Date;
   updatedAt: Date;
+  /** Server-computed stock fields — null when no limit is set */
+  stockLimit?: string | null;
+  orderedQty?: number;
+  remainingQty?: number | null;
+  isSoldOutByStock?: boolean;
 };
 
 interface DealsProps {
@@ -128,17 +133,19 @@ interface DealsProps {
 interface PowerDropButtonProps {
   showPowerDrop: boolean;
   available: boolean;
+  soldOut: boolean;
   onAdd: () => void;
   onFlyTrigger?: (e: React.MouseEvent<HTMLButtonElement>) => void;
 }
 
-function PowerDropButton({ showPowerDrop, available, onAdd, onFlyTrigger }: PowerDropButtonProps) {
+function PowerDropButton({ showPowerDrop, available, soldOut, onAdd, onFlyTrigger }: PowerDropButtonProps) {
   const [ripples, setRipples] = useState<{ id: number; x: number; y: number }[]>([]);
   const btnRef = useRef<HTMLButtonElement>(null);
   const nextId = useRef(0);
+  const isDisabled = !available || soldOut;
 
   const handleClick = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
-    if (!available) return;
+    if (isDisabled) return;
     const rect = btnRef.current?.getBoundingClientRect();
     if (rect) {
       const x = e.clientX - rect.left;
@@ -149,13 +156,13 @@ function PowerDropButton({ showPowerDrop, available, onAdd, onFlyTrigger }: Powe
     }
     onFlyTrigger?.(e);
     onAdd();
-  }, [available, onAdd, onFlyTrigger]);
+  }, [isDisabled, onAdd, onFlyTrigger]);
 
   return (
     <button
       ref={btnRef}
       onClick={handleClick}
-      disabled={!available}
+      disabled={isDisabled}
       className={`relative overflow-hidden flex items-center gap-1.5 font-display text-[10px] tracking-widest px-3 py-2 transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
         showPowerDrop
           ? "bg-[#c73e3a] text-[#f5f2ec] hover:bg-[#a83330]"
@@ -178,7 +185,9 @@ function PowerDropButton({ showPowerDrop, available, onAdd, onFlyTrigger }: Powe
           }}
         />
       ))}
-      {showPowerDrop ? (
+      {soldOut ? (
+        <>SOLD OUT</>
+      ) : showPowerDrop ? (
         <>
           <Zap size={11} className="fill-current" />
           Secure Power-Drop
@@ -460,6 +469,13 @@ export default function DealsSection({ onAddToCart, powerDropActive = false }: D
                   const savingsPct = (showPowerDrop && pdPrice != null && pdPrice < comparisonPrice)
                     ? Math.round(((comparisonPrice - pdPrice) / comparisonPrice) * 100)
                     : null;
+                  // Stock limit UI
+                  const isSoldOutByStock = !!(product as { isSoldOutByStock?: boolean }).isSoldOutByStock;
+                  const remainingQty = (product as { remainingQty?: number | null }).remainingQty ?? null;
+                  const stockLimit = (product as { stockLimit?: string | null }).stockLimit;
+                  const hasStockLimit = stockLimit != null;
+                  const isKgUnit = (product.unit ?? "").toLowerCase().includes("kg");
+                  const soldOut = !product.available || isSoldOutByStock;
 
                   return (
                     <motion.div
@@ -505,12 +521,18 @@ export default function DealsSection({ onAddToCart, powerDropActive = false }: D
                             {savingsPct != null ? `SAVE ${savingsPct}%` : "POWER DROP"}
                           </span>
                         )}
-                        {!product.available && (
+                        {soldOut && (
                           <div className="absolute inset-0 flex items-center justify-center bg-[#0a0a0a]/40">
                             <span className="font-display text-[12px] tracking-widest text-[#f5f2ec] border border-[#f5f2ec]/50 px-3 py-1">
                               SOLD OUT
                             </span>
                           </div>
+                        )}
+                        {/* Stock remaining badge — only when not sold out and close to limit */}
+                        {!soldOut && hasStockLimit && remainingQty != null && remainingQty <= parseFloat(stockLimit!) * 0.25 && (
+                          <span className="absolute bottom-2 left-2 font-mono-brand text-[9px] tracking-wider px-2 py-0.5 bg-[#c73e3a] text-[#f5f2ec]">
+                            {remainingQty <= 0 ? "SOLD OUT" : `${remainingQty.toFixed(isKgUnit ? 1 : 0)}${isKgUnit ? "kg" : ""} left`}
+                          </span>
                         )}
                       </div>
 
@@ -553,6 +575,7 @@ export default function DealsSection({ onAddToCart, powerDropActive = false }: D
                             <PowerDropButton
                               showPowerDrop={showPowerDrop}
                               available={product.available}
+                              soldOut={soldOut}
                               onFlyTrigger={() => {
                                 // Find the product image element inside this card
                                 const cardEl = document.querySelector(

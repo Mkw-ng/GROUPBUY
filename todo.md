@@ -383,3 +383,21 @@
 - [x] AdminOrders.tsx: remove unused refreshKey state variable
 - [x] AdminDrops.tsx: UnassignedOrdersCard uses listUnassigned query instead of paginated list
 - [x] Add 4 vitest tests for getActiveOrderCounts and getUnassignedOrders (25 tests passing)
+
+## Archive All Paid (Bulk Action)
+- [x] Add getPaidActiveOrderIds() helper to db.ts
+- [x] Add archiveAllPaidActiveOrders() helper to db.ts
+- [x] Add admin.orders.archiveAllPaid tRPC mutation — fetches IDs first, archives, then runs upsertCustomerFromOrder for each
+- [x] AdminOrders.tsx: amber-styled "Archive Paid (N)" button in toolbar, disabled when counts.paid === 0
+- [x] AdminOrders.tsx: AlertDialog confirmation with paid count, Cancel + Archive Paid Orders actions
+- [x] On success: toast, handleRefresh(), listArchived.invalidate(), counts.invalidate()
+
+## Product Stock Limits
+- [x] Add stockLimit DECIMAL(10,3) NULL column to products table in drizzle/schema.ts
+- [x] Run pnpm db:push migration
+- [x] Add getOrderedQtyByProduct() helper to server/db.ts
+- [x] Enrich products.list response with orderedQty, remainingQty, isSoldOutByStock
+- [x] Add checkout validation in orders.create: reject if qty exceeds remainingQty
+- [x] Admin product editor: add Stock Limit field, show Ordered/Remaining status
+- [x] Public product cards: show "Xkg left" / "SOLD OUT" badge, disable add-to-cart when sold out
+- [x] Cart: surface server error message on checkout rejection

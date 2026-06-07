@@ -40,6 +40,7 @@ import {
   searchArchivedOrdersByPhone,
   getPaidActiveOrderIds,
   archiveAllPaidActiveOrders,
+  getOrderedQtyByProduct,
 } from "./db";
 import { OrderItem } from "../drizzle/schema";
 import {
@@ -141,6 +142,7 @@ const productInput = z.object({
   available: z.boolean().default(true),
   img: z.string().optional().nullable(),
   sortOrder: z.number().default(0),
+  stockLimit: z.string().regex(/^\d+(\.\d{1,3})?$/).optional().nullable(),
 });
 
 // ─── Order item schema ─────────────────────────────────────────────────────────────────
@@ -266,7 +268,17 @@ export const appRouter = router({
 
   products: router({
     list: publicProcedure.query(async () => {
-      return getAllProducts();
+      const [rawProducts, orderedQtyMap] = await Promise.all([
+        getAllProducts(),
+        getOrderedQtyByProduct(),
+      ]);
+      return rawProducts.map((p) => {
+        const orderedQty = orderedQtyMap.get(p.id) ?? 0;
+        const stockLimit = p.stockLimit != null ? parseFloat(p.stockLimit) : null;
+        const remainingQty = stockLimit != null ? Math.max(stockLimit - orderedQty, 0) : null;
+        const isSoldOutByStock = stockLimit != null && remainingQty != null && remainingQty <= 0;
+        return { ...p, orderedQty, remainingQty, isSoldOutByStock };
+      });
     }),
   }),
 
@@ -322,6 +334,54 @@ export const appRouter = router({
           throw new TRPCError({ code: "BAD_REQUEST", message: "items must be valid JSON" });
         }
 
+        // ─── Stock limit validation ─────────────────────────────────────────
+        // Re-fetch products and current ordered quantities server-side.
+        // Do NOT trust frontend stock values — backend is the source of truth.
+        // NOTE: This is a best-effort check. A future order_items table with
+        // row-level locking would make this fully race-condition-proof.
+        {
+          const [allProducts, orderedQtyMap] = await Promise.all([
+            getAllProducts(),
+            getOrderedQtyByProduct(),
+          ]);
+          const productMap = new Map(allProducts.map((p) => [p.id, p]));
+          for (const item of parsedItems) {
+            const product = productMap.get(item.id);
+            if (!product) {
+              throw new TRPCError({
+                code: "BAD_REQUEST",
+                message: `Product "${item.name}" no longer exists.`,
+              });
+            }
+            if (!product.available) {
+              throw new TRPCError({
+                code: "BAD_REQUEST",
+                message: `"${product.name}" is currently unavailable.`,
+              });
+            }
+            if (product.stockLimit != null) {
+              const stockLimit = parseFloat(product.stockLimit);
+              const orderedQty = orderedQtyMap.get(product.id) ?? 0;
+              const remaining = Math.max(stockLimit - orderedQty, 0);
+              if (remaining <= 0) {
+                throw new TRPCError({
+                  code: "BAD_REQUEST",
+                  message: `"${product.name}" is sold out.`,
+                });
+              }
+              const isKg = (product.unit ?? "").toLowerCase().includes("kg");
+              const requestedQty = item.qty ?? 0;
+              if (requestedQty > remaining) {
+                const unit = isKg ? "kg" : "unit(s)";
+                throw new TRPCError({
+                  code: "BAD_REQUEST",
+                  message: `"${product.name}" only has ${remaining.toFixed(isKg ? 1 : 0)}${unit} remaining. Please reduce your quantity.`,
+                });
+              }
+            }
+          }
+        }
+
         const activeDrop = await getActiveDrop();
         const id = await createOrder({
           phone: input.phone,
@@ -351,6 +411,7 @@ export const appRouter = router({
           retailPrice: input.retailPrice ?? null,
           badge: input.badge ?? null,
           img: input.img ?? null,
+          stockLimit: input.stockLimit ?? null,
         });
         return { id };
       }),

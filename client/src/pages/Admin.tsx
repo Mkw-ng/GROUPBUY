@@ -178,6 +178,7 @@ interface ProductForm {
   available: boolean;
   img: string;
   sortOrder: number;
+  stockLimit: string;
 }
 
 const EMPTY_FORM: ProductForm = {
@@ -193,6 +194,7 @@ const EMPTY_FORM: ProductForm = {
   available: true,
   img: "",
   sortOrder: 0,
+  stockLimit: "",
 };
 
 // ─── Admin Guard ──────────────────────────────────────────────────────────────
@@ -641,6 +643,7 @@ function AdminContent() {
         available: p.available,
         img: p.img ?? "",
         sortOrder: p.sortOrder,
+        stockLimit: (p as { stockLimit?: string | null }).stockLimit ?? "",
       });
       setProductModalOpen(true);
     },
@@ -666,6 +669,7 @@ function AdminContent() {
       available: editingProduct.available,
       img: editingProduct.img || undefined,
       sortOrder: editingProduct.sortOrder,
+      stockLimit: editingProduct.stockLimit || undefined,
     });
   };
 
@@ -1220,6 +1224,38 @@ function AdminContent() {
                     }
                   />
                 </div>
+              </div>
+
+              {/* Stock Limit */}
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">
+                  Stock Limit
+                  <span className="ml-2 text-xs font-normal text-muted-foreground">(optional — leave blank for unlimited)</span>
+                </label>
+                <Input
+                  type="number"
+                  step="0.001"
+                  min="0"
+                  placeholder="e.g. 50 for 50 kg or 50 units"
+                  value={editingProduct.stockLimit}
+                  onChange={(e) =>
+                    setEditingProduct((p) => ({ ...p, stockLimit: e.target.value }))
+                  }
+                />
+                {(() => {
+                  const existing = (editingProduct as { id?: number; orderedQty?: number; remainingQty?: number | null }).id
+                    ? (trpc.products.list.useQuery(undefined, { enabled: false }).data ?? []).find(
+                        (p) => p.id === (editingProduct as { id?: number }).id
+                      )
+                    : null;
+                  if (!existing || existing.stockLimit == null) return null;
+                  return (
+                    <p className="text-xs text-muted-foreground">
+                      Ordered: <strong>{(existing.orderedQty ?? 0).toFixed(1)}</strong> ·
+                      Remaining: <strong>{(existing.remainingQty ?? 0).toFixed(1)}</strong>
+                    </p>
+                  );
+                })()}
               </div>
 
               <div className="space-y-1.5">
