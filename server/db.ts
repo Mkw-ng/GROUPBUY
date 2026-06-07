@@ -329,6 +329,34 @@ export async function getUnassignedOrders(): Promise<(typeof orders.$inferSelect
     .orderBy(asc(orders.createdAt));
 }
 
+/**
+ * Returns IDs of all paid, non-archived orders.
+ * Used by archiveAllPaidActiveOrders to run per-order analytics updates after bulk archive.
+ */
+export async function getPaidActiveOrderIds(): Promise<number[]> {
+  const db = await getDb();
+  if (!db) return [];
+  const rows = await db
+    .select({ id: orders.id })
+    .from(orders)
+    .where(and(eq(orders.archived, false), eq(orders.status, "paid")));
+  return rows.map((r) => r.id);
+}
+
+/**
+ * Archives all paid, non-archived orders in a single UPDATE.
+ * Returns the number of rows affected.
+ */
+export async function archiveAllPaidActiveOrders(): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db
+    .update(orders)
+    .set({ archived: true })
+    .where(and(eq(orders.archived, false), eq(orders.status, "paid")));
+  return Number((result[0] as { affectedRows?: number })?.affectedRows ?? 0);
+}
+
 export async function getArchivedOrders() {
   const db = await getDb();
   if (!db) return [];

@@ -38,6 +38,8 @@ import {
   updateOrderSpecialInstructions,
   searchActiveOrdersByPhone,
   searchArchivedOrdersByPhone,
+  getPaidActiveOrderIds,
+  archiveAllPaidActiveOrders,
 } from "./db";
 import { OrderItem } from "../drizzle/schema";
 import {
@@ -488,6 +490,19 @@ export const appRouter = router({
             ? searchArchivedOrdersByPhone(input.phoneQuery)
             : searchActiveOrdersByPhone(input.phoneQuery);
         }),
+
+      /**
+       * Archives all paid, non-archived orders in one action.
+       * Runs upsertCustomerFromOrder for each archived order so analytics stay accurate.
+       */
+      archiveAllPaid: adminProcedure.mutation(async () => {
+        // Fetch IDs before archiving so we can update analytics for each
+        const ids = await getPaidActiveOrderIds();
+        const archivedCount = await archiveAllPaidActiveOrders();
+        // Update customer analytics for every archived order (fire-and-forget errors)
+        await Promise.allSettled(ids.map((id) => upsertCustomerFromOrder(id)));
+        return { success: true, archivedCount };
+      }),
     }),
 
     settings: router({

@@ -1137,6 +1137,17 @@ export default function AdminOrders() {
     }
   }
 
+  // ─── Bulk archive all paid mutation ─────────────────────────────────────────
+  const archiveAllPaid = trpc.admin.orders.archiveAllPaid.useMutation({
+    onSuccess: (result) => {
+      toast.success(`Archived ${result.archivedCount} paid order${result.archivedCount === 1 ? "" : "s"}`);
+      handleRefresh();
+      utils.admin.orders.listArchived.invalidate();
+      utils.admin.orders.counts.invalidate();
+    },
+    onError: () => toast.error("Failed to archive paid orders"),
+  });
+
   // ─── Phone search state ─────────────────────────────────────────────────────
   const [phoneSearch, setPhoneSearch] = useState("");
   const [debouncedPhoneSearch, setDebouncedPhoneSearch] = useState("");
@@ -1323,6 +1334,39 @@ export default function AdminOrders() {
           </div>
         </div>
         <div className="flex items-center gap-3">
+          {/* Archive All Paid — bulk action button with confirmation dialog */}
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <button
+                disabled={archiveAllPaid.isPending || counts.paid === 0}
+                className="flex items-center gap-1.5 font-mono-brand text-[10px] text-amber-500/70 hover:text-amber-400 transition-colors disabled:opacity-40 disabled:cursor-not-allowed border border-amber-500/30 hover:border-amber-400/50 rounded px-2 py-1"
+                title="Archive all paid active orders"
+              >
+                <Archive size={12} />
+                {archiveAllPaid.isPending ? "Archiving…" : `Archive Paid${counts.paid > 0 ? ` (${counts.paid})` : ""}`}
+              </button>
+            </AlertDialogTrigger>
+            <AlertDialogContent className="section-ink border-white/10">
+              <AlertDialogHeader>
+                <AlertDialogTitle className="font-display tracking-widest text-[#f5f2ec]">Archive all paid orders?</AlertDialogTitle>
+                <AlertDialogDescription className="font-mono-brand text-[#8a857c] space-y-1">
+                  <span className="block">This will archive all currently paid, non-archived orders and move them out of the active order tabs.</span>
+                  <span className="block">They will remain available in the Archived tab and analytics.</span>
+                  <span className="block mt-2 text-amber-400/80">{counts.paid} paid order{counts.paid !== 1 ? "s" : ""} will be archived.</span>
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel className="font-display text-[10px] tracking-widest">Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => archiveAllPaid.mutate()}
+                  className="font-display text-[10px] tracking-widest bg-amber-600 hover:bg-amber-500 text-white"
+                >
+                  Archive Paid Orders
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+          <div className="w-px h-4 bg-white/10" />
           {/* Export buttons use server-side counts.paid so they are never incorrectly
               disabled when paid orders exist beyond the first loaded page. */}
           <button
