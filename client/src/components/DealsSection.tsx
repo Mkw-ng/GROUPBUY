@@ -129,6 +129,15 @@ interface DealsProps {
   powerDropActive?: boolean;
 }
 
+// ── Stock quantity label helper ─────────────────────────────────────────────
+function formatRemainingQty(value: number, unit: string): string {
+  const isKg = (unit ?? "").toLowerCase().includes("kg");
+  const formatted = Number.isInteger(value)
+    ? String(value)
+    : value.toFixed(1).replace(/\.0$/, "");
+  return isKg ? `${formatted}kg left` : `${formatted} left`;
+}
+
 // ── PowerDropButton with ripple effect ──────────────────────────────────────
 interface PowerDropButtonProps {
   showPowerDrop: boolean;
@@ -544,6 +553,18 @@ export default function DealsSection({ onAddToCart, powerDropActive = false }: D
                         <h3 className="font-body text-[12px] sm:text-[15px] font-bold text-[#0a0a0a] mb-1.5 sm:mb-3 leading-snug flex-1 line-clamp-2">
                           {product.name}
                         </h3>
+                        {/* Stock availability label */}
+                        {hasStockLimit && (
+                          <p className={`font-mono-brand text-[9px] sm:text-[10px] uppercase tracking-wider mb-1 sm:mb-1.5 ${
+                            soldOut ? "text-[#c73e3a]" : remainingQty != null && remainingQty <= 5 ? "text-amber-500" : "text-emerald-600"
+                          }`}>
+                            {soldOut
+                              ? "SOLD OUT"
+                              : remainingQty != null
+                                ? formatRemainingQty(remainingQty, product.unit)
+                                : null}
+                          </p>
+                        )}
                         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-1.5 sm:gap-2">
                           <div>
                             {showPowerDrop ? (
