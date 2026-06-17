@@ -856,16 +856,6 @@ export default function CartDrawer({
                 <button
                   type="button"
                   onClick={() => {
-                    const opened = window.open(savedWaUrl, "_blank", "noopener,noreferrer");
-                    if (!opened) window.location.href = savedWaUrl;
-                  }}
-                  className="bg-[#25D366] text-white w-full py-3 font-display text-[11px] tracking-widest hover:bg-[#1ebe5a] transition-colors"
-                >
-                  Send via WhatsApp →
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
                     setOrderSuccess(false);
                     onClose();
                   }}
