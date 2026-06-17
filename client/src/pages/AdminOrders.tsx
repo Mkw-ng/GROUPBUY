@@ -1110,7 +1110,7 @@ export default function AdminOrders() {
   const [pickupSort, setPickupSort] = useState<"none" | "asc" | "desc">("none");
   const [phoneSort, setPhoneSort] = useState<"none" | "asc" | "desc">("none");
   const [bankDetails, setBankDetails] = useState(
-    "BSB: 182-888\nAccount: 001 052 935\nAccount Name: BEST QUALITY BUTCHER"
+    "PayID: 0400032420\nAccount Name: Best Quality Butcher Pty Ltd\nBSB: 013268\nAccount No: 661195191"
   );
   const [editingBank, setEditingBank] = useState(false);
   const [downloadingInvoices, setDownloadingInvoices] = useState(false);
