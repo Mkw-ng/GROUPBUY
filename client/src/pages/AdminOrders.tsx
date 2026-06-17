@@ -771,7 +771,7 @@ Here's how to lock it in:
                 <AlertDialogTrigger asChild>
                   <Button
                     size="sm"
-                    className="font-display text-[10px] tracking-widest bg-green-700 hover:bg-green-600 text-white gap-1.5"
+                    className="font-display text-[10px] tracking-widest bg-blue-700 hover:bg-blue-600 text-white gap-1.5"
                     disabled={markPaid.isPending}
                   >
                     <CheckCircle2 size={13} />
@@ -788,7 +788,7 @@ Here's how to lock it in:
                   <AlertDialogFooter>
                     <AlertDialogCancel className="font-display text-[10px] tracking-widest">Cancel</AlertDialogCancel>
                     <AlertDialogAction
-                      className="font-display text-[10px] tracking-widest bg-green-700 hover:bg-green-600"
+                      className="font-display text-[10px] tracking-widest bg-blue-700 hover:bg-blue-600"
                       onClick={() => {
                         setConfirmMarkPaid(false);
                         markPaid.mutate({ id: order.id });
