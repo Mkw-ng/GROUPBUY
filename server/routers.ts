@@ -98,6 +98,7 @@ const orderItemValidationSchema = z.array(
     price: z.string().regex(/^\d+(\.\d{1,2})?$/, "Invalid price format"),
     unit: z.string(),
     finalWeightKg: z.string().optional(),
+    note: z.string().max(500).optional(),
   })
 );
 
@@ -157,6 +158,7 @@ const orderItemSchema = z.object({
   price: z.string(),
   unit: z.string(),
   finalWeightKg: z.string().optional(),
+  note: z.string().max(500).optional(),
 });
 
 // ─── Shared order total helper ─────────────────────────────────────────────────────────────────
