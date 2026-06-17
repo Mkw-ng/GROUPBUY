@@ -826,16 +826,18 @@ export default function CartDrawer({
               <div className="flex-1 min-h-0 overflow-y-auto px-6 py-8 flex flex-col items-center gap-4">
                 <CheckCircle size={40} color="#22c55e" strokeWidth={1.5} />
                 <p className="font-display tracking-widest text-[#f5f2ec] text-[18px] text-center">
-                  Order Placed!
+                  Your order has been successfully saved
                 </p>
                 <p className="font-mono-brand text-[12px] text-[#8a857c] text-center max-w-xs mx-auto">
-                  Your order has been successfully saved. Click below to send to WhatsApp.
+                  An invoice will be sent to your WhatsApp shortly.
                 </p>
+                {powerDropActive && (
+                  <p className="font-mono-brand text-[11px] text-[#8a857c] text-center max-w-xs mx-auto">
+                    ⚡ Once payment is confirmed your order will be processed and you'll be messaged when it's ready — within 7 days.
+                  </p>
+                )}
                 {/* Scrollable order summary */}
                 <div className="border border-white/10 p-4 w-full max-h-[35dvh] overflow-y-auto">
-                  <p className="font-mono-brand text-[11px] text-[#8a857c] mb-1">
-                    {savedSummary.dateStr}
-                  </p>
                   <p className="font-mono-brand text-[11px] text-[#8a857c] mb-3">
                     {savedSummary.locationLabel}
                   </p>
