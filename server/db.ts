@@ -295,11 +295,12 @@ export async function getAllPaidActiveOrders(): Promise<(typeof orders.$inferSel
 export async function getActiveOrderCounts(): Promise<{
   all: number;
   pending: number;
+  invoice_issued: number;
   paid: number;
   cancelled: number;
 }> {
   const db = await getDb();
-  if (!db) return { all: 0, pending: 0, paid: 0, cancelled: 0 };
+  if (!db) return { all: 0, pending: 0, invoice_issued: 0, paid: 0, cancelled: 0 };
   const rows = await db
     .select({ status: orders.status, cnt: count() })
     .from(orders)
@@ -310,6 +311,7 @@ export async function getActiveOrderCounts(): Promise<{
   return {
     all: Object.values(map).reduce((a, b) => a + b, 0),
     pending: map["pending"] ?? 0,
+    invoice_issued: map["invoice_issued"] ?? 0,
     paid: map["paid"] ?? 0,
     cancelled: map["cancelled"] ?? 0,
   };
@@ -382,7 +384,7 @@ export async function updateOrderDeliveryCharge(id: number, deliveryCharge: stri
   await db.update(orders).set({ deliveryCharge }).where(eq(orders.id, id));
 }
 
-export async function updateOrderStatus(id: number, status: "pending" | "paid" | "cancelled"): Promise<void> {
+export async function updateOrderStatus(id: number, status: "pending" | "invoice_issued" | "paid" | "cancelled"): Promise<void> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   await db.update(orders).set({ status }).where(eq(orders.id, id));

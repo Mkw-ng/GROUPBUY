@@ -64,14 +64,14 @@ interface Order {
   items: string;
   specialInstructions: string | null;
   deliveryCharge: string | null;
-  status: "pending" | "paid" | "cancelled";
+  status: "pending" | "invoice_issued" | "paid" | "cancelled";
   isPowerDrop: boolean;
   archived: boolean | null;
   customerName: string | null;
   createdAt: Date;
 }
 
-type StatusFilter = "all" | "pending" | "paid" | "cancelled" | "archived";
+type StatusFilter = "all" | "pending" | "invoice_issued" | "paid" | "cancelled" | "archived";
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -242,6 +242,13 @@ Here's how to lock it in:
   });
 
   const [pendingPaidOrder, setPendingPaidOrder] = useState<{phone: string; pickupDate: string; location: string; deliveryAddress: string | null} | null>(null);
+  const markInvoiceIssued = trpc.admin.orders.markInvoiceIssued.useMutation({
+    onSuccess: () => {
+      onRefresh();
+    },
+    onError: () => toast.error("Failed to update order status"),
+  });
+
   const markPaid = trpc.admin.orders.markPaid.useMutation({
     onSuccess: () => {
       toast.success("Order marked as paid ✓");
@@ -328,12 +335,14 @@ Here's how to lock it in:
 
   const statusColors: Record<string, string> = {
     pending: "bg-amber-500/20 text-amber-400 border-amber-500/30",
+    invoice_issued: "bg-blue-500/20 text-blue-300 border-blue-500/30",
     paid: "bg-green-500/20 text-green-400 border-green-500/30",
     cancelled: "bg-red-500/20 text-red-400 border-red-500/30",
   };
 
   const statusIcons: Record<string, React.ReactNode> = {
     pending: <Clock size={11} />,
+    invoice_issued: <MessageCircle size={11} />,
     paid: <CheckCircle2 size={11} />,
     cancelled: <Ban size={11} />,
   };
@@ -707,7 +716,12 @@ Here's how to lock it in:
                   <AlertDialogCancel className="font-display text-[10px] tracking-widest">Cancel</AlertDialogCancel>
                   <AlertDialogAction
                     className="font-display text-[10px] tracking-widest bg-[#25D366] hover:bg-[#1da851] text-white"
-                    onClick={() => { setConfirmInvoice(false); handleIssueInvoice(); }}
+                    onClick={() => {
+      setConfirmInvoice(false);
+      handleIssueInvoice();
+      // Transition order to Invoice Issued status
+      markInvoiceIssued.mutate({ id: order.id });
+    }}
                   >
                     Send Invoice
                   </AlertDialogAction>
@@ -1281,6 +1295,7 @@ export default function AdminOrders() {
   const counts = {
     all: serverCounts?.all ?? allOrders.length,
     pending: serverCounts?.pending ?? allOrders.filter((o) => o.status === "pending").length,
+    invoice_issued: serverCounts?.invoice_issued ?? allOrders.filter((o) => o.status === "invoice_issued").length,
     paid: serverCounts?.paid ?? allOrders.filter((o) => o.status === "paid").length,
     cancelled: serverCounts?.cancelled ?? allOrders.filter((o) => o.status === "cancelled").length,
     archived: allArchived.length,
@@ -1291,6 +1306,7 @@ export default function AdminOrders() {
   const filterTabs: { key: StatusFilter; label: string }[] = [
     { key: "all", label: "All" },
     { key: "pending", label: "Pending" },
+    { key: "invoice_issued", label: "Invoice Issued" },
     { key: "paid", label: "Paid" },
     { key: "cancelled", label: "Cancelled" },
     { key: "archived", label: "Archived" },
@@ -1525,7 +1541,7 @@ export default function AdminOrders() {
           <div className="flex flex-col items-center justify-center py-24 gap-3">
             <Package size={40} className="text-[#8a857c]/30" />
             <p className="font-display text-[11px] tracking-widest text-[#8a857c]">
-              {statusFilter === "all" ? "NO ORDERS YET" : statusFilter === "archived" ? "NO ARCHIVED ORDERS" : `NO ${statusFilter.toUpperCase()} ORDERS`}
+              {statusFilter === "all" ? "NO ORDERS YET" : statusFilter === "archived" ? "NO ARCHIVED ORDERS" : statusFilter === "invoice_issued" ? "NO INVOICE ISSUED ORDERS" : `NO ${statusFilter.toUpperCase()} ORDERS`}
             </p>
             <p className="font-mono-brand text-[11px] text-[#8a857c]/60">
               {statusFilter === "all"

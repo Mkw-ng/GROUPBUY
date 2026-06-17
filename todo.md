@@ -420,3 +420,14 @@
 - [x] Change PowerDropCountdown timer window from 3 days to 48 hours in PowerDropCountdown.tsx
 - [x] Remove 10–14 day pickup date restriction during Power Drop in CartDrawer.tsx — all future dates now selectable
 - [x] Replace restricted date hint with processing-time note: "Once payment is confirmed your order will be processed and you'll be messaged when it's ready — within 7 days."
+
+## Invoice Issued Status
+- [x] Add "invoice_issued" to status mysqlEnum in drizzle/schema.ts
+- [x] Run pnpm db:push to migrate schema
+- [x] Update updateOrderStatus DB helper to accept "invoice_issued"
+- [x] Add admin.orders.markInvoiceIssued tRPC mutation
+- [x] Update getActiveOrderCounts to include invoice_issued count
+- [x] Update AdminOrders.tsx: call markInvoiceIssued after handleIssueInvoice succeeds
+- [x] Update AdminOrders.tsx: add "Invoice Issued" tab with blue styling
+- [x] Update AdminOrders.tsx: StatusFilter type, counts, filterTabs, and status badge colours
+- [x] Update AdminOrders.tsx: status badge and icon for invoice_issued (blue badge + MessageCircle icon)
