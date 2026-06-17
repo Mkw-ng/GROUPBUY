@@ -4,7 +4,7 @@
  * Admin can: enter final weights per item, set delivery charge,
  * issue a WhatsApp invoice, mark as paid, or cancel/delete the order.
  */
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Link } from "wouter";
@@ -472,9 +472,8 @@ Here's how to lock it in:
                 const isPerKg = item.unit?.toLowerCase().includes("kg");
                 const lineTotal = calcItemTotal(item);
                 return (
-                  <>
+                  <React.Fragment key={idx}>
                   <div
-                    key={idx}
                     className="grid grid-cols-[1fr_auto_auto_auto] gap-3 items-center text-[12px]"
                   >
                     {/* Item name */}
@@ -520,7 +519,7 @@ Here's how to lock it in:
                       <span className="font-mono-brand italic">{item.note}</span>
                     </div>
                   )}
-                  </>
+                  </React.Fragment>
                 );
               })}
             </div>
