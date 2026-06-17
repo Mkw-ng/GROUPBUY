@@ -252,7 +252,27 @@ export async function updateOrderSpecialInstructions(id: number, specialInstruct
 export async function searchActiveOrdersByPhone(phoneQuery: string): Promise<(typeof orders.$inferSelect)[]> {
   const db = await getDb();
   if (!db) return [];
-  const cleaned = phoneQuery.replace(/\D/g, "");
+  const trimmed = phoneQuery.trim();
+  if (!trimmed) return [];
+  // Check if query looks like an invoice number (starts with GB- or is all digits)
+  const isInvoiceSearch = /^GB-?\d*/i.test(trimmed);
+  if (isInvoiceSearch) {
+    // Search by invoice number (case-insensitive prefix/contains match)
+    const invoicePattern = trimmed.toUpperCase().replace(/^GB-?/, "GB-");
+    return db
+      .select()
+      .from(orders)
+      .where(
+        and(
+          eq(orders.archived, false),
+          sql`${orders.invoiceNumber} LIKE ${`%${invoicePattern}%`}`
+        )
+      )
+      .orderBy(desc(orders.createdAt), desc(orders.id))
+      .limit(100);
+  }
+  // Otherwise search by phone number (strip non-digits)
+  const cleaned = trimmed.replace(/\D/g, "");
   if (!cleaned) return [];
   // Normalize stored phone in SQL: remove spaces, dashes, brackets, plus signs
   const normalizedPhone = sql`REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(${orders.phone}, ' ', ''), '-', ''), '(', ''), ')', ''), '+', '')`;
@@ -276,7 +296,25 @@ export async function searchActiveOrdersByPhone(phoneQuery: string): Promise<(ty
 export async function searchArchivedOrdersByPhone(phoneQuery: string): Promise<(typeof orders.$inferSelect)[]> {
   const db = await getDb();
   if (!db) return [];
-  const cleaned = phoneQuery.replace(/\D/g, "");
+  const trimmed = phoneQuery.trim();
+  if (!trimmed) return [];
+  // Check if query looks like an invoice number (starts with GB-)
+  const isInvoiceSearch = /^GB-?\d*/i.test(trimmed);
+  if (isInvoiceSearch) {
+    const invoicePattern = trimmed.toUpperCase().replace(/^GB-?/, "GB-");
+    return db
+      .select()
+      .from(orders)
+      .where(
+        and(
+          eq(orders.archived, true),
+          sql`${orders.invoiceNumber} LIKE ${`%${invoicePattern}%`}`
+        )
+      )
+      .orderBy(desc(orders.createdAt), desc(orders.id))
+      .limit(100);
+  }
+  const cleaned = trimmed.replace(/\D/g, "");
   if (!cleaned) return [];
   const normalizedPhone = sql`REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(${orders.phone}, ' ', ''), '-', ''), '(', ''), ')', ''), '+', '')`;
   return db

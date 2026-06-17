@@ -569,6 +569,7 @@ export const appRouter = router({
           phoneQuery: z.string().min(1),
           archived: z.boolean().default(false),
         }))
+        // Note: phoneQuery can also be an invoice number (GB-XXXX) — the DB helper handles routing
         .query(async ({ input }) => {
           return input.archived
             ? searchArchivedOrdersByPhone(input.phoneQuery)

@@ -1221,7 +1221,8 @@ export default function AdminOrders() {
     return () => clearTimeout(timer);
   }, [phoneSearch]);
 
-  const isSearchingPhone = debouncedPhoneSearch.replace(/\D/g, "").length > 0;
+  // Treat as active search if query has digits OR looks like an invoice number (GB-...)
+  const isSearchingPhone = debouncedPhoneSearch.replace(/\D/g, "").length > 0 || /^GB-?\d*/i.test(debouncedPhoneSearch.trim());
 
   const { data: phoneSearchResults, isLoading: isPhoneSearchLoading } =
     trpc.admin.orders.searchByPhone.useQuery(
@@ -1528,7 +1529,7 @@ export default function AdminOrders() {
             type="text"
             value={phoneSearch}
             onChange={(e) => setPhoneSearch(e.target.value)}
-            placeholder="Search phone…"
+            placeholder="Search phone or invoice (GB-…)…"
             className="flex-1 bg-transparent text-[#f5f2ec] font-mono-brand text-[12px] placeholder-[#8a857c] focus:outline-none"
           />
           {phoneSearch && (
