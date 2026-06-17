@@ -179,8 +179,8 @@ function OrderCard({
   const [expanded, setExpanded] = useState(true);
   const [items, setItems] = useState<OrderItem[]>(() => parseItems(order.items));
   const [deliveryCharge, setDeliveryCharge] = useState(order.deliveryCharge ?? "0");
-  const [customerName, setCustomerName] = useState(order.customerName ?? "");
-  const [editingName, setEditingName] = useState(false);
+  const [editPhone, setEditPhone] = useState(order.phone);
+  const [editingPhone, setEditingPhone] = useState(false);
   const [specialInstructions, setSpecialInstructions] = useState(order.specialInstructions ?? "");
   const [editingInstructions, setEditingInstructions] = useState(false);
   const updateSpecialInstructions = trpc.admin.orders.updateSpecialInstructions.useMutation({
@@ -192,13 +192,13 @@ function OrderCard({
     onError: () => toast.error("Failed to save special instructions"),
   });
 
-  const updateCustomerName = trpc.admin.orders.updateCustomerName.useMutation({
+  const updatePhone = trpc.admin.orders.updatePhone.useMutation({
     onSuccess: () => {
-      toast.success("Customer name saved");
-      setEditingName(false);
+      toast.success("Phone number updated");
+      setEditingPhone(false);
       onRefresh();
     },
-    onError: () => toast.error("Failed to save name"),
+    onError: () => toast.error("Failed to update phone number"),
   });
   const [savingWeights, setSavingWeights] = useState(false);
   const [confirmSaveWeights, setConfirmSaveWeights] = useState(false);
@@ -389,11 +389,7 @@ Here's how to lock it in:
             <span className="font-mono-brand text-[11px] text-[#8a857c] mt-0.5">
               {locationLabel(order.location, order.deliveryAddress)} · {order.pickupDate}
             </span>
-            {order.customerName && (
-              <span className="font-mono-brand text-[11px] text-[#c73e3a]/80 mt-0.5">
-                {order.customerName}
-              </span>
-            )}
+
           </div>
         </div>
 
@@ -574,22 +570,22 @@ Here's how to lock it in:
             )}
           </div>
 
-          {/* Customer name */}
+          {/* Phone number — editable */}
           <div>
             <p className="font-display text-[10px] tracking-widest text-[#8a857c] mb-2">
-              CUSTOMER NAME
+              PHONE NUMBER
             </p>
-            {editingName ? (
+            {editingPhone ? (
               <div className="flex items-center gap-2">
                 <input
-                  type="text"
-                  value={customerName}
-                  onChange={(e) => setCustomerName(e.target.value)}
-                  placeholder="e.g. John Smith"
+                  type="tel"
+                  value={editPhone}
+                  onChange={(e) => setEditPhone(e.target.value)}
+                  placeholder="e.g. 0412 345 678"
                   className="flex-1 bg-transparent border border-white/15 text-[#f5f2ec] font-mono-brand text-[12px] px-3 py-2 focus:outline-none focus:border-[#c73e3a]/60"
                   onKeyDown={(e) => {
-                    if (e.key === "Enter") updateCustomerName.mutate({ id: order.id, customerName: customerName || null });
-                    if (e.key === "Escape") { setCustomerName(order.customerName ?? ""); setEditingName(false); }
+                    if (e.key === "Enter" && editPhone.trim()) updatePhone.mutate({ id: order.id, phone: editPhone.trim() });
+                    if (e.key === "Escape") { setEditPhone(order.phone); setEditingPhone(false); }
                   }}
                   autoFocus
                 />
@@ -597,16 +593,16 @@ Here's how to lock it in:
                   size="sm"
                   variant="outline"
                   className="font-display text-[10px] tracking-widest border-white/20 text-[#f5f2ec] hover:bg-white/10"
-                  disabled={updateCustomerName.isPending}
-                  onClick={() => updateCustomerName.mutate({ id: order.id, customerName: customerName || null })}
+                  disabled={updatePhone.isPending || !editPhone.trim()}
+                  onClick={() => updatePhone.mutate({ id: order.id, phone: editPhone.trim() })}
                 >
-                  {updateCustomerName.isPending ? "Saving…" : "Save"}
+                  {updatePhone.isPending ? "Saving…" : "Save"}
                 </Button>
                 <Button
                   size="sm"
                   variant="ghost"
                   className="font-display text-[10px] tracking-widest text-[#8a857c] hover:text-[#f5f2ec]"
-                  onClick={() => { setCustomerName(order.customerName ?? ""); setEditingName(false); }}
+                  onClick={() => { setEditPhone(order.phone); setEditingPhone(false); }}
                 >
                   Cancel
                 </Button>
@@ -614,10 +610,10 @@ Here's how to lock it in:
             ) : (
               <div
                 className="flex items-center gap-2 cursor-pointer group"
-                onClick={() => setEditingName(true)}
+                onClick={() => setEditingPhone(true)}
               >
                 <span className="font-mono-brand text-[12px] text-[#f5f2ec]/80 group-hover:text-[#f5f2ec]">
-                  {customerName || <span className="text-[#8a857c] italic">Add name…</span>}
+                  {editPhone}
                 </span>
                 <span className="font-mono-brand text-[10px] text-[#8a857c] group-hover:text-[#c73e3a]">✎</span>
               </div>

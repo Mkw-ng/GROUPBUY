@@ -394,6 +394,12 @@ export async function updateOrderItems(id: number, items: OrderItem[]): Promise<
   await db.update(orders).set({ items: JSON.stringify(items) }).where(eq(orders.id, id));
 }
 
+export async function updateOrderPhone(id: number, phone: string): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(orders).set({ phone }).where(eq(orders.id, id));
+}
+
 export async function updateOrderDeliveryCharge(id: number, deliveryCharge: string): Promise<void> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");

@@ -441,3 +441,10 @@
 - [x] Update AdminOrders.tsx: Order type, StatusFilter, counts, filterTabs, badge colours (purple), icon (Package)
 - [x] Add "Mark Pick up Available" action button on paid orders in AdminOrders.tsx
 - [x] Update tests for pickup_available
+
+## Admin Order Editing & Customer Name Removal
+- [x] Add editable phone number field to admin order card (inline edit + save)
+- [x] Add updateOrderPhone tRPC mutation and DB helper
+- [x] Verify item quantity editing works on admin order card (existing finalWeightKg field)
+- [x] Remove customer name input from CartDrawer order form (was not present — removed from admin card header)
+- [x] Remove customerName from order creation payload if no longer needed (not in CartDrawer payload)
