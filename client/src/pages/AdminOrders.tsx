@@ -241,7 +241,7 @@ Here's how to lock it in:
     onError: () => toast.error("Failed to update delivery charge"),
   });
 
-  const [pendingPaidOrder, setPendingPaidOrder] = useState<{phone: string; pickupDate: string; location: string; deliveryAddress: string | null} | null>(null);
+  const [confirmPaymentConfirmation, setConfirmPaymentConfirmation] = useState(false);
   const markInvoiceIssued = trpc.admin.orders.markInvoiceIssued.useMutation({
     onSuccess: () => {
       onRefresh();
@@ -253,15 +253,8 @@ Here's how to lock it in:
     onSuccess: () => {
       toast.success("Order marked as paid ✓");
       onRefresh();
-      if (pendingPaidOrder) {
-        const locStr = locationLabel(pendingPaidOrder.location, pendingPaidOrder.deliveryAddress);
-        const msg = `Your payment for the GroupBuy Power-Drop order has been received and is now locked-in.\nSee you next week (${pendingPaidOrder.pickupDate}) at (${locStr})`;
-        const intlPhone = pendingPaidOrder.phone.replace(/\D/g, "").replace(/^0/, "61");
-        window.open(`https://wa.me/${intlPhone}?text=${encodeURIComponent(msg)}`, "_blank");
-        setPendingPaidOrder(null);
-      }
     },
-    onError: () => { toast.error("Failed to mark as paid"); setPendingPaidOrder(null); },
+    onError: () => toast.error("Failed to mark as paid"),
   });
 
   const markPickupAvailable = trpc.admin.orders.markPickupAvailable.useMutation({
@@ -798,7 +791,6 @@ Here's how to lock it in:
                       className="font-display text-[10px] tracking-widest bg-green-700 hover:bg-green-600"
                       onClick={() => {
                         setConfirmMarkPaid(false);
-                        setPendingPaidOrder({ phone: order.phone, pickupDate: order.pickupDate, location: order.location, deliveryAddress: order.deliveryAddress });
                         markPaid.mutate({ id: order.id });
                       }}
                     >
@@ -808,6 +800,45 @@ Here's how to lock it in:
                 </AlertDialogContent>
               </AlertDialog>
             )}
+
+            {/* Payment Confirmation WhatsApp message */}
+            <AlertDialog open={confirmPaymentConfirmation} onOpenChange={setConfirmPaymentConfirmation}>
+              <AlertDialogTrigger asChild>
+                <Button
+                  size="sm"
+                  className="font-display text-[10px] tracking-widest bg-[#25D366] hover:bg-[#1da851] text-white gap-1.5"
+                >
+                  <MessageCircle size={13} />
+                  Payment Confirmation
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent className="section-ink border-white/10">
+                <AlertDialogHeader>
+                  <AlertDialogTitle className="font-display tracking-widest text-[#f5f2ec]">Send payment confirmation?</AlertDialogTitle>
+                  <AlertDialogDescription className="font-mono-brand text-[#8a857c]">
+                    This will send the following message to {order.phone}:
+                  </AlertDialogDescription>
+                  <div className="mt-3 bg-white/5 border border-white/10 px-4 py-3 font-mono-brand text-[12px] text-[#f5f2ec] whitespace-pre-line">
+                    {`Your payment for the GroupBuy Power-Drop order has been received and is now locked-in.\nSee you next week (${order.pickupDate}) at (${locationLabel(order.location, order.deliveryAddress)})`}
+                  </div>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel className="font-display text-[10px] tracking-widest">Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    className="font-display text-[10px] tracking-widest bg-[#25D366] hover:bg-[#1da851] text-white"
+                    onClick={() => {
+                      setConfirmPaymentConfirmation(false);
+                      const locStr = locationLabel(order.location, order.deliveryAddress);
+                      const msg = `Your payment for the GroupBuy Power-Drop order has been received and is now locked-in.\nSee you next week (${order.pickupDate}) at (${locStr})`;
+                      const intlPhone = order.phone.replace(/\D/g, "").replace(/^0/, "61");
+                      window.open(`https://wa.me/${intlPhone}?text=${encodeURIComponent(msg)}`, "_blank");
+                    }}
+                  >
+                    Send Message
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
 
             {/* Mark as Pick up Available */}
             {order.status === "paid" && (
