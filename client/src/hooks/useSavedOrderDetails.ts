@@ -10,13 +10,7 @@ const STORAGE_KEY = "groupbuy_order_details";
 export type SavedPickupLocation =
   | "cranbourne"
   | "clayton"
-  | "delivery"
-  | "williamstown"
-  | "footscray"
-  | "sunshine"
-  | "essendon"
-  | "preston"
-  | "point-cook";
+  | "delivery";
 
 export interface SavedOrderDetails {
   phone: string;
@@ -28,12 +22,6 @@ const VALID_LOCATIONS: SavedPickupLocation[] = [
   "cranbourne",
   "clayton",
   "delivery",
-  "williamstown",
-  "footscray",
-  "sunshine",
-  "essendon",
-  "preston",
-  "point-cook",
 ];
 
 function readStorage(): SavedOrderDetails | null {

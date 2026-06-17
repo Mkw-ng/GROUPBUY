@@ -48,27 +48,13 @@ interface CartDrawerProps {
   powerDropActivatedAt?: string; // ISO timestamp of when Power Drop was activated
 }
 
-type PickupLocation = "cranbourne" | "clayton" | "delivery" | "williamstown" | "footscray" | "sunshine" | "essendon" | "preston" | "point-cook";
+type PickupLocation = "cranbourne" | "clayton" | "delivery";
 
 const LOCATION_LABELS: Record<PickupLocation, string> = {
   cranbourne: "Cranbourne",
   clayton: "Clayton",
   delivery: "Delivery",
-  williamstown: "Williamstown — $20 Delivery",
-  footscray: "Footscray — $20 Delivery",
-  sunshine: "Sunshine — $20 Delivery",
-  essendon: "Essendon — $20 Delivery",
-  preston: "Preston — $20 Delivery",
-  "point-cook": "Point Cook — $20 Delivery",
 };
-
-// Fixed-price delivery suburbs — no free-text address required
-const FIXED_DELIVERY_SUBURBS: PickupLocation[] = [
-  "williamstown", "footscray", "sunshine", "essendon", "preston", "point-cook",
-];
-function isFixedDeliverySuburb(loc: PickupLocation): boolean {
-  return FIXED_DELIVERY_SUBURBS.includes(loc);
-}
 
 export default function CartDrawer({
   open,
@@ -363,8 +349,6 @@ export default function CartDrawer({
         ? "Cranbourne Park"
         : location === "clayton"
         ? "Clayton South"
-        : isFixedDeliverySuburb(location)
-        ? LOCATION_LABELS[location]
         : LOCATION_LABELS[location];
     setSavedWaUrl(waUrl);
     setSavedSummary({
@@ -704,46 +688,7 @@ export default function CartDrawer({
                         </label>
                       ))}
 
-                      {/* $20 delivery suburbs group */}
-                      <p className="font-display text-[9px] tracking-[0.2em] text-[#8a857c] pt-1 pb-0.5">
-                        $20 Delivery Suburbs
-                      </p>
-                      {FIXED_DELIVERY_SUBURBS.map((opt) => (
-                        <label
-                          key={opt}
-                          className={`flex items-center gap-3 px-3 py-2.5 border cursor-pointer transition-colors ${
-                            location === opt
-                              ? "border-[#c73e3a]/60 bg-[#c73e3a]/8"
-                              : "border-white/15 hover:border-white/30"
-                          }`}
-                        >
-                          <span
-                            className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
-                              location === opt ? "border-[#c73e3a]" : "border-white/30"
-                            }`}
-                          >
-                            {location === opt && (
-                              <span className="w-1.5 h-1.5 rounded-full bg-[#c73e3a]" />
-                            )}
-                          </span>
-                          <input
-                            type="radio"
-                            name="location"
-                            value={opt}
-                            checked={location === opt}
-                            onChange={() => setLocation(opt)}
-                            className="sr-only"
-                          />
-                          <span className="font-mono-brand text-[12px] text-[#f5f2ec]">
-                            {LOCATION_LABELS[opt]}
-                          </span>
-                        </label>
-                      ))}
-
-                      {/* Custom delivery address option */}
-                      <p className="font-display text-[9px] tracking-[0.2em] text-[#8a857c] pt-1 pb-0.5">
-                        Other
-                      </p>
+                                            {/* Delivery option */}
                       {(["delivery"] as PickupLocation[]).map((opt) => (
                         <label
                           key={opt}
