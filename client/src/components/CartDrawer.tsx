@@ -434,7 +434,8 @@ export default function CartDrawer({
               </button>
             </div>
 
-            {/* Scrollable body */}
+            {/* Scrollable body — hidden during success screen */}
+            {!orderSuccess && (
             <div className="flex-1 min-h-0 overflow-y-auto">
               {/* Items */}
               <div className="px-6 py-4">
@@ -784,7 +785,7 @@ export default function CartDrawer({
                   </div>
                 </div>
               )}
-            </div>
+            </div>)}
 
             {/* Success screen — shown after successful DB persistence */}
             {orderSuccess && savedSummary && (
