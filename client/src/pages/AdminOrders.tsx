@@ -1406,16 +1406,6 @@ export default function AdminOrders() {
           </button>
           <div className="w-px h-4 bg-white/10" />
           <button
-            onClick={handleDownloadItems}
-            disabled={downloadingItems}
-            className="flex items-center gap-1.5 font-mono-brand text-[10px] text-[#8a857c] hover:text-[#f5f2ec] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-            title={`Download items ordered list${counts.paid > 0 ? ` for ${counts.paid} paid order${counts.paid !== 1 ? "s" : ""}` : ""}`}
-          >
-            <FileDown size={13} />
-            {downloadingItems ? "Generating…" : `Items Ordered${counts.paid > 0 ? ` (${counts.paid})` : ""}`}
-          </button>
-          <div className="w-px h-4 bg-white/10" />
-          <button
             onClick={() => setPickupSort(s => s === "none" ? "asc" : s === "asc" ? "desc" : "none")}
             className={`flex items-center gap-1 font-mono-brand text-[10px] transition-colors ${pickupSort !== "none" ? "text-[#c73e3a]" : "text-[#8a857c] hover:text-[#f5f2ec]"}`}
             title="Sort by pickup date"
