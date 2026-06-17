@@ -404,7 +404,7 @@ export default function CartDrawer({
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
             transition={{ type: "tween", duration: 0.25 }}
-            className="fixed right-0 top-0 bottom-0 z-50 w-full max-w-sm section-ink border-l border-white/10 flex flex-col"
+            className="fixed right-0 top-0 bottom-0 z-50 w-full max-w-sm section-ink border-l border-white/10 flex flex-col h-[100dvh] overflow-hidden"
             onKeyDown={handleDrawerKeyDown}
           >
             {/* Header */}
@@ -435,10 +435,10 @@ export default function CartDrawer({
             </div>
 
             {/* Scrollable body */}
-            <div className="flex-1 overflow-y-auto">
+            <div className="flex-1 min-h-0 overflow-y-auto">
               {/* Items */}
               <div className="px-6 py-4">
-                {items.length === 0 ? (
+                {items.length === 0 && !orderSuccess ? (
                   <div className="flex flex-col items-center justify-center py-16 gap-3">
                     <div className="w-16 h-16 opacity-10">
                       <img
@@ -788,7 +788,7 @@ export default function CartDrawer({
 
             {/* Success screen — shown after successful DB persistence */}
             {orderSuccess && savedSummary && (
-              <div className="flex-1 flex flex-col items-center justify-center px-6 py-10 gap-4">
+              <div className="flex-1 min-h-0 overflow-y-auto px-6 py-8 flex flex-col items-center gap-4">
                 <CheckCircle size={40} color="#22c55e" strokeWidth={1.5} />
                 <p className="font-display tracking-widest text-[#f5f2ec] text-[18px] text-center">
                   Order Placed!
@@ -796,7 +796,8 @@ export default function CartDrawer({
                 <p className="font-mono-brand text-[12px] text-[#8a857c] text-center max-w-xs mx-auto">
                   Your order has been successfully saved. Click below to send to WhatsApp.
                 </p>
-                <div className="border border-white/10 p-4 w-full mt-2">
+                {/* Scrollable order summary */}
+                <div className="border border-white/10 p-4 w-full max-h-[35dvh] overflow-y-auto">
                   <p className="font-mono-brand text-[11px] text-[#8a857c] mb-1">
                     {savedSummary.dateStr}
                   </p>
@@ -809,13 +810,19 @@ export default function CartDrawer({
                     </p>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {/* Success screen footer buttons — fixed at bottom */}
+            {orderSuccess && savedSummary && (
+              <div className="shrink-0 border-t border-white/10 px-6 py-4 pb-[calc(1rem+env(safe-area-inset-bottom))] flex flex-col gap-2">
                 <button
                   type="button"
                   onClick={() => {
                     const opened = window.open(savedWaUrl, "_blank", "noopener,noreferrer");
                     if (!opened) window.location.href = savedWaUrl;
                   }}
-                  className="bg-[#25D366] text-white w-full py-3 font-display text-[11px] tracking-widest hover:bg-[#1ebe5a] transition-colors mt-2"
+                  className="bg-[#25D366] text-white w-full py-3 font-display text-[11px] tracking-widest hover:bg-[#1ebe5a] transition-colors"
                 >
                   Send via WhatsApp →
                 </button>
@@ -834,7 +841,7 @@ export default function CartDrawer({
 
             {/* Footer — hidden when success screen is shown */}
             {items.length > 0 && !orderSuccess && (
-              <div className="px-6 py-5 border-t border-white/10 shrink-0">
+              <div className="px-6 py-5 border-t border-white/10 shrink-0 pb-[calc(1.25rem+env(safe-area-inset-bottom))]">
                 <div className="flex items-end justify-between mb-4">
                   <div className="flex flex-col gap-0.5">
                     <span className="font-display text-[11px] tracking-widest text-[#8a857c]">
