@@ -7,6 +7,7 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import Home from "./pages/Home";
 import { lazy, Suspense, useEffect } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { getLoginUrl } from "./const";
 
 const Admin = lazy(() => import("./pages/Admin"));
 const AdminOrders = lazy(() => import("./pages/AdminOrders"));
@@ -21,7 +22,14 @@ function AdminGuard({ children }: { children: React.ReactNode }) {
   const [, setLocation] = useLocation();
 
   useEffect(() => {
-    if (!loading && (!user || user.role !== "admin")) {
+    if (loading) return;
+    if (!user) {
+      // Not logged in — send to Manus OAuth login, return here after
+      window.location.href = getLoginUrl("/admin");
+      return;
+    }
+    if (user.role !== "admin") {
+      // Logged in but not admin — send to home
       setLocation("/");
     }
   }, [loading, user, setLocation]);
