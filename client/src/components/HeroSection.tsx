@@ -6,7 +6,7 @@
  * Power Drop: red overlay banner with pulsing indicator when active
  */
 import { motion } from "framer-motion";
-import { ArrowRight, MessageCircle, Zap, Rocket, Dices, BarChart2 } from "lucide-react";
+import { ArrowRight, MessageCircle, Zap, Dices, BarChart2 } from "lucide-react";
 import PowerDropCountdown from "@/components/PowerDropCountdown";
 
 const STATS = [
@@ -170,15 +170,7 @@ export default function HeroSection({ powerDropActive = false, powerDropActivate
             <MessageCircle size={14} strokeWidth={1.5} />
             Join WhatsApp
           </a>
-          <a
-            href="https://metavore-x.com/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="metavore-btn inline-flex items-center gap-2 font-display text-[11px] tracking-widest px-6 py-3.5 transition-all"
-          >
-            <Rocket size={14} strokeWidth={1.5} />
-            Transport to the Metavore
-          </a>
+
           <a
             href="https://groupbuy-deal-of-fortune-432233841783.us-west1.run.app"
             target="_blank"
