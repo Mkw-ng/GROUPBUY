@@ -40,6 +40,7 @@ import {
   searchArchivedOrdersByPhone,
   getPaidActiveOrderIds,
   archiveAllPaidActiveOrders,
+  transferAllPaidToPickupAvailable,
   getOrderedQtyByProduct,
 } from "./db";
 import { OrderItem } from "../drizzle/schema";
@@ -577,6 +578,14 @@ export const appRouter = router({
         // Update customer analytics for every archived order (fire-and-forget errors)
         await Promise.allSettled(ids.map((id) => upsertCustomerFromOrder(id)));
         return { success: true, archivedCount };
+      }),
+
+      /**
+       * Transfers all paid, non-archived orders to pickup_available status in one action.
+       */
+      transferPaidToPickupAvailable: adminProcedure.mutation(async () => {
+        const transferredCount = await transferAllPaidToPickupAvailable();
+        return { success: true, transferredCount };
       }),
     }),
 
