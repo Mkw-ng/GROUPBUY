@@ -20,6 +20,7 @@ interface OrderItem {
   price: string;
   unit: string;
   finalWeightKg?: string;
+  note?: string;
 }
 
 function parseItems(raw: string): OrderItem[] {
@@ -660,6 +661,7 @@ function generatePackingSheetCSV(orders: PaidOrder[]): string {
     "Line Total",
     "Order Total",
     "Special Instructions",
+    "Item Request/Note",
   ];
 
   const rows: string[] = [headers.map(csvEscape).join(",")];
@@ -694,6 +696,7 @@ function generatePackingSheetCSV(orders: PaidOrder[]): string {
         csvEscape(lineTotal.toFixed(2)),
         csvEscape(orderTotal.toFixed(2)),
         csvEscape(order.specialInstructions),
+        csvEscape(item.note ?? ""),
       ];
       rows.push(row.join(","));
     }
@@ -829,7 +832,18 @@ function generatePackingSlipPDF(order: PaidOrder): Promise<Buffer> {
       doc.text(`$${price.toFixed(2)}`, LEFT + COL_CHECK + COL_ITEM + COL_QTY + COL_WEIGHT + 3,     textY, { width: COL_PRICE - 6,  lineBreak: false });
       doc.text(`$${lineTotal.toFixed(2)}`, LEFT + COL_CHECK + COL_ITEM + COL_QTY + COL_WEIGHT + COL_PRICE + 3, textY, { width: COL_TOTAL - 6, lineBreak: false });
 
-      rowY += ROW_H;
+      // Per-item customer note — printed below the row in amber/italic style
+      if (item.note && item.note.trim()) {
+        rowY += ROW_H;
+        const NOTE_H = 14;
+        doc.rect(LEFT, rowY, 495, NOTE_H).fillColor("#fffbeb").fill();
+        doc.rect(LEFT, rowY, 495, NOTE_H).strokeColor("#cccccc").lineWidth(0.4).stroke();
+        doc.font("Helvetica-Oblique").fontSize(7.5).fillColor("#92400e")
+          .text(`↳ Request: ${item.note.trim()}`, LEFT + COL_CHECK + 3, rowY + 3, { width: 490 - COL_CHECK, lineBreak: false });
+        rowY += NOTE_H;
+      } else {
+        rowY += ROW_H;
+      }
     }
 
     // ── Order total ───────────────────────────────────────────────────────────
@@ -969,7 +983,18 @@ function generateAllPackingSlipsPDF(orders: PaidOrder[]): Promise<Buffer> {
         doc.text(`$${price.toFixed(2)}`,     LEFT + COL_CHECK + COL_ITEM + COL_QTY + COL_WEIGHT + 3,      textY, { width: COL_PRICE - 6,  lineBreak: false });
         doc.text(`$${lineTotal.toFixed(2)}`, LEFT + COL_CHECK + COL_ITEM + COL_QTY + COL_WEIGHT + COL_PRICE + 3, textY, { width: COL_TOTAL - 6, lineBreak: false });
 
-        rowY += ROW_H;
+        // Per-item customer note — printed below the row
+        if (item.note && item.note.trim()) {
+          rowY += ROW_H;
+          const NOTE_H = 14;
+          doc.rect(LEFT, rowY, 495, NOTE_H).fillColor("#fffbeb").fill();
+          doc.rect(LEFT, rowY, 495, NOTE_H).strokeColor("#cccccc").lineWidth(0.4).stroke();
+          doc.font("Helvetica-Oblique").fontSize(7.5).fillColor("#92400e")
+            .text(`↳ Request: ${item.note.trim()}`, LEFT + COL_CHECK + 3, rowY + 3, { width: 490 - COL_CHECK, lineBreak: false });
+          rowY += NOTE_H;
+        } else {
+          rowY += ROW_H;
+        }
       }
 
       // ── Order total ──────────────────────────────────────────────────────────
