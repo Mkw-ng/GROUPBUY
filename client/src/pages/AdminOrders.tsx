@@ -68,6 +68,7 @@ interface Order {
   isPowerDrop: boolean;
   archived: boolean | null;
   customerName: string | null;
+  invoiceNumber: string | null;
   createdAt: Date;
 }
 
@@ -129,7 +130,7 @@ function buildInvoiceMessage(
   const parts: string[] = [
     openingSentence,
     ``,
-    `*Invoice #:* ${formatInvoiceNumber(order.id)}`,
+    `*Invoice #:* ${order.invoiceNumber ?? formatInvoiceNumber(order.id)}`,
     `*Phone:* ${order.phone}`,
     `*Pick-up Date:* ${order.pickupDate}`,
     `*Location:* ${locationStr}`,
@@ -379,6 +380,11 @@ Here's how to lock it in:
               <span className="font-mono-brand text-[13px] font-bold text-[#f5f2ec]">
                 {order.phone}
               </span>
+              {order.invoiceNumber && (
+                <span className="font-mono-brand text-[10px] text-[#c73e3a] border border-[#c73e3a]/40 px-1.5 py-0.5 tracking-wider">
+                  {order.invoiceNumber}
+                </span>
+              )}
               {order.isPowerDrop && (
                 <span className="flex items-center gap-0.5 font-mono-brand text-[9px] text-[#c73e3a] border border-[#c73e3a]/40 px-1.5 py-0.5">
                   <Zap size={8} className="fill-current" />

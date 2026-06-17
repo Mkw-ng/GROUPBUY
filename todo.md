@@ -448,3 +448,12 @@
 - [x] Verify item quantity editing works on admin order card (existing finalWeightKg field)
 - [x] Remove customer name input from CartDrawer order form (was not present — removed from admin card header)
 - [x] Remove customerName from order creation payload if no longer needed (not in CartDrawer payload)
+
+## Invoice Number (GB-XXXX)
+- [x] Add invoiceNumber column (varchar, unique) to orders table in drizzle/schema.ts
+- [x] Run pnpm db:push to migrate schema
+- [x] Generate GB-XXXX on order creation in createOrder DB helper (4 random digits, unique, 20 retries)
+- [x] Return invoiceNumber in getAllOrders and getOrdersPage DB helpers (auto-included via select *)
+- [x] Show invoice number prominently on admin order card header (red badge next to phone)
+- [x] Include invoice number in WhatsApp invoice message (Invoice #: GB-XXXX line)
+- [x] Update tests for invoiceNumber (no test changes needed — existing tests pass)

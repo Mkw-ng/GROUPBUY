@@ -130,6 +130,8 @@ export const orders = mysqlTable("orders", {
   archived: boolean("archived").notNull().default(false),
   /** Optional customer name filled in by admin */
   customerName: varchar("customerName", { length: 255 }),
+  /** Auto-generated invoice number in format GB-XXXX (4 random digits) */
+  invoiceNumber: varchar("invoiceNumber", { length: 16 }).unique(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

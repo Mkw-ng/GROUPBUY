@@ -173,10 +173,24 @@ export async function batchReorderProducts(updates: { id: number; sortOrder: num
  */
 // ─── Orders ─────────────────────────────────────────────────────────────────
 
+/** Generate a unique GB-XXXX invoice number (4 random digits, retries on collision). */
+async function generateInvoiceNumber(db: Awaited<ReturnType<typeof getDb>>): Promise<string> {
+  if (!db) throw new Error("Database not available");
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const digits = String(Math.floor(Math.random() * 10000)).padStart(4, "0");
+    const candidate = `GB-${digits}`;
+    const existing = await db.select({ id: orders.id }).from(orders).where(eq(orders.invoiceNumber, candidate)).limit(1);
+    if (existing.length === 0) return candidate;
+  }
+  // Fallback: use timestamp-based suffix to guarantee uniqueness
+  return `GB-${Date.now().toString().slice(-4)}`;
+}
+
 export async function createOrder(data: InsertOrder): Promise<number> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  const result = await db.insert(orders).values(data);
+  const invoiceNumber = await generateInvoiceNumber(db);
+  const result = await db.insert(orders).values({ ...data, invoiceNumber });
   return (result[0] as { insertId: number }).insertId;
 }
 

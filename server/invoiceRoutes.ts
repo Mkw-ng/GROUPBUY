@@ -64,6 +64,7 @@ type PaidOrder = {
   id: number;
   phone: string;
   customerName: string | null;
+  invoiceNumber: string | null;
   pickupDate: string;
   location: string;
   deliveryAddress: string | null;
