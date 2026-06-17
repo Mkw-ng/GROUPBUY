@@ -30,6 +30,8 @@ const CATEGORIES = [
   { id: "offal-tallow",      label: "Offal & Tallow" },
   { id: "value-added",       label: "Value Added" },
   { id: "korean-bbq-hotpot", label: "Korean BBQ / Hotpot" },
+  { id: "burger-sausages",   label: "Burger & Sausages" },
+  { id: "bbq-packs",         label: "BBQ Packs" },
   { id: "freezer",           label: "Freezer" },
   { id: "other",             label: "Other" },
 ];

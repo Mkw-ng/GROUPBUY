@@ -133,6 +133,8 @@ const productInput = z.object({
     "offal-tallow",
     "value-added",
     "korean-bbq-hotpot",
+    "burger-sausages",
+    "bbq-packs",
     "freezer",
     "other",
   ]),

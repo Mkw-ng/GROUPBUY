@@ -112,6 +112,8 @@ type Category =
   | "offal-tallow"
   | "value-added"
   | "korean-bbq-hotpot"
+  | "burger-sausages"
+  | "bbq-packs"
   | "freezer"
   | "other";
 type BadgeType = "LIMITED" | "POPULAR" | "NEW" | "SOLD OUT" | null;
@@ -133,6 +135,8 @@ const CATEGORIES: { value: Category | "all"; label: string }[] = [
   { value: "offal-tallow",      label: "Offal & Tallow" },
   { value: "value-added",       label: "Value Added" },
   { value: "korean-bbq-hotpot", label: "Korean BBQ / Hotpot" },
+  { value: "burger-sausages",   label: "Burger & Sausages" },
+  { value: "bbq-packs",         label: "BBQ Packs" },
   { value: "freezer",           label: "Freezer" },
   { value: "other",             label: "Other" },
 ];
@@ -160,6 +164,8 @@ const CATEGORY_EMOJI: Record<string, string> = {
   "offal-tallow":      "🫀",
   "value-added":       "✨",
   "korean-bbq-hotpot": "🍲",
+  "burger-sausages":   "🍔",
+  "bbq-packs":         "🔥",
   freezer:             "🧊",
   other:               "🛒",
 };

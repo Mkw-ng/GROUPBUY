@@ -58,6 +58,8 @@ export const products = mysqlTable("products", {
     "offal-tallow",
     "value-added",
     "korean-bbq-hotpot",
+    "burger-sausages",
+    "bbq-packs",
     "freezer",
     "other",
   ])
