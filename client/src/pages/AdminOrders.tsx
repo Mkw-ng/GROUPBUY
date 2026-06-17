@@ -54,6 +54,7 @@ interface OrderItem {
   price: string;
   unit: string;
   finalWeightKg?: string;
+  note?: string;
 }
 
 interface Order {
@@ -471,6 +472,7 @@ Here's how to lock it in:
                 const isPerKg = item.unit?.toLowerCase().includes("kg");
                 const lineTotal = calcItemTotal(item);
                 return (
+                  <>
                   <div
                     key={idx}
                     className="grid grid-cols-[1fr_auto_auto_auto] gap-3 items-center text-[12px]"
@@ -511,6 +513,14 @@ Here's how to lock it in:
                       {"$"}{lineTotal.toFixed(2)}
                     </span>
                   </div>
+                  {/* Per-item customer request note */}
+                  {item.note && (
+                    <div className="mt-0.5 mb-1 flex items-start gap-1.5 text-[11px] text-[#c9a96e]">
+                      <span className="shrink-0 mt-0.5">↳</span>
+                      <span className="font-mono-brand italic">{item.note}</span>
+                    </div>
+                  )}
+                  </>
                 );
               })}
             </div>
