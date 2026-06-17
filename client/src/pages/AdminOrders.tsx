@@ -1182,6 +1182,32 @@ export default function AdminOrders() {
 
   const [downloadingSchedule, setDownloadingSchedule] = useState(false);
   const [downloadingItems, setDownloadingItems] = useState(false);
+  const [downloadingAllSlips, setDownloadingAllSlips] = useState(false);
+
+  async function handleDownloadAllSlips() {
+    setDownloadingAllSlips(true);
+    try {
+      const res = await fetch(`/api/admin/packing-slips/download`, { credentials: "include" });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "Unknown error" }));
+        toast.error(err.error || "Download failed");
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const timestamp = new Date().toISOString().slice(0, 10);
+      a.href = url;
+      a.download = `packing-slips-${timestamp}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err);
+      toast.error("Download failed");
+    } finally {
+      setDownloadingAllSlips(false);
+    }
+  }
 
   async function handleDownloadItems() {
     setDownloadingItems(true);
@@ -1517,6 +1543,16 @@ export default function AdminOrders() {
           >
             <FileDown size={13} />
             {downloadingSchedule ? "Generating…" : `Schedule List${counts.paid > 0 ? ` (${counts.paid})` : ""}`}
+          </button>
+          <div className="w-px h-4 bg-white/10" />
+          <button
+            onClick={handleDownloadAllSlips}
+            disabled={downloadingAllSlips}
+            className="flex items-center gap-1.5 font-mono-brand text-[10px] text-[#8a857c] hover:text-[#f5f2ec] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            title={`Download all packing slips${counts.paid > 0 ? ` for ${counts.paid} paid order${counts.paid !== 1 ? "s" : ""}` : ""}`}
+          >
+            <FileText size={13} />
+            {downloadingAllSlips ? "Generating…" : `All Packing Slips${counts.paid > 0 ? ` (${counts.paid})` : ""}`}
           </button>
           <div className="w-px h-4 bg-white/10" />
           <button

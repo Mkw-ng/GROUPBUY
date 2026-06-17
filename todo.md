@@ -467,7 +467,11 @@
 - [x] Change downloaded filename to packing-sheet-YYYY-MM-DD.csv
 
 ## Per-Order Packing Slip PDF
-- [ ] Add /api/admin/packing-slip/:orderId route in invoiceRoutes.ts — returns PDF
-- [ ] PDF includes: invoice number, phone, location, delivery address, pickup date, items (name/cut/qty/unit/finalWeight/price/total), order total, special instructions, large checkbox per item for packer
-- [ ] Add "Packing Slip" button to paid order cards in AdminOrders.tsx
-- [ ] Button opens PDF in new tab
+- [x] Add /api/admin/packing-slip/:orderId route in invoiceRoutes.ts — returns PDF
+- [x] PDF includes: invoice number, phone, location, delivery address, pickup date, items (name/cut/qty/unit/finalWeight/price/total), order total, special instructions, large checkbox per item for packer
+- [x] Add "Packing Slip" button to paid order cards in AdminOrders.tsx
+- [x] Button downloads PDF (packing-slip-GB-XXXX.pdf)
+
+## Bulk All Packing Slips PDF Download
+- [x] Add /api/admin/packing-slips/download route — generates one combined PDF with all paid orders' packing slips (one per page)
+- [x] Add "All Packing Slips" button in AdminOrders toolbar next to Packing Sheet and Schedule List
