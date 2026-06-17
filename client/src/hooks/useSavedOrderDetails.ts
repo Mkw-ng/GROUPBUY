@@ -7,13 +7,34 @@ import { useState, useEffect } from "react";
 
 const STORAGE_KEY = "groupbuy_order_details";
 
-export type SavedPickupLocation = "cranbourne" | "clayton" | "delivery";
+export type SavedPickupLocation =
+  | "cranbourne"
+  | "clayton"
+  | "delivery"
+  | "williamstown"
+  | "footscray"
+  | "sunshine"
+  | "essendon"
+  | "preston"
+  | "point-cook";
 
 export interface SavedOrderDetails {
   phone: string;
   location: SavedPickupLocation;
   deliveryAddress?: string;
 }
+
+const VALID_LOCATIONS: SavedPickupLocation[] = [
+  "cranbourne",
+  "clayton",
+  "delivery",
+  "williamstown",
+  "footscray",
+  "sunshine",
+  "essendon",
+  "preston",
+  "point-cook",
+];
 
 function readStorage(): SavedOrderDetails | null {
   try {
@@ -22,13 +43,11 @@ function readStorage(): SavedOrderDetails | null {
     const parsed = JSON.parse(raw) as Partial<SavedOrderDetails>;
     if (
       typeof parsed.phone === "string" &&
-      (parsed.location === "cranbourne" ||
-        parsed.location === "clayton" ||
-        parsed.location === "delivery")
+      VALID_LOCATIONS.includes(parsed.location as SavedPickupLocation)
     ) {
       return {
         phone: parsed.phone,
-        location: parsed.location,
+        location: parsed.location as SavedPickupLocation,
         deliveryAddress: typeof parsed.deliveryAddress === "string" ? parsed.deliveryAddress : undefined,
       };
     }

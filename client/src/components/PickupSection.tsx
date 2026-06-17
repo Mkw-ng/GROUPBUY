@@ -36,6 +36,12 @@ const DELIVERY_ZONES = [
   { suburb: "Melbourne CBD", price: 15 },
   { suburb: "Upwey",         price: 15 },
   { suburb: "Dromana",       price: 20 },
+  { suburb: "Williamstown",  price: 20 },
+  { suburb: "Footscray",     price: 20 },
+  { suburb: "Sunshine",      price: 20 },
+  { suburb: "Essendon",      price: 20 },
+  { suburb: "Preston",       price: 20 },
+  { suburb: "Point Cook",    price: 20 },
 ];
 
 export default function PickupSection() {

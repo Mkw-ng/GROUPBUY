@@ -401,3 +401,16 @@
 - [x] Admin product editor: add Stock Limit field, show Ordered/Remaining status
 - [x] Public product cards: show "Xkg left" / "SOLD OUT" badge, disable add-to-cart when sold out
 - [x] Cart: surface server error message on checkout rejection
+
+## New $20 Delivery Suburb Locations
+- [x] Add 6 new $20 delivery suburbs: Williamstown, Footscray, Sunshine, Essendon, Preston, Point Cook
+- [x] Expand PickupLocation type in CartDrawer.tsx to include all 6 new suburbs
+- [x] Update LOCATION_LABELS record with suburb names + $20 delivery label
+- [x] Add FIXED_DELIVERY_SUBURBS array and isFixedDeliverySuburb() helper
+- [x] Update location radio buttons in CartDrawer: group new suburbs under "$20 Delivery Suburbs" heading
+- [x] Update useSavedOrderDetails.ts SavedPickupLocation type to include new suburbs
+- [x] Update invoiceRoutes.ts locationLabel() to handle new suburb values
+- [x] Update invoiceRoutes.ts LOCATION_ORDER map with new suburbs (sort keys 3–8)
+- [x] Update invoiceRoutes.ts shortLocationLabel() to return clean suburb names
+- [x] Add 6 new suburb entries to PickupSection.tsx DELIVERY_ZONES list
+- [x] Add 6 new suburb pins to PickupMap.tsx DELIVERY_ZONES array with coordinates

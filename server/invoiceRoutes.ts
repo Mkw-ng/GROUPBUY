@@ -34,14 +34,26 @@ function locationLabel(location: string, address: string | null): string {
   if (location === "delivery") return `Delivery${address ? ` — ${address}` : ""}`;
   if (location === "cranbourne") return "Cranbourne Park (Mitchells Quality Meat)";
   if (location === "clayton") return "Clayton South (BQ Direct)";
+  if (location === "williamstown") return "Williamstown — $20 Delivery";
+  if (location === "footscray") return "Footscray — $20 Delivery";
+  if (location === "sunshine") return "Sunshine — $20 Delivery";
+  if (location === "essendon") return "Essendon — $20 Delivery";
+  if (location === "preston") return "Preston — $20 Delivery";
+  if (location === "point-cook") return "Point Cook — $20 Delivery";
   return location;
 }
 
-// Location group order: Cranbourne first, then Clayton, then Delivery, then others
+// Location group order: Cranbourne first, then Clayton, then Delivery, then $20 suburbs, then others
 const LOCATION_ORDER: Record<string, number> = {
   cranbourne: 0,
   clayton: 1,
   delivery: 2,
+  williamstown: 3,
+  footscray: 4,
+  sunshine: 5,
+  essendon: 6,
+  preston: 7,
+  "point-cook": 8,
 };
 
 function locationSortKey(location: string): number {
@@ -262,6 +274,12 @@ function generateScheduleListPDF(orders: PaidOrder[]): Promise<Buffer> {
       if (loc === "clayton") return "Clayton";
       if (loc === "cranbourne") return "Cranbourne";
       if (loc === "delivery") return "Delivery";
+      if (loc === "williamstown") return "Williamstown";
+      if (loc === "footscray") return "Footscray";
+      if (loc === "sunshine") return "Sunshine";
+      if (loc === "essendon") return "Essendon";
+      if (loc === "preston") return "Preston";
+      if (loc === "point-cook") return "Point Cook";
       return loc;
     }
 

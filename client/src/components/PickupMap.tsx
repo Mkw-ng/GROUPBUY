@@ -45,6 +45,12 @@ const DELIVERY_ZONES: { suburb: string; price: number; lat: number; lng: number 
   { suburb: "Melbourne CBD", price: 15, lat: -37.8136, lng: 144.9631 },
   { suburb: "Upwey",         price: 15, lat: -37.9000, lng: 145.3190 },
   { suburb: "Dromana",       price: 20, lat: -38.3370, lng: 145.1380 },
+  { suburb: "Williamstown",  price: 20, lat: -37.8607, lng: 144.8997 },
+  { suburb: "Footscray",     price: 20, lat: -37.8001, lng: 144.8997 },
+  { suburb: "Sunshine",      price: 20, lat: -37.7888, lng: 144.8310 },
+  { suburb: "Essendon",      price: 20, lat: -37.7490, lng: 144.9170 },
+  { suburb: "Preston",       price: 20, lat: -37.7440, lng: 145.0710 },
+  { suburb: "Point Cook",    price: 20, lat: -37.9000, lng: 144.7540 },
 ];
 
 // Colour per price tier
