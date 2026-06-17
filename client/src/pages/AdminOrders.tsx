@@ -127,6 +127,44 @@ function buildInvoiceMessage(
   const delivery = parseFloat(deliveryCharge) || 0;
   const grandTotal = subtotal + delivery;
 
+  if (order.isPowerDrop) {
+    // Power Drop format
+    const invoiceRef = order.invoiceNumber ?? formatInvoiceNumber(order.id);
+    const pdParts: string[] = [
+      `*We got your GroupBuy Power-Drop order!*`,
+      ``,
+      `*Next Steps*`,
+      `1. Invoice and payment details are down below`,
+      `2. Send me a photo remittance within 24 hours to avoid cancellations`,
+      `3. Order will be processed after this point and will be available within 7 days`,
+      `4. You'll receive a scheduling message from me once its ready`,
+      ``,
+      `Invoice Reference #: *${invoiceRef}*`,
+      `Phone: ${order.phone}`,
+      `Location: ${locationStr}`,
+      ``,
+      `*Items:*`,
+      ...itemLines,
+      ``,
+    ];
+    if (delivery > 0) {
+      pdParts.push(`Subtotal: $${subtotal.toFixed(2)}`);
+      pdParts.push(`Delivery: $${delivery.toFixed(2)}`);
+    }
+    pdParts.push(`Total Due: $${grandTotal.toFixed(2)}`);
+    if (order.specialInstructions) {
+      pdParts.push(``);
+      pdParts.push(`Notes: ${order.specialInstructions}`);
+    }
+    if (bankDetails.trim()) {
+      pdParts.push(``);
+      pdParts.push(`Payment Details:`);
+      pdParts.push(bankDetails.trim());
+    }
+    return pdParts.join("\n");
+  }
+
+  // Standard (non-Power Drop) format
   const parts: string[] = [
     openingSentence,
     ``,
@@ -155,11 +193,6 @@ function buildInvoiceMessage(
     parts.push(``);
     parts.push(`*Payment Details:*`);
     parts.push(bankDetails.trim());
-  }
-
-  if (order.isPowerDrop) {
-    parts.push(``);
-    parts.push(`⚡ Power Drop pricing applied`);
   }
 
   return parts.join("\n");
