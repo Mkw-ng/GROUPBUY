@@ -242,6 +242,7 @@ Here's how to lock it in:
   });
 
   const [confirmPaymentConfirmation, setConfirmPaymentConfirmation] = useState(false);
+  const [confirmPickupAvailableMsg, setConfirmPickupAvailableMsg] = useState(false);
   const markInvoiceIssued = trpc.admin.orders.markInvoiceIssued.useMutation({
     onSuccess: () => {
       onRefresh();
@@ -831,6 +832,49 @@ Here's how to lock it in:
                       const locStr = locationLabel(order.location, order.deliveryAddress);
                       const msg = `Your payment for the GroupBuy Power-Drop order has been received and is now locked-in.\nSee you next week (${order.pickupDate}) at (${locStr})`;
                       const intlPhone = order.phone.replace(/\D/g, "").replace(/^0/, "61");
+                      window.open(`https://wa.me/${intlPhone}?text=${encodeURIComponent(msg)}`, "_blank");
+                    }}
+                  >
+                    Send Message
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+
+            {/* Pick up Available WhatsApp message */}
+            <AlertDialog open={confirmPickupAvailableMsg} onOpenChange={setConfirmPickupAvailableMsg}>
+              <AlertDialogTrigger asChild>
+                <Button
+                  size="sm"
+                  className="font-display text-[10px] tracking-widest bg-[#25D366] hover:bg-[#1da851] text-white gap-1.5"
+                >
+                  <MessageCircle size={13} />
+                  Pick up Available
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent className="section-ink border-white/10">
+                <AlertDialogHeader>
+                  <AlertDialogTitle className="font-display tracking-widest text-[#f5f2ec]">Send pick up available message?</AlertDialogTitle>
+                  <AlertDialogDescription className="font-mono-brand text-[#8a857c]">
+                    This will send the following message to {order.phone}:
+                  </AlertDialogDescription>
+                  <div className="mt-3 bg-white/5 border border-white/10 px-4 py-3 font-mono-brand text-[12px] text-[#f5f2ec] whitespace-pre-line">
+                    {order.location === "delivery"
+                      ? `Great news! Your GroupBuy order is ready.\n\nOur driver will be in contact shortly to confirm a delivery schedule for your order.`
+                      : `Great news! Your GroupBuy order is available for pick up at ${locationLabel(order.location, order.deliveryAddress)} from tomorrow onwards.\n\nSee you soon!`
+                    }
+                  </div>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel className="font-display text-[10px] tracking-widest">Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    className="font-display text-[10px] tracking-widest bg-[#25D366] hover:bg-[#1da851] text-white"
+                    onClick={() => {
+                      setConfirmPickupAvailableMsg(false);
+                      const intlPhone = order.phone.replace(/\D/g, "").replace(/^0/, "61");
+                      const msg = order.location === "delivery"
+                        ? `Great news! Your GroupBuy order is ready.\n\nOur driver will be in contact shortly to confirm a delivery schedule for your order.`
+                        : `Great news! Your GroupBuy order is available for pick up at ${locationLabel(order.location, order.deliveryAddress)} from tomorrow onwards.\n\nSee you soon!`;
                       window.open(`https://wa.me/${intlPhone}?text=${encodeURIComponent(msg)}`, "_blank");
                     }}
                   >
