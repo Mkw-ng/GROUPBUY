@@ -25,6 +25,7 @@ import {
   Clock,
   Ban,
   FileDown,
+  FileText,
   Search,
   X,
 } from "lucide-react";
@@ -276,6 +277,28 @@ Here's how to lock it in:
 
   const [confirmPaymentConfirmation, setConfirmPaymentConfirmation] = useState(false);
   const [confirmPickupAvailableMsg, setConfirmPickupAvailableMsg] = useState(false);
+  const [downloadingSlip, setDownloadingSlip] = useState(false);
+
+  async function handleDownloadPackingSlip() {
+    setDownloadingSlip(true);
+    try {
+      const res = await fetch(`/api/admin/packing-slip/${order.id}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to generate packing slip");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const invoiceRef = order.invoiceNumber ?? `GB-${String(order.id).padStart(5, "0")}`;
+      a.download = `packing-slip-${invoiceRef}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast.error("Failed to download packing slip");
+    } finally {
+      setDownloadingSlip(false);
+    }
+  }
+
   const markInvoiceIssued = trpc.admin.orders.markInvoiceIssued.useMutation({
     onSuccess: () => {
       onRefresh();
@@ -952,6 +975,18 @@ Here's how to lock it in:
                 </AlertDialogContent>
               </AlertDialog>
             )}
+
+            {/* Packing Slip PDF */}
+            <Button
+              size="sm"
+              variant="outline"
+              className="font-display text-[10px] tracking-widest border-slate-500/40 text-slate-300 hover:bg-slate-500/10 gap-1.5"
+              onClick={handleDownloadPackingSlip}
+              disabled={downloadingSlip}
+            >
+              <FileText size={13} />
+              {downloadingSlip ? "Generating…" : "Packing Slip"}
+            </Button>
 
             {/* Cancel Order */}
             {order.status === "pending" && (

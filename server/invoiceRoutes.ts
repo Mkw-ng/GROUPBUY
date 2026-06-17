@@ -702,8 +702,223 @@ function generatePackingSheetCSV(orders: PaidOrder[]): string {
   return rows.join("\r\n");
 }
 
+function generatePackingSlipPDF(order: PaidOrder): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const doc = new PDFDocument({ margin: 50, size: "A4" });
+    const chunks: Buffer[] = [];
+    doc.on("data", (chunk: Buffer) => chunks.push(chunk));
+    doc.on("end", () => resolve(Buffer.concat(chunks)));
+    doc.on("error", reject);
+
+    const items = parseItems(order.items);
+    const invoiceNum = order.invoiceNumber ?? `GB-${String(order.id).padStart(5, "0")}`;
+    const locLabel = locationLabel(order.location, order.deliveryAddress);
+    const dateGenerated = new Date().toLocaleDateString("en-AU", {
+      day: "2-digit", month: "short", year: "numeric",
+    });
+
+    // ── Header ────────────────────────────────────────────────────────────────
+    doc
+      .font("Helvetica-Bold")
+      .fontSize(20)
+      .fillColor("#000000")
+      .text("GROUPBUY — Packing Slip", { align: "left" });
+
+    doc
+      .font("Helvetica")
+      .fontSize(9)
+      .fillColor("#666666")
+      .text(`Generated: ${dateGenerated}`, { align: "left" })
+      .moveDown(0.6);
+
+    doc
+      .moveTo(50, doc.y).lineTo(545, doc.y)
+      .strokeColor("#000000").lineWidth(1.5).stroke();
+    doc.moveDown(0.8);
+
+    // ── Customer details ──────────────────────────────────────────────────────
+    doc.font("Helvetica-Bold").fontSize(11).fillColor("#000000").text("Customer Details");
+    doc.moveDown(0.3);
+
+    const details: [string, string][] = [
+      ["Invoice #", invoiceNum],
+      ["Phone", order.phone],
+      ["Location", locLabel],
+    ];
+    if (order.location.toLowerCase() === "delivery" && order.deliveryAddress) {
+      details.push(["Delivery Address", order.deliveryAddress]);
+    }
+    if (order.pickupDate) {
+      details.push(["Pickup Date", order.pickupDate]);
+    }
+    if (order.specialInstructions) {
+      details.push(["Special Instructions", order.specialInstructions]);
+    }
+
+    for (const [label, value] of details) {
+      doc
+        .font("Helvetica-Bold").fontSize(9).fillColor("#333333")
+        .text(`${label}: `, { continued: true })
+        .font("Helvetica").text(value);
+    }
+
+    doc.moveDown(0.8);
+    doc
+      .moveTo(50, doc.y).lineTo(545, doc.y)
+      .strokeColor("#cccccc").lineWidth(0.75).stroke();
+    doc.moveDown(0.8);
+
+    // ── Items table ───────────────────────────────────────────────────────────
+    doc.font("Helvetica-Bold").fontSize(11).fillColor("#000000").text("Items");
+    doc.moveDown(0.4);
+
+    // Table header
+    const LEFT = 50;
+    const COL_CHECK = 22;
+    const COL_ITEM = 200;
+    const COL_QTY = 70;
+    const COL_WEIGHT = 80;
+    const COL_PRICE = 70;
+    const COL_TOTAL = 545 - LEFT - COL_CHECK - COL_ITEM - COL_QTY - COL_WEIGHT - COL_PRICE;
+    const HEADER_H = 18;
+    const headerY = doc.y;
+
+    doc.rect(LEFT, headerY, 495, HEADER_H).fillColor("#eeeeee").fill();
+    doc.rect(LEFT, headerY, 495, HEADER_H).strokeColor("#000000").lineWidth(0.5).stroke();
+
+    const hTextY = headerY + 4;
+    doc.font("Helvetica-Bold").fontSize(8).fillColor("#000000");
+    doc.text("✓",         LEFT + 4,                                                    hTextY, { width: COL_CHECK - 4, lineBreak: false });
+    doc.text("Item",      LEFT + COL_CHECK + 3,                                        hTextY, { width: COL_ITEM - 6,  lineBreak: false });
+    doc.text("Ordered",   LEFT + COL_CHECK + COL_ITEM + 3,                             hTextY, { width: COL_QTY - 6,   lineBreak: false });
+    doc.text("Final Wt",  LEFT + COL_CHECK + COL_ITEM + COL_QTY + 3,                  hTextY, { width: COL_WEIGHT - 6, lineBreak: false });
+    doc.text("Unit Price",LEFT + COL_CHECK + COL_ITEM + COL_QTY + COL_WEIGHT + 3,     hTextY, { width: COL_PRICE - 6,  lineBreak: false });
+    doc.text("Total",     LEFT + COL_CHECK + COL_ITEM + COL_QTY + COL_WEIGHT + COL_PRICE + 3, hTextY, { width: COL_TOTAL - 6, lineBreak: false });
+
+    let rowY = headerY + HEADER_H;
+    const ROW_H = 26;
+
+    for (const item of items) {
+      const price = parseFloat(item.price) || 0;
+      const weight = parseFloat(item.finalWeightKg || "") || 0;
+      const isKg = (item.unit || "").toLowerCase().includes("kg");
+      const finalQty = weight > 0 ? weight : item.qty;
+      const lineTotal = weight > 0 ? weight * price : item.qty * price;
+      const itemLabel = item.cut ? `${item.name} — ${item.cut}` : item.name;
+      const orderedStr = `${item.qty}${item.unit ? ` ${item.unit}` : ""}`;
+      const finalStr = weight > 0 ? `${weight.toFixed(2)} kg` : (isKg ? `${finalQty} kg` : `${finalQty}`);
+
+      // Row border
+      doc.rect(LEFT, rowY, 495, ROW_H).strokeColor("#cccccc").lineWidth(0.4).stroke();
+
+      // Checkbox cell (large empty square for packer to tick)
+      doc.rect(LEFT + 4, rowY + 5, 12, 12).strokeColor("#000000").lineWidth(0.8).stroke();
+
+      // Column dividers
+      let cx = LEFT + COL_CHECK;
+      for (const w of [COL_ITEM, COL_QTY, COL_WEIGHT, COL_PRICE]) {
+        doc.moveTo(cx, rowY).lineTo(cx, rowY + ROW_H).strokeColor("#cccccc").lineWidth(0.4).stroke();
+        cx += w;
+      }
+
+      const textY = rowY + 7;
+      doc.font("Helvetica").fontSize(8).fillColor("#000000");
+      doc.text(itemLabel,              LEFT + COL_CHECK + 3,                                        textY, { width: COL_ITEM - 6,  lineBreak: false });
+      doc.text(orderedStr,             LEFT + COL_CHECK + COL_ITEM + 3,                             textY, { width: COL_QTY - 6,   lineBreak: false });
+      doc.text(finalStr,               LEFT + COL_CHECK + COL_ITEM + COL_QTY + 3,                  textY, { width: COL_WEIGHT - 6, lineBreak: false });
+      doc.text(`$${price.toFixed(2)}`, LEFT + COL_CHECK + COL_ITEM + COL_QTY + COL_WEIGHT + 3,     textY, { width: COL_PRICE - 6,  lineBreak: false });
+      doc.text(`$${lineTotal.toFixed(2)}`, LEFT + COL_CHECK + COL_ITEM + COL_QTY + COL_WEIGHT + COL_PRICE + 3, textY, { width: COL_TOTAL - 6, lineBreak: false });
+
+      rowY += ROW_H;
+    }
+
+    // ── Order total ───────────────────────────────────────────────────────────
+    const subtotal = items.reduce((s, i) => {
+      const w = parseFloat(i.finalWeightKg || "") || 0;
+      const p = parseFloat(i.price) || 0;
+      return s + (w > 0 ? w * p : i.qty * p);
+    }, 0);
+    const delivery = parseFloat(order.deliveryCharge || "0") || 0;
+    const grandTotal = subtotal + delivery;
+
+    doc.moveDown(0.2);
+    rowY += 6;
+    if (delivery > 0) {
+      doc.font("Helvetica").fontSize(9).fillColor("#333333")
+        .text(`Subtotal: $${subtotal.toFixed(2)}`, LEFT, rowY, { align: "right", width: 495 });
+      rowY += 14;
+      doc.text(`Delivery: $${delivery.toFixed(2)}`, LEFT, rowY, { align: "right", width: 495 });
+      rowY += 14;
+    }
+    doc.font("Helvetica-Bold").fontSize(10).fillColor("#000000")
+      .text(`Total: $${grandTotal.toFixed(2)}`, LEFT, rowY, { align: "right", width: 495 });
+
+    doc.end();
+  });
+}
+
 export function registerInvoiceRoutes(app: Application) {
   const router = Router();
+
+  router.get("/api/admin/packing-slip/:orderId", async (req, res) => {
+    try {
+      let user;
+      try {
+        user = await sdk.authenticateRequest(req as any);
+      } catch {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
+      if (!user || user.role !== "admin") {
+        res.status(403).json({ error: "Forbidden" });
+        return;
+      }
+
+      const orderId = parseInt(req.params.orderId, 10);
+      if (isNaN(orderId)) {
+        res.status(400).json({ error: "Invalid order ID" });
+        return;
+      }
+
+      const { getOrderById } = await import("./db");
+      const order = await getOrderById(orderId);
+      if (!order) {
+        res.status(404).json({ error: "Order not found" });
+        return;
+      }
+
+      const paidOrder: PaidOrder = {
+        id: order.id,
+        phone: order.phone,
+        customerName: order.customerName ?? null,
+        invoiceNumber: order.invoiceNumber ?? null,
+        pickupDate: order.pickupDate,
+        location: order.location,
+        deliveryAddress: order.deliveryAddress ?? null,
+        items: order.items,
+        specialInstructions: order.specialInstructions ?? null,
+        deliveryCharge: order.deliveryCharge ?? null,
+        isPowerDrop: order.isPowerDrop ?? false,
+        createdAt: order.createdAt,
+        status: order.status,
+      };
+
+      const pdfBuffer = await generatePackingSlipPDF(paidOrder);
+      const invoiceRef = order.invoiceNumber ?? `GB-${String(order.id).padStart(5, "0")}`;
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader(
+        "Content-Disposition",
+        `inline; filename="packing-slip-${invoiceRef}.pdf"`
+      );
+      res.setHeader("Content-Length", pdfBuffer.length);
+      res.send(pdfBuffer);
+    } catch (err) {
+      console.error("[packing-slip] error:", err instanceof Error ? err.message : err);
+      if (!res.headersSent) {
+        res.status(500).json({ error: "Failed to generate packing slip" });
+      }
+    }
+  });
 
   router.get("/api/admin/packing-sheet/download", async (req, res) => {
     try {
