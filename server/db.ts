@@ -167,7 +167,7 @@ export async function batchReorderProducts(updates: { id: number; sortOrder: num
 }
 
 /**
- * Check if Power Drop has expired (activatedAt + 3 days < now).
+ * Check if Power Drop has expired (activatedAt + 48 hours < now).
  * If so, turn it off and clear the activation timestamp.
  * Returns true if it was expired and turned off, false otherwise.
  */
@@ -404,7 +404,7 @@ export async function checkAndExpirePowerDrop(): Promise<boolean> {
   const activated = new Date(activatedAt).getTime();
   if (isNaN(activated)) return false;
 
-  const deadline = activated + 3 * 24 * 60 * 60 * 1000;
+  const deadline = activated + 48 * 60 * 60 * 1000; // 48 hours
   if (Date.now() < deadline) return false;
 
   // Expired — turn off Power Drop

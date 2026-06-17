@@ -1,6 +1,6 @@
 /*
  * PowerDropCountdown
- * Counts down to activatedAt + 3 days.
+ * Counts down to activatedAt + 48 hours.
  * When the timer hits zero it calls settings.checkExpiry on the server to turn
  * Power Drop off, then invalidates the settings cache so the UI updates immediately.
  */
@@ -21,7 +21,7 @@ interface TimeLeft {
   expired: boolean;
 }
 
-const POWER_DROP_WINDOW_MS = 3 * 24 * 60 * 60 * 1000; // 3 days
+const POWER_DROP_WINDOW_MS = 48 * 60 * 60 * 1000; // 48 hours
 
 function computeTimeLeft(activatedAt: string): TimeLeft {
   const activated = new Date(activatedAt).getTime();

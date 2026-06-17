@@ -414,3 +414,9 @@
 - [x] Update invoiceRoutes.ts shortLocationLabel() to return clean suburb names
 - [x] Add 6 new suburb entries to PickupSection.tsx DELIVERY_ZONES list
 - [x] Add 6 new suburb pins to PickupMap.tsx DELIVERY_ZONES array with coordinates
+
+## Power Drop Timing Changes
+- [x] Change Power Drop expiry from 3 days to 48 hours in server/db.ts (checkAndExpirePowerDrop)
+- [x] Change PowerDropCountdown timer window from 3 days to 48 hours in PowerDropCountdown.tsx
+- [x] Remove 10–14 day pickup date restriction during Power Drop in CartDrawer.tsx — all future dates now selectable
+- [x] Replace restricted date hint with processing-time note: "Once payment is confirmed your order will be processed and you'll be messaged when it's ready — within 7 days."

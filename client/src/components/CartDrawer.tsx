@@ -196,29 +196,22 @@ export default function CartDrawer({
   }, [calendarOpen]);
 
   // ─── Date picker constraints ────────────────────────────────────────────────
-  // Power Drop mode: only 10–14 days from activation are selectable
+  // Power Drop mode: all future dates selectable; show processing-time note instead
   // Standard mode: earliest = today + 2 days, no upper limit
-  const { disabledDays, dateHint, pdWindowStart, pdWindowEnd } = (() => {
+  const { disabledDays, dateHint } = (() => {
     const today = startOfDay(new Date());
-    if (powerDropActive && powerDropActivatedAt) {
-      const activatedAt = startOfDay(new Date(powerDropActivatedAt));
-      const windowStart = new Date(activatedAt);
-      windowStart.setDate(windowStart.getDate() + 10);
-      const windowEnd = new Date(activatedAt);
-      windowEnd.setDate(windowEnd.getDate() + 14);
-      const disabled = (date: Date) => {
-        const d = startOfDay(date);
-        return d < windowStart || d > windowEnd;
-      };
-      const hint = `⚡ Power Drop orders: pick-up between ${format(windowStart, "d MMM")} – ${format(windowEnd, "d MMM yyyy")}`;
-      return { disabledDays: disabled, dateHint: hint, pdWindowStart: windowStart, pdWindowEnd: windowEnd };
+    if (powerDropActive) {
+      // No date restriction during Power Drop — customer is informed of processing time
+      const disabled = (date: Date) => startOfDay(date) < today;
+      const hint = `⚡ Once payment is confirmed your order will be processed and you'll be messaged when it's ready — within 7 days.`;
+      return { disabledDays: disabled, dateHint: hint };
     }
     // Standard: minimum 2 days from today
     const earliest = new Date(today);
     earliest.setDate(earliest.getDate() + 2);
     const disabled = (date: Date) => startOfDay(date) < earliest;
     const hint = `Earliest available date: ${format(earliest, "d MMMM yyyy")}`;
-    return { disabledDays: disabled, dateHint: hint, pdWindowStart: null, pdWindowEnd: null };
+    return { disabledDays: disabled, dateHint: hint };
   })();
 
   // ─── Validation + WhatsApp message ─────────────────────────────────────────
