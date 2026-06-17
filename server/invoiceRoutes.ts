@@ -633,8 +633,115 @@ function generateItemsOrderedPDF(orders: PaidOrder[]): Promise<Buffer> {
   });
 }
 
+import { calcLineItemTotal, calcOrderTotal } from "../shared/orderUtils";
+
+/**
+ * Escape a value for CSV: wrap in double-quotes, escape internal double-quotes by doubling them.
+ */
+function csvEscape(value: string | number | null | undefined): string {
+  const str = value == null ? "" : String(value);
+  return `"${str.replace(/"/g, '""')}"`;
+}
+
+function generatePackingSheetCSV(orders: PaidOrder[]): string {
+  const headers = [
+    "Invoice Number",
+    "Phone Number",
+    "Customer Name",
+    "Pickup Date",
+    "Location",
+    "Delivery Address",
+    "Item Name",
+    "Cut",
+    "Quantity Ordered",
+    "Unit",
+    "Final Weight/Qty",
+    "Unit Price",
+    "Line Total",
+    "Order Total",
+    "Special Instructions",
+  ];
+
+  const rows: string[] = [headers.map(csvEscape).join(",")];
+
+  for (const order of orders) {
+    const items = parseItems(order.items);
+    const invoiceNum = order.invoiceNumber ?? `GB-${String(order.id).padStart(5, "0")}`;
+    const locLabel = locationLabel(order.location, order.deliveryAddress);
+    const orderTotal = calcOrderTotal(items, order.deliveryCharge);
+
+    for (const item of items) {
+      const isKg = (item.unit || "").toLowerCase().includes("kg");
+      const finalWeightKg = item.finalWeightKg ? parseFloat(item.finalWeightKg) : null;
+      const displayFinalQty = isKg && finalWeightKg != null && finalWeightKg > 0
+        ? finalWeightKg.toFixed(2)
+        : String(item.qty);
+      const lineTotal = calcLineItemTotal(item);
+
+      const row = [
+        csvEscape(invoiceNum),
+        csvEscape(order.phone),
+        csvEscape(order.customerName),
+        csvEscape(order.pickupDate),
+        csvEscape(locLabel),
+        csvEscape(order.deliveryAddress),
+        csvEscape(item.name),
+        csvEscape(item.cut),
+        csvEscape(item.qty),
+        csvEscape(item.unit),
+        csvEscape(displayFinalQty),
+        csvEscape(parseFloat(item.price).toFixed(2)),
+        csvEscape(lineTotal.toFixed(2)),
+        csvEscape(orderTotal.toFixed(2)),
+        csvEscape(order.specialInstructions),
+      ];
+      rows.push(row.join(","));
+    }
+  }
+
+  return rows.join("\r\n");
+}
+
 export function registerInvoiceRoutes(app: Application) {
   const router = Router();
+
+  router.get("/api/admin/packing-sheet/download", async (req, res) => {
+    try {
+      let user;
+      try {
+        user = await sdk.authenticateRequest(req as any);
+      } catch {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
+      if (!user || user.role !== "admin") {
+        res.status(403).json({ error: "Forbidden" });
+        return;
+      }
+
+      const paidOrders = (await getAllPaidActiveOrders()) as PaidOrder[];
+
+      if (paidOrders.length === 0) {
+        res.status(404).json({ error: "No paid orders found" });
+        return;
+      }
+
+      const csvContent = generatePackingSheetCSV(paidOrders);
+      const dateStr = new Date().toISOString().slice(0, 10);
+      res.setHeader("Content-Type", "text/csv; charset=utf-8");
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="packing-sheet-${dateStr}.csv"`
+      );
+      // BOM for Excel compatibility
+      res.send("\uFEFF" + csvContent);
+    } catch (err) {
+      console.error("[packing-sheet-csv] error:", err instanceof Error ? err.message : err);
+      if (!res.headersSent) {
+        res.status(500).json({ error: "Failed to generate packing sheet CSV" });
+      }
+    }
+  });
 
   router.get("/api/admin/invoices/download", async (req, res) => {
     try {

@@ -457,3 +457,11 @@
 - [x] Show invoice number prominently on admin order card header (red badge next to phone)
 - [x] Include invoice number in WhatsApp invoice message (Invoice #: GB-XXXX line)
 - [x] Update tests for invoiceNumber (no test changes needed — existing tests pass)
+
+## Packing Sheet CSV Export
+- [x] Add /api/admin/packing-sheet/download CSV route in invoiceRoutes.ts
+- [x] CSV: one row per item, all columns as specified
+- [x] CSV escaping helper (quote-wrap, double-quote escaping)
+- [x] Order total calculation per row (same logic as existing — shared/orderUtils.ts)
+- [x] Update AdminOrders.tsx Packing Sheet button to call new CSV route
+- [x] Change downloaded filename to packing-sheet-YYYY-MM-DD.csv

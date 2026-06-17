@@ -1175,8 +1175,7 @@ export default function AdminOrders() {
   async function handleDownloadInvoices() {
     setDownloadingInvoices(true);
     try {
-      const params = new URLSearchParams({ bankDetails });
-      const res = await fetch(`/api/admin/invoices/download?${params}`, {
+      const res = await fetch(`/api/admin/packing-sheet/download`, {
         credentials: "include",
       });
       if (!res.ok) {
@@ -1189,7 +1188,7 @@ export default function AdminOrders() {
       const a = document.createElement("a");
       const timestamp = new Date().toISOString().slice(0, 10);
       a.href = url;
-      a.download = `packing-sheet-${timestamp}.pdf`;
+      a.download = `packing-sheet-${timestamp}.csv`;
       a.click();
       URL.revokeObjectURL(url);
     } catch (err) {
