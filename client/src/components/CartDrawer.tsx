@@ -643,9 +643,9 @@ export default function CartDrawer({
                               today: "font-bold text-[#c73e3a]",
                               nav: "flex items-center justify-between",
                               button_previous:
-                                "text-[#f5f2ec] hover:text-[#c73e3a] hover:bg-white/10 p-1 rounded transition-colors disabled:text-[#8a857c]/40 disabled:cursor-not-allowed",
+                                "text-[#c73e3a] hover:text-[#a83330] hover:bg-white/10 p-1 rounded transition-colors disabled:text-[#c73e3a]/30 disabled:cursor-not-allowed",
                               button_next:
-                                "text-[#f5f2ec] hover:text-[#c73e3a] hover:bg-white/10 p-1 rounded transition-colors disabled:text-[#8a857c]/40 disabled:cursor-not-allowed",
+                                "text-[#c73e3a] hover:text-[#a83330] hover:bg-white/10 p-1 rounded transition-colors disabled:text-[#c73e3a]/30 disabled:cursor-not-allowed",
                             }}
                           />
                         </motion.div>
