@@ -105,7 +105,7 @@ export type Setting = typeof settings.$inferSelect;
 /**
  * Orders table — each row is a customer order submitted through the cart checkout.
  * items is stored as JSON text: Array<{ id: number; name: string; cut: string; qty: number; price: string; finalWeightKg?: string }>
- * status: pending = awaiting payment, invoice_issued = invoice sent via WhatsApp, paid = payment confirmed, cancelled = order cancelled
+ * status: pending = awaiting payment, invoice_issued = invoice sent via WhatsApp, paid = payment confirmed, pickup_available = order ready for collection, cancelled = order cancelled
  */
 export const orders = mysqlTable("orders", {
   id: int("id").autoincrement().primaryKey(),
@@ -121,7 +121,7 @@ export const orders = mysqlTable("orders", {
   specialInstructions: text("specialInstructions"),
   /** Delivery charge in dollars — admin sets this after reviewing the order */
   deliveryCharge: decimal("deliveryCharge", { precision: 10, scale: 2 }).default("0.00"),
-  status: mysqlEnum("status", ["pending", "invoice_issued", "paid", "cancelled"]).notNull().default("pending"),
+  status: mysqlEnum("status", ["pending", "invoice_issued", "paid", "pickup_available", "cancelled"]).notNull().default("pending"),
   /** Whether this order was placed during a Power Drop event */
   isPowerDrop: boolean("isPowerDrop").notNull().default(false),
   /** FK to drops table — which drop this order belongs to (null = unassigned) */

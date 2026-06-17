@@ -431,3 +431,13 @@
 - [x] Update AdminOrders.tsx: add "Invoice Issued" tab with blue styling
 - [x] Update AdminOrders.tsx: StatusFilter type, counts, filterTabs, and status badge colours
 - [x] Update AdminOrders.tsx: status badge and icon for invoice_issued (blue badge + MessageCircle icon)
+
+## Pick up Available Status
+- [x] Add "pickup_available" to status mysqlEnum in drizzle/schema.ts
+- [x] Run pnpm db:push to migrate schema
+- [x] Update updateOrderStatus DB helper to accept "pickup_available"
+- [x] Update getActiveOrderCounts to include pickup_available count
+- [x] Add admin.orders.markPickupAvailable tRPC mutation
+- [x] Update AdminOrders.tsx: Order type, StatusFilter, counts, filterTabs, badge colours (purple), icon (Package)
+- [x] Add "Mark Pick up Available" action button on paid orders in AdminOrders.tsx
+- [x] Update tests for pickup_available

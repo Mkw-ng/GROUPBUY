@@ -69,10 +69,11 @@ vi.mock("./db", () => ({
     return { orders: slice, limit, offset, hasMore };
   }),
   getActiveOrderCounts: vi.fn().mockResolvedValue({
-    all: 13,
+    all: 14,
     pending: 7,
     invoice_issued: 1,
     paid: 4,
+    pickup_available: 1,
     cancelled: 1,
   }),
   getUnassignedOrders: vi.fn().mockResolvedValue(
@@ -311,21 +312,23 @@ describe("getOrdersPage pagination helper", () => {
 describe("getActiveOrderCounts helper", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("returns counts for all, pending, invoice_issued, paid, cancelled", async () => {
+  it("returns counts for all, pending, invoice_issued, paid, pickup_available, cancelled", async () => {
     const counts = await getActiveOrderCounts();
     expect(counts).toHaveProperty("all");
     expect(counts).toHaveProperty("pending");
     expect(counts).toHaveProperty("invoice_issued");
     expect(counts).toHaveProperty("paid");
+    expect(counts).toHaveProperty("pickup_available");
     expect(counts).toHaveProperty("cancelled");
     expect(typeof counts.all).toBe("number");
     expect(typeof counts.invoice_issued).toBe("number");
     expect(typeof counts.paid).toBe("number");
+    expect(typeof counts.pickup_available).toBe("number");
   });
 
-  it("all equals sum of pending + invoice_issued + paid + cancelled", async () => {
+  it("all equals sum of pending + invoice_issued + paid + pickup_available + cancelled", async () => {
     const counts = await getActiveOrderCounts();
-    expect(counts.all).toBe(counts.pending + counts.invoice_issued + counts.paid + counts.cancelled);
+    expect(counts.all).toBe(counts.pending + counts.invoice_issued + counts.paid + counts.pickup_available + counts.cancelled);
   });
 });
 

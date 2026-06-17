@@ -64,14 +64,14 @@ interface Order {
   items: string;
   specialInstructions: string | null;
   deliveryCharge: string | null;
-  status: "pending" | "invoice_issued" | "paid" | "cancelled";
+  status: "pending" | "invoice_issued" | "paid" | "pickup_available" | "cancelled";
   isPowerDrop: boolean;
   archived: boolean | null;
   customerName: string | null;
   createdAt: Date;
 }
 
-type StatusFilter = "all" | "pending" | "invoice_issued" | "paid" | "cancelled" | "archived";
+type StatusFilter = "all" | "pending" | "invoice_issued" | "paid" | "pickup_available" | "cancelled" | "archived";
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -205,6 +205,7 @@ function OrderCard({
   const [confirmSaveDelivery, setConfirmSaveDelivery] = useState(false);
   const [confirmInvoice, setConfirmInvoice] = useState(false);
   const [confirmMarkPaid, setConfirmMarkPaid] = useState(false);
+  const [confirmMarkPickupAvailable, setConfirmMarkPickupAvailable] = useState(false);
   const [confirmPrep, setConfirmPrep] = useState(false);
   const [confirmFinalCall, setConfirmFinalCall] = useState(false);
   const [confirmDayOf, setConfirmDayOf] = useState(false);
@@ -262,6 +263,14 @@ Here's how to lock it in:
       }
     },
     onError: () => { toast.error("Failed to mark as paid"); setPendingPaidOrder(null); },
+  });
+
+  const markPickupAvailable = trpc.admin.orders.markPickupAvailable.useMutation({
+    onSuccess: () => {
+      toast.success("Order marked as Pick up Available ✓");
+      onRefresh();
+    },
+    onError: () => toast.error("Failed to update order status"),
   });
 
   const cancelOrder = trpc.admin.orders.cancel.useMutation({
@@ -337,6 +346,7 @@ Here's how to lock it in:
     pending: "bg-amber-500/20 text-amber-400 border-amber-500/30",
     invoice_issued: "bg-blue-500/20 text-blue-300 border-blue-500/30",
     paid: "bg-green-500/20 text-green-400 border-green-500/30",
+    pickup_available: "bg-purple-500/20 text-purple-300 border-purple-500/30",
     cancelled: "bg-red-500/20 text-red-400 border-red-500/30",
   };
 
@@ -344,6 +354,7 @@ Here's how to lock it in:
     pending: <Clock size={11} />,
     invoice_issued: <MessageCircle size={11} />,
     paid: <CheckCircle2 size={11} />,
+    pickup_available: <Package size={11} />,
     cancelled: <Ban size={11} />,
   };
 
@@ -874,6 +885,42 @@ Here's how to lock it in:
               </AlertDialog>
             )}
 
+            {/* Mark as Pick up Available */}
+            {order.status === "paid" && (
+              <AlertDialog open={confirmMarkPickupAvailable} onOpenChange={setConfirmMarkPickupAvailable}>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    size="sm"
+                    className="font-display text-[10px] tracking-widest bg-purple-700 hover:bg-purple-600 text-white gap-1.5"
+                    disabled={markPickupAvailable.isPending}
+                  >
+                    <Package size={13} />
+                    {markPickupAvailable.isPending ? "Saving…" : "Pick up Available"}
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent className="section-ink border-white/10">
+                  <AlertDialogHeader>
+                    <AlertDialogTitle className="font-display tracking-widest text-[#f5f2ec]">Mark order as Pick up Available?</AlertDialogTitle>
+                    <AlertDialogDescription className="font-mono-brand text-[#8a857c]">
+                      Order #{order.phone} will be moved to the Pick up Available tab. The customer's order is ready for collection.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel className="font-display text-[10px] tracking-widest">Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      className="font-display text-[10px] tracking-widest bg-purple-700 hover:bg-purple-600"
+                      onClick={() => {
+                        setConfirmMarkPickupAvailable(false);
+                        markPickupAvailable.mutate({ id: order.id });
+                      }}
+                    >
+                      Mark as Pick up Available
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
+
             {/* Cancel Order */}
             {order.status === "pending" && (
               <AlertDialog>
@@ -1297,6 +1344,7 @@ export default function AdminOrders() {
     pending: serverCounts?.pending ?? allOrders.filter((o) => o.status === "pending").length,
     invoice_issued: serverCounts?.invoice_issued ?? allOrders.filter((o) => o.status === "invoice_issued").length,
     paid: serverCounts?.paid ?? allOrders.filter((o) => o.status === "paid").length,
+    pickup_available: serverCounts?.pickup_available ?? allOrders.filter((o) => o.status === "pickup_available").length,
     cancelled: serverCounts?.cancelled ?? allOrders.filter((o) => o.status === "cancelled").length,
     archived: allArchived.length,
   };
@@ -1308,6 +1356,7 @@ export default function AdminOrders() {
     { key: "pending", label: "Pending" },
     { key: "invoice_issued", label: "Invoice Issued" },
     { key: "paid", label: "Paid" },
+    { key: "pickup_available", label: "Pick up Available" },
     { key: "cancelled", label: "Cancelled" },
     { key: "archived", label: "Archived" },
   ];
@@ -1531,7 +1580,7 @@ export default function AdminOrders() {
           <div className="flex flex-col items-center justify-center py-24 gap-3">
             <Package size={40} className="text-[#8a857c]/30" />
             <p className="font-display text-[11px] tracking-widest text-[#8a857c]">
-              {statusFilter === "all" ? "NO ORDERS YET" : statusFilter === "archived" ? "NO ARCHIVED ORDERS" : statusFilter === "invoice_issued" ? "NO INVOICE ISSUED ORDERS" : `NO ${statusFilter.toUpperCase()} ORDERS`}
+              {statusFilter === "all" ? "NO ORDERS YET" : statusFilter === "archived" ? "NO ARCHIVED ORDERS" : statusFilter === "invoice_issued" ? "NO INVOICE ISSUED ORDERS" : statusFilter === "pickup_available" ? "NO PICK UP AVAILABLE ORDERS" : `NO ${statusFilter.toUpperCase()} ORDERS`}
             </p>
             <p className="font-mono-brand text-[11px] text-[#8a857c]/60">
               {statusFilter === "all"
