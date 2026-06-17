@@ -95,6 +95,10 @@ export default function Home() {
     setCartItems((prev) => prev.map((i) => (i.id === id ? { ...i, qty } : i)));
   };
 
+  const handleNoteChange = (id: number, note: string) => {
+    setCartItems((prev) => prev.map((i) => (i.id === id ? { ...i, note } : i)));
+  };
+
   const cartCount = cartItems.reduce((sum, i) => sum + i.qty, 0);
 
   return (
@@ -134,6 +138,7 @@ export default function Home() {
         items={cartItems}
         onRemove={handleRemove}
         onQtyChange={handleQtyChange}
+        onNoteChange={handleNoteChange}
         powerDropActive={powerDropActive}
         powerDropActivatedAt={settings?.powerDropActivatedAt ?? ""}
       />

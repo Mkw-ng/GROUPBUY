@@ -1,7 +1,7 @@
 /*
  * GROUPBUY Cart Drawer
  * Design: Ink background slide-in panel, items list with JetBrains Mono prices
- * Order details form below items: phone, pickup date, location/delivery, special instructions
+ * Order details form below items: phone, pickup date, location/delivery
  * Saved details: phone + location persisted to localStorage, auto-filled on next visit
  * Checkout CTA in red, close button top-right
  * Power Drop: indicator in header + note in WhatsApp checkout message
@@ -35,6 +35,7 @@ export interface CartItem {
   retailPrice?: number | null; // RRP, used as savings comparison baseline when set
   unit: string;
   qty: number;
+  note?: string; // per-item customer request
 }
 
 interface CartDrawerProps {
@@ -43,6 +44,7 @@ interface CartDrawerProps {
   items: CartItem[];
   onRemove: (id: number) => void;
   onQtyChange: (id: number, qty: number) => void;
+  onNoteChange: (id: number, note: string) => void;
   onCheckoutSuccess?: () => void;
   powerDropActive?: boolean;
   powerDropActivatedAt?: string; // ISO timestamp of when Power Drop was activated
@@ -62,6 +64,7 @@ export default function CartDrawer({
   items,
   onRemove,
   onQtyChange,
+  onNoteChange,
   onCheckoutSuccess,
   powerDropActive = false,
   powerDropActivatedAt = "",
@@ -144,7 +147,6 @@ export default function CartDrawer({
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [location, setLocation] = useState<PickupLocation>("cranbourne");
   const [deliveryAddress, setDeliveryAddress] = useState("");
-  const [instructions, setInstructions] = useState("");
   const [saveDetails, setSaveDetails] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const calendarRef = useRef<HTMLDivElement>(null);
@@ -238,10 +240,11 @@ export default function CartDrawer({
         ? `Delivery — ${deliveryAddress}`
         : LOCATION_LABELS[location];
 
-    const itemLines = items.map((i) => {
+    const itemLines = items.flatMap((i) => {
       const qtyStr = i.qty % 1 === 0 ? String(i.qty) : i.qty.toFixed(1);
       const cleanUnit = i.unit.replace(/^\/\s*/, "");
-      return `${qtyStr}/${cleanUnit} x ${i.name} — $${i.price.toFixed(2)}/${cleanUnit}`;
+      const line = `${qtyStr}/${cleanUnit} x ${i.name} \u2014 $${i.price.toFixed(2)}/${cleanUnit}`;
+      return i.note?.trim() ? [line, `  \u21b3 Request: ${i.note.trim()}`] : [line];
     });
 
     let parts: string[];
@@ -290,11 +293,6 @@ export default function CartDrawer({
       ];
     }
 
-    if (instructions.trim()) {
-      parts.push("");
-      parts.push(`*Special Instructions:* ${instructions.trim()}`);
-    }
-
     return `https://wa.me/61407249272?text=${encodeURIComponent(parts.join("\n"))}`;
   }
 
@@ -310,6 +308,7 @@ export default function CartDrawer({
       qty: i.qty,
       price: i.price.toFixed(2),
       unit: i.unit,
+      note: i.note?.trim() || undefined,
     }));
 
     try {
@@ -319,7 +318,6 @@ export default function CartDrawer({
         location,
         deliveryAddress: location === "delivery" ? deliveryAddress.trim() : undefined,
         items: JSON.stringify(orderItems),
-        specialInstructions: instructions.trim() || undefined,
         isPowerDrop: powerDropActive,
       });
     } catch (err: unknown) {
@@ -453,7 +451,8 @@ export default function CartDrawer({
                 ) : (
                   <div className="flex flex-col gap-4">
                     {items.map((item) => (
-                      <div key={item.id} className="flex gap-3 border-b border-white/8 pb-4">
+                      <div key={item.id} className="flex flex-col gap-0">
+                      <div className="flex gap-3 border-b border-white/8 pb-4">
                         <div className="flex-1 min-w-0">
                           <p className="font-body text-[13px] font-bold text-[#f5f2ec] leading-snug">
                             {item.name}
@@ -533,6 +532,15 @@ export default function CartDrawer({
                         >
                           <Trash2 size={14} strokeWidth={1.5} />
                         </button>
+                      </div>
+                      {/* Per-item request note */}
+                      <input
+                        type="text"
+                        value={item.note ?? ""}
+                        onChange={(e) => onNoteChange(item.id, e.target.value)}
+                        placeholder="Add a request for this item (optional)"
+                        className="w-full font-mono-brand text-[11px] text-[#f5f2ec] bg-white/5 border border-white/10 border-t-0 px-2.5 py-1.5 placeholder:text-[#8a857c] focus:outline-none focus:border-white/25 transition-colors"
+                      />
                       </div>
                     ))}
                   </div>
@@ -756,19 +764,7 @@ export default function CartDrawer({
                     </AnimatePresence>
                   </div>
 
-                  {/* 4. Special instructions */}
-                  <div>
-                    <label className={labelBase}>Special Instructions</label>
-                    <textarea
-                      value={instructions}
-                      onChange={(e) => setInstructions(e.target.value)}
-                      placeholder="e.g., Please trim fat, cut into steaks, etc."
-                      rows={3}
-                      className={`${inputBase} resize-none`}
-                    />
-                  </div>
-
-                  {/* 5. Save / clear details */}
+                  {/* 4. Save / clear details */}
                   <div className="border border-white/10 px-3 py-3 space-y-2">
                     <label className="flex items-center gap-2.5 cursor-pointer select-none">
                       <span
