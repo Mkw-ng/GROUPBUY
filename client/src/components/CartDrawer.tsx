@@ -182,15 +182,13 @@ export default function CartDrawer({
   }, [calendarOpen]);
 
   // ─── Date picker constraints ────────────────────────────────────────────────
-  // Power Drop mode: all future dates selectable; show processing-time note instead
+  // Power Drop mode: date picker hidden; auto-select today as the date
   // Standard mode: earliest = today + 2 days, no upper limit
   const { disabledDays, dateHint } = (() => {
     const today = startOfDay(new Date());
     if (powerDropActive) {
-      // No date restriction during Power Drop — customer is informed of processing time
       const disabled = (date: Date) => startOfDay(date) < today;
-      const hint = `⚡ Once payment is confirmed your order will be processed and you'll be messaged when it's ready — within 7 days.`;
-      return { disabledDays: disabled, dateHint: hint };
+      return { disabledDays: disabled, dateHint: "" };
     }
     // Standard: minimum 2 days from today
     const earliest = new Date(today);
@@ -199,6 +197,13 @@ export default function CartDrawer({
     const hint = `Earliest available date: ${format(earliest, "d MMMM yyyy")}`;
     return { disabledDays: disabled, dateHint: hint };
   })();
+
+  // Auto-select today when Power Drop is active
+  useEffect(() => {
+    if (powerDropActive) {
+      setPickupDate(startOfDay(new Date()));
+    }
+  }, [powerDropActive]);
 
   // ─── Validation + WhatsApp message ─────────────────────────────────────────
   function normalisePhone(raw: string): string {
@@ -579,7 +584,8 @@ export default function CartDrawer({
                     )}
                   </div>
 
-                  {/* 2. Pickup / delivery date */}
+                  {/* 2. Pickup / delivery date — hidden during Power Drop (auto-selected) */}
+                  {!powerDropActive && (
                   <div ref={calendarRef}>
                     <label className={labelBase}>Pick-up / Delivery Date *</label>
                     <button
@@ -601,7 +607,7 @@ export default function CartDrawer({
                       />
                     </button>
                     {errors.date && <p className={errorBase}>{errors.date}</p>}
-                    {!errors.date && (
+                    {!errors.date && dateHint && (
                       <p className="font-mono-brand text-[10px] text-[#8a857c] mt-1">{dateHint}</p>
                     )}
 
@@ -650,6 +656,7 @@ export default function CartDrawer({
                       )}
                     </AnimatePresence>
                   </div>
+                  )}
 
                   {/* 3. Pickup location */}
                   <div>
@@ -909,6 +916,11 @@ export default function CartDrawer({
                   <MessageCircle size={14} strokeWidth={1.5} />
                   {createOrder.isPending ? "Saving order…" : "Checkout via WhatsApp"}
                 </button>
+                {powerDropActive && (
+                  <p className="font-mono-brand text-[10px] text-[#8a857c] text-center mt-1">
+                    ⚡ Once payment is confirmed your order will be processed and you'll be messaged when it's ready — within 7 days.
+                  </p>
+                )}
                 <p className="font-mono-brand text-[10px] text-[#8a857c] text-center">
                   Payment by bank transfer or card on confirmation
                 </p>
