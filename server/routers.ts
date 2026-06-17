@@ -135,6 +135,7 @@ const productInput = z.object({
     "korean-bbq-hotpot",
     "burger-sausages",
     "bbq-packs",
+    "quick-meals",
     "freezer",
     "other",
   ]),

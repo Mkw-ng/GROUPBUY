@@ -114,6 +114,7 @@ type Category =
   | "korean-bbq-hotpot"
   | "burger-sausages"
   | "bbq-packs"
+  | "quick-meals"
   | "freezer"
   | "other";
 type BadgeType = "LIMITED" | "POPULAR" | "NEW" | "SOLD OUT" | null;
@@ -137,6 +138,7 @@ const CATEGORIES: { value: Category | "all"; label: string }[] = [
   { value: "korean-bbq-hotpot", label: "Korean BBQ / Hotpot" },
   { value: "burger-sausages",   label: "Burger & Sausages" },
   { value: "bbq-packs",         label: "BBQ Packs" },
+  { value: "quick-meals",       label: "Quick Meals" },
   { value: "freezer",           label: "Freezer" },
   { value: "other",             label: "Other" },
 ];
@@ -166,6 +168,7 @@ const CATEGORY_EMOJI: Record<string, string> = {
   "korean-bbq-hotpot": "🍲",
   "burger-sausages":   "🍔",
   "bbq-packs":         "🔥",
+  "quick-meals":        "⏱️",
   freezer:             "🧊",
   other:               "🛒",
 };

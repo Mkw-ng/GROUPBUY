@@ -1,0 +1,1 @@
+ALTER TABLE `products` MODIFY COLUMN `category` enum('limited-offer','featured-deals','m3atfr3ak','beef','pork','lamb','poultry','seafood','whole-slabs','whole-animal','box-deals','mince','offal-tallow','value-added','korean-bbq-hotpot','burger-sausages','bbq-packs','quick-meals','freezer','other') NOT NULL DEFAULT 'beef';

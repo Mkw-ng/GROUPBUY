@@ -32,6 +32,7 @@ const CATEGORIES = [
   { id: "korean-bbq-hotpot", label: "Korean BBQ / Hotpot" },
   { id: "burger-sausages",   label: "Burger & Sausages" },
   { id: "bbq-packs",         label: "BBQ Packs" },
+  { id: "quick-meals",       label: "Quick Meals" },
   { id: "freezer",           label: "Freezer" },
   { id: "other",             label: "Other" },
 ];
