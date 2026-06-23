@@ -1310,21 +1310,24 @@ export function registerInvoiceRoutes(app: Application) {
         productCategoryMap.set(p.id, p.category ?? "");
       }
 
-      // Aggregate quantities by item name + cut, carrying category
+      // Aggregate final weight/qty by item name + cut, carrying category
+      // Use finalWeightKg if set (including 0), otherwise fall back to ordered qty
       const aggregated = new Map<string, { name: string; cut: string; qty: number; category: string }>();
       for (const order of allOrders) {
         const items = parseItems(order.items);
         for (const item of items) {
           // Prefer category stored on the item; fall back to product catalogue lookup
           const category = item.category ?? (item.id ? productCategoryMap.get(item.id) ?? "" : "");
+          const hasOverride = item.finalWeightKg !== undefined && item.finalWeightKg !== null && item.finalWeightKg !== "";
+          const effectiveQty = hasOverride ? (parseFloat(item.finalWeightKg!) || 0) : (Number(item.qty) || 0);
           const key = `${item.name}|||${item.cut ?? ""}`;
           const existing = aggregated.get(key);
           if (existing) {
-            existing.qty += Number(item.qty) || 0;
+            existing.qty += effectiveQty;
             // Fill in category if not yet set
             if (!existing.category && category) existing.category = category;
           } else {
-            aggregated.set(key, { name: item.name, cut: item.cut ?? "", qty: Number(item.qty) || 0, category });
+            aggregated.set(key, { name: item.name, cut: item.cut ?? "", qty: effectiveQty, category });
           }
         }
       }
@@ -1334,7 +1337,7 @@ export function registerInvoiceRoutes(app: Application) {
         a.category.localeCompare(b.category) || a.name.localeCompare(b.name) || a.cut.localeCompare(b.cut)
       );
 
-      const headers = ["Category", "Item Name", "Cut", "Total Qty Ordered"];
+      const headers = ["Category", "Item Name", "Cut", "Total Final Weight/Qty"];
       const rows: string[] = [headers.map(csvEscape).join(",")];
       for (const item of sorted) {
         rows.push([
