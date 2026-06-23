@@ -1347,10 +1347,10 @@ export default function AdminOrders() {
     }
   }
 
-  // ─── Bulk transfer paid → pickup_available mutation ─────────────────────────
+  // ─── Bulk transfer paid → in_progress mutation ──────────────────────────────
   const transferPaidToPickupAvailable = trpc.admin.orders.transferPaidToPickupAvailable.useMutation({
     onSuccess: (result) => {
-      toast.success(`Transferred ${result.transferredCount} paid order${result.transferredCount === 1 ? "" : "s"} to Pick up Available`);
+      toast.success(`Transferred ${result.transferredCount} paid order${result.transferredCount === 1 ? "" : "s"} to In Progress`);
       handleRefresh();
       utils.admin.orders.counts.invalidate();
     },
@@ -1550,31 +1550,31 @@ export default function AdminOrders() {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          {/* Transfer Paid → Pick up Available — bulk action button with confirmation dialog */}
+          {/* Transfer Paid → In Progress — bulk action button with confirmation dialog */}
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <button
                 disabled={transferPaidToPickupAvailable.isPending || counts.paid === 0}
-                className="flex items-center gap-1.5 font-mono-brand text-[10px] text-purple-400/70 hover:text-purple-300 transition-colors disabled:opacity-40 disabled:cursor-not-allowed border border-purple-500/30 hover:border-purple-400/50 rounded px-2 py-1"
-                title="Transfer all paid orders to Pick up Available"
+                className="flex items-center gap-1.5 font-mono-brand text-[10px] text-orange-400/70 hover:text-orange-300 transition-colors disabled:opacity-40 disabled:cursor-not-allowed border border-orange-500/30 hover:border-orange-400/50 rounded px-2 py-1"
+                title="Transfer all paid orders to In Progress"
               >
-                <Package size={12} />
+                <Loader2 size={12} />
                 {transferPaidToPickupAvailable.isPending ? "Transferring…" : `Transfer Paid${counts.paid > 0 ? ` (${counts.paid})` : ""}`}
               </button>
             </AlertDialogTrigger>
             <AlertDialogContent className="section-ink border-white/10">
               <AlertDialogHeader>
-                <AlertDialogTitle className="font-display tracking-widest text-[#f5f2ec]">Transfer all paid orders to Pick up Available?</AlertDialogTitle>
+                <AlertDialogTitle className="font-display tracking-widest text-[#f5f2ec]">Transfer all paid orders to In Progress?</AlertDialogTitle>
                 <AlertDialogDescription className="font-mono-brand text-[#8a857c] space-y-1">
-                  <span className="block">This will move all currently paid, non-archived orders to the Pick up Available tab.</span>
-                  <span className="block mt-2 text-purple-400/80">{counts.paid} paid order{counts.paid !== 1 ? "s" : ""} will be transferred.</span>
+                  <span className="block">This will move all currently paid, non-archived orders to the In Progress tab.</span>
+                  <span className="block mt-2 text-orange-400/80">{counts.paid} paid order{counts.paid !== 1 ? "s" : ""} will be transferred.</span>
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel className="font-display text-[10px] tracking-widest">Cancel</AlertDialogCancel>
                 <AlertDialogAction
                   onClick={() => transferPaidToPickupAvailable.mutate()}
-                  className="font-display text-[10px] tracking-widest bg-purple-700 hover:bg-purple-600 text-white"
+                  className="font-display text-[10px] tracking-widest bg-orange-700 hover:bg-orange-600 text-white"
                 >
                   Transfer Paid Orders
                 </AlertDialogAction>

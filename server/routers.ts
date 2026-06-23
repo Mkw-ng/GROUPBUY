@@ -42,6 +42,7 @@ import {
   getPaidActiveOrderIds,
   archiveAllPaidActiveOrders,
   transferAllPaidToPickupAvailable,
+  transferAllPaidToInProgress,
   getOrderedQtyByProduct,
 } from "./db";
 import { OrderItem } from "../drizzle/schema";
@@ -602,10 +603,10 @@ export const appRouter = router({
       }),
 
       /**
-       * Transfers all paid, non-archived orders to pickup_available status in one action.
+       * Transfers all paid, non-archived orders to in_progress status in one action.
        */
       transferPaidToPickupAvailable: adminProcedure.mutation(async () => {
-        const transferredCount = await transferAllPaidToPickupAvailable();
+        const transferredCount = await transferAllPaidToInProgress();
         return { success: true, transferredCount };
       }),
     }),

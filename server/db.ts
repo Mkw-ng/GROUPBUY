@@ -416,6 +416,20 @@ export async function transferAllPaidToPickupAvailable(): Promise<number> {
 }
 
 /**
+ * Transfers all paid, non-archived orders to in_progress status in a single UPDATE.
+ * Returns the number of rows affected.
+ */
+export async function transferAllPaidToInProgress(): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db
+    .update(orders)
+    .set({ status: "in_progress" })
+    .where(and(eq(orders.archived, false), eq(orders.status, "paid")));
+  return Number((result[0] as { affectedRows?: number })?.affectedRows ?? 0);
+}
+
+/**
  * Archives all paid, non-archived orders in a single UPDATE.
  * Returns the number of rows affected.
  */
