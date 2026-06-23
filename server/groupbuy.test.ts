@@ -69,9 +69,10 @@ vi.mock("./db", () => ({
     return { orders: slice, limit, offset, hasMore };
   }),
   getActiveOrderCounts: vi.fn().mockResolvedValue({
-    all: 14,
+    all: 15,
     pending: 7,
     invoice_issued: 1,
+    remittance: 1,
     paid: 3,
     in_progress: 1,
     pickup_available: 1,
@@ -313,25 +314,27 @@ describe("getOrdersPage pagination helper", () => {
 describe("getActiveOrderCounts helper", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("returns counts for all, pending, invoice_issued, paid, in_progress, pickup_available, cancelled", async () => {
+  it("returns counts for all, pending, invoice_issued, remittance, paid, in_progress, pickup_available, cancelled", async () => {
     const counts = await getActiveOrderCounts();
     expect(counts).toHaveProperty("all");
     expect(counts).toHaveProperty("pending");
     expect(counts).toHaveProperty("invoice_issued");
+    expect(counts).toHaveProperty("remittance");
     expect(counts).toHaveProperty("paid");
     expect(counts).toHaveProperty("in_progress");
     expect(counts).toHaveProperty("pickup_available");
     expect(counts).toHaveProperty("cancelled");
     expect(typeof counts.all).toBe("number");
     expect(typeof counts.invoice_issued).toBe("number");
+    expect(typeof counts.remittance).toBe("number");
     expect(typeof counts.paid).toBe("number");
     expect(typeof counts.in_progress).toBe("number");
     expect(typeof counts.pickup_available).toBe("number");
   });
 
-  it("all equals sum of pending + invoice_issued + paid + in_progress + pickup_available + cancelled", async () => {
+  it("all equals sum of pending + invoice_issued + remittance + paid + in_progress + pickup_available + cancelled", async () => {
     const counts = await getActiveOrderCounts();
-    expect(counts.all).toBe(counts.pending + counts.invoice_issued + counts.paid + counts.in_progress + counts.pickup_available + counts.cancelled);
+    expect(counts.all).toBe(counts.pending + counts.invoice_issued + counts.remittance + counts.paid + counts.in_progress + counts.pickup_available + counts.cancelled);
   });
 });
 

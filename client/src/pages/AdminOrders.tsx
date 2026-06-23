@@ -29,6 +29,7 @@ import {
   FileText,
   Search,
   X,
+  DollarSign,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -67,7 +68,7 @@ interface Order {
   items: string;
   specialInstructions: string | null;
   deliveryCharge: string | null;
-  status: "pending" | "invoice_issued" | "paid" | "in_progress" | "pickup_available" | "cancelled"; // cancelled kept for DB compat
+  status: "pending" | "invoice_issued" | "remittance" | "paid" | "in_progress" | "pickup_available" | "cancelled"; // cancelled kept for DB compat
   isPowerDrop: boolean;
   archived: boolean | null;
   customerName: string | null;
@@ -75,7 +76,7 @@ interface Order {
   createdAt: Date;
 }
 
-type StatusFilter = "all" | "pending" | "invoice_issued" | "paid" | "in_progress" | "pickup_available" | "archived";
+type StatusFilter = "all" | "pending" | "invoice_issued" | "remittance" | "paid" | "in_progress" | "pickup_available" | "archived";
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -245,6 +246,7 @@ function OrderCard({
   const [confirmSaveWeights, setConfirmSaveWeights] = useState(false);
   const [confirmSaveDelivery, setConfirmSaveDelivery] = useState(false);
   const [confirmInvoice, setConfirmInvoice] = useState(false);
+  const [confirmMarkRemittance, setConfirmMarkRemittance] = useState(false);
   const [confirmMarkPaid, setConfirmMarkPaid] = useState(false);
   const [confirmMarkInProgress, setConfirmMarkInProgress] = useState(false);
   const [confirmMarkPickupAvailable, setConfirmMarkPickupAvailable] = useState(false);
@@ -308,6 +310,14 @@ Here's how to lock it in:
 
   const markInvoiceIssued = trpc.admin.orders.markInvoiceIssued.useMutation({
     onSuccess: () => {
+      onRefresh();
+    },
+    onError: () => toast.error("Failed to update order status"),
+  });
+
+  const markRemittance = trpc.admin.orders.markRemittance.useMutation({
+    onSuccess: () => {
+      toast.success("Order moved to Remittance ✓");
       onRefresh();
     },
     onError: () => toast.error("Failed to update order status"),
@@ -394,6 +404,7 @@ Here's how to lock it in:
   const statusColors: Record<string, string> = {
     pending: "bg-amber-500/20 text-amber-400 border-amber-500/30",
     invoice_issued: "bg-blue-500/20 text-blue-300 border-blue-500/30",
+    remittance: "bg-cyan-500/20 text-cyan-300 border-cyan-500/30",
     paid: "bg-green-500/20 text-green-400 border-green-500/30",
     in_progress: "bg-orange-500/20 text-orange-300 border-orange-500/30",
     pickup_available: "bg-purple-500/20 text-purple-300 border-purple-500/30",
@@ -402,6 +413,7 @@ Here's how to lock it in:
   const statusIcons: Record<string, React.ReactNode> = {
     pending: <Clock size={11} />,
     invoice_issued: <MessageCircle size={11} />,
+    remittance: <DollarSign size={11} />,
     paid: <CheckCircle2 size={11} />,
     in_progress: <Loader2 size={11} />,
     pickup_available: <Package size={11} />,
@@ -955,6 +967,78 @@ Here's how to lock it in:
               </AlertDialogContent>
             </AlertDialog>
 
+            {/* Move to Remittance */}
+            {order.status === "invoice_issued" && (
+              <AlertDialog open={confirmMarkRemittance} onOpenChange={setConfirmMarkRemittance}>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    size="sm"
+                    className="font-display text-[10px] tracking-widest bg-cyan-700 hover:bg-cyan-600 text-white gap-1.5"
+                    disabled={markRemittance.isPending}
+                  >
+                    <DollarSign size={13} />
+                    {markRemittance.isPending ? "Saving…" : "Move to Remittance"}
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent className="section-ink border-white/10">
+                  <AlertDialogHeader>
+                    <AlertDialogTitle className="font-display tracking-widest text-[#f5f2ec]">Move order to Remittance?</AlertDialogTitle>
+                    <AlertDialogDescription className="font-mono-brand text-[#8a857c]">
+                      Order #{order.phone} will be moved to the Remittance tab, indicating a payment remittance has been received and is pending verification.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel className="font-display text-[10px] tracking-widest">Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      className="font-display text-[10px] tracking-widest bg-cyan-700 hover:bg-cyan-600"
+                      onClick={() => {
+                        setConfirmMarkRemittance(false);
+                        markRemittance.mutate({ id: order.id });
+                      }}
+                    >
+                      Move to Remittance
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
+
+            {/* Mark as Paid — also available from Remittance */}
+            {order.status === "remittance" && (
+              <AlertDialog open={confirmMarkPaid} onOpenChange={setConfirmMarkPaid}>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    size="sm"
+                    className="font-display text-[10px] tracking-widest bg-green-700 hover:bg-green-600 text-white gap-1.5"
+                    disabled={markPaid.isPending}
+                  >
+                    <CheckCircle2 size={13} />
+                    {markPaid.isPending ? "Saving…" : "Mark as Paid"}
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent className="section-ink border-white/10">
+                  <AlertDialogHeader>
+                    <AlertDialogTitle className="font-display tracking-widest text-[#f5f2ec]">Mark order as paid?</AlertDialogTitle>
+                    <AlertDialogDescription className="font-mono-brand text-[#8a857c]">
+                      Order #{order.phone} will be marked as PAID. This action cannot be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel className="font-display text-[10px] tracking-widest">Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      className="font-display text-[10px] tracking-widest bg-green-700 hover:bg-green-600"
+                      onClick={() => {
+                        setConfirmMarkPaid(false);
+                        markPaid.mutate({ id: order.id });
+                      }}
+                    >
+                      Mark as Paid
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
+
             {/* Mark as In Progress */}
             {order.status === "paid" && (
               <AlertDialog open={confirmMarkInProgress} onOpenChange={setConfirmMarkInProgress}>
@@ -1486,6 +1570,7 @@ export default function AdminOrders() {
     all: serverCounts?.all ?? allOrders.length,
     pending: serverCounts?.pending ?? allOrders.filter((o) => o.status === "pending").length,
     invoice_issued: serverCounts?.invoice_issued ?? allOrders.filter((o) => o.status === "invoice_issued").length,
+    remittance: serverCounts?.remittance ?? allOrders.filter((o) => o.status === "remittance").length,
     paid: serverCounts?.paid ?? allOrders.filter((o) => o.status === "paid").length,
     in_progress: serverCounts?.in_progress ?? allOrders.filter((o) => o.status === "in_progress").length,
     pickup_available: serverCounts?.pickup_available ?? allOrders.filter((o) => o.status === "pickup_available").length,
@@ -1498,6 +1583,7 @@ export default function AdminOrders() {
     { key: "all", label: "All" },
     { key: "pending", label: "Pending" },
     { key: "invoice_issued", label: "Invoice Issued" },
+    { key: "remittance", label: "Remittance" },
     { key: "paid", label: "Paid" },
     { key: "in_progress", label: "In Progress" },
     { key: "pickup_available", label: "Pick up Available" },

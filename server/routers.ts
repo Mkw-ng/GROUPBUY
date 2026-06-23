@@ -490,6 +490,13 @@ export const appRouter = router({
           return { success: true };
         }),
 
+      markRemittance: adminProcedure
+        .input(z.object({ id: z.number() }))
+        .mutation(async ({ input }) => {
+          await updateOrderStatus(input.id, "remittance");
+          return { success: true };
+        }),
+
       markPaid: adminProcedure
         .input(z.object({ id: z.number() }))
         .mutation(async ({ input }) => {
