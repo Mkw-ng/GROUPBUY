@@ -1830,10 +1830,10 @@ export default function AdminOrders() {
             onClick={handleDownloadSchedule}
             disabled={downloadingSchedule}
             className="flex items-center gap-1.5 font-mono-brand text-[10px] text-[#8a857c] hover:text-[#f5f2ec] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-            title={`Download schedule list${counts.paid > 0 ? ` for ${counts.paid} paid order${counts.paid !== 1 ? "s" : ""}` : ""}`}
+            title={`Download schedule list${counts.pickup_available > 0 ? ` for ${counts.pickup_available} pick up available order${counts.pickup_available !== 1 ? "s" : ""}` : ""}`}
           >
             <FileDown size={13} />
-            {downloadingSchedule ? "Generating…" : `Schedule List${counts.paid > 0 ? ` (${counts.paid})` : ""}`}
+            {downloadingSchedule ? "Generating…" : `Schedule List${counts.pickup_available > 0 ? ` (${counts.pickup_available})` : ""}`}
           </button>
           <div className="w-px h-4 bg-white/10" />
           <button
