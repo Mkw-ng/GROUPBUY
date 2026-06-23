@@ -649,8 +649,6 @@ function generatePackingSheetCSV(orders: PaidOrder[]): string {
   const headers = [
     "Invoice Number",
     "Phone Number",
-    "Customer Name",
-    "Pickup Date",
     "Location",
     "Delivery Address",
     "Item Name",
@@ -658,9 +656,6 @@ function generatePackingSheetCSV(orders: PaidOrder[]): string {
     "Quantity Ordered",
     "Unit",
     "Final Weight/Qty",
-    "Unit Price",
-    "Line Total",
-    "Order Total",
     "Special Instructions",
     "Item Request/Note",
   ];
@@ -684,8 +679,6 @@ function generatePackingSheetCSV(orders: PaidOrder[]): string {
       const row = [
         csvEscape(invoiceNum),
         csvEscape(order.phone),
-        csvEscape(order.customerName),
-        csvEscape(order.pickupDate),
         csvEscape(locLabel),
         csvEscape(order.deliveryAddress),
         csvEscape(item.name),
@@ -693,9 +686,6 @@ function generatePackingSheetCSV(orders: PaidOrder[]): string {
         csvEscape(item.qty),
         csvEscape(item.unit),
         csvEscape(displayFinalQty),
-        csvEscape(parseFloat(item.price).toFixed(2)),
-        csvEscape(lineTotal.toFixed(2)),
-        csvEscape(orderTotal.toFixed(2)),
         csvEscape(order.specialInstructions),
         csvEscape(item.note ?? ""),
       ];
