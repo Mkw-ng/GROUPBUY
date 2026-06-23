@@ -877,6 +877,30 @@ function generatePackingSlipPDF(order: PaidOrder): Promise<Buffer> {
       fx += FIELD_W + FIELD_GAP;
     }
 
+    // ── Tear-off section ────────────────────────────────────────────
+    const tearY = FIELD_TOP + FIELD_H + 36;
+    // Dashed cut line
+    doc.save();
+    doc.dash(4, { space: 4 });
+    doc.moveTo(LEFT, tearY).lineTo(545, tearY).strokeColor("#555555").lineWidth(0.8).stroke();
+    doc.restore();
+    // Scissors icon text
+    doc.font("Helvetica").fontSize(8).fillColor("#555555")
+      .text("✂  Return this slip to the administrator to confirm order collection", LEFT, tearY + 4, { width: 495, align: "center" });
+
+    const tearContentY = tearY + 22;
+    doc.font("Helvetica-Bold").fontSize(13).fillColor("#000000")
+      .text("COLLECTION RECEIPT", LEFT, tearContentY, { width: 495, align: "center" });
+
+    doc.moveDown(0.5);
+    const tearDetailY = tearContentY + 22;
+    doc.font("Helvetica-Bold").fontSize(10).fillColor("#333333")
+      .text(`Invoice #: `, LEFT, tearDetailY, { continued: true, width: 495, align: "left" })
+      .font("Helvetica").text(invoiceNum);
+    doc.font("Helvetica-Bold").fontSize(10).fillColor("#333333")
+      .text(`Phone: `, LEFT, tearDetailY + 18, { continued: true, width: 495, align: "left" })
+      .font("Helvetica").text(order.phone);
+
     doc.end();
   });
 }
@@ -1046,6 +1070,27 @@ function generateAllPackingSlipsPDF(orders: PaidOrder[]): Promise<Buffer> {
         doc.rect(sfx, boxY, FIELD_W, FIELD_H).strokeColor("#000000").lineWidth(0.8).stroke();
         sfx += FIELD_W + FIELD_GAP;
       }
+
+      // ── Tear-off section ─────────────────────────────────────────
+      const tearY = FIELD_TOP + FIELD_H + 36;
+      doc.save();
+      doc.dash(4, { space: 4 });
+      doc.moveTo(LEFT, tearY).lineTo(545, tearY).strokeColor("#555555").lineWidth(0.8).stroke();
+      doc.restore();
+      doc.font("Helvetica").fontSize(8).fillColor("#555555")
+        .text("✂  Return this slip to the administrator to confirm order collection", LEFT, tearY + 4, { width: 495, align: "center" });
+
+      const tearContentY = tearY + 22;
+      doc.font("Helvetica-Bold").fontSize(13).fillColor("#000000")
+        .text("COLLECTION RECEIPT", LEFT, tearContentY, { width: 495, align: "center" });
+
+      const tearDetailY = tearContentY + 22;
+      doc.font("Helvetica-Bold").fontSize(10).fillColor("#333333")
+        .text(`Invoice #: `, LEFT, tearDetailY, { continued: true, width: 495, align: "left" })
+        .font("Helvetica").text(invoiceNum);
+      doc.font("Helvetica-Bold").fontSize(10).fillColor("#333333")
+        .text(`Phone: `, LEFT, tearDetailY + 18, { continued: true, width: 495, align: "left" })
+        .font("Helvetica").text(order.phone);
     }
 
     doc.end();
