@@ -10,7 +10,7 @@ import { Router } from "express";
 import type { Application } from "express";
 import PDFDocument from "pdfkit";
 import { sdk } from "./_core/sdk";
-import { getAllPaidActiveOrders, getAllPickupAvailableActiveOrders, getAllNonArchivedOrders } from "./db";
+import { getAllPaidActiveOrders, getAllPickupAvailableActiveOrders, getAllNonArchivedOrders, getAllProducts } from "./db";
 
 interface OrderItem {
   id: number;
@@ -21,6 +21,7 @@ interface OrderItem {
   unit: string;
   finalWeightKg?: string;
   note?: string;
+  category?: string;
 }
 
 function parseItems(raw: string): OrderItem[] {
@@ -1302,30 +1303,42 @@ export function registerInvoiceRoutes(app: Application) {
         return `"${str.replace(/"/g, '""')}"`;
       };
 
-      // Aggregate quantities by item name + cut
-      const aggregated = new Map<string, { name: string; cut: string; qty: number }>();
+      // Build a product-ID → category lookup for fallback on older orders
+      const allProducts = await getAllProducts();
+      const productCategoryMap = new Map<number, string>();
+      for (const p of allProducts) {
+        productCategoryMap.set(p.id, p.category ?? "");
+      }
+
+      // Aggregate quantities by item name + cut, carrying category
+      const aggregated = new Map<string, { name: string; cut: string; qty: number; category: string }>();
       for (const order of allOrders) {
         const items = parseItems(order.items);
         for (const item of items) {
+          // Prefer category stored on the item; fall back to product catalogue lookup
+          const category = item.category ?? (item.id ? productCategoryMap.get(item.id) ?? "" : "");
           const key = `${item.name}|||${item.cut ?? ""}`;
           const existing = aggregated.get(key);
           if (existing) {
             existing.qty += Number(item.qty) || 0;
+            // Fill in category if not yet set
+            if (!existing.category && category) existing.category = category;
           } else {
-            aggregated.set(key, { name: item.name, cut: item.cut ?? "", qty: Number(item.qty) || 0 });
+            aggregated.set(key, { name: item.name, cut: item.cut ?? "", qty: Number(item.qty) || 0, category });
           }
         }
       }
 
-      // Sort alphabetically by name then cut
+      // Sort alphabetically by category then name then cut
       const sorted = Array.from(aggregated.values()).sort((a, b) =>
-        a.name.localeCompare(b.name) || a.cut.localeCompare(b.cut)
+        a.category.localeCompare(b.category) || a.name.localeCompare(b.name) || a.cut.localeCompare(b.cut)
       );
 
-      const headers = ["Item Name", "Cut", "Total Qty Ordered"];
+      const headers = ["Category", "Item Name", "Cut", "Total Qty Ordered"];
       const rows: string[] = [headers.map(csvEscape).join(",")];
       for (const item of sorted) {
         rows.push([
+          csvEscape(item.category),
           csvEscape(item.name),
           csvEscape(item.cut),
           csvEscape(item.qty),

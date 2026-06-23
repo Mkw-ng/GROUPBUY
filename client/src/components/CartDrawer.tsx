@@ -36,6 +36,7 @@ export interface CartItem {
   unit: string;
   qty: number;
   note?: string; // per-item customer request
+  category?: string; // product category, stored for CSV export
 }
 
 interface CartDrawerProps {

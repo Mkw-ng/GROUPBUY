@@ -59,6 +59,7 @@ export default function Home() {
     powerDropPrice?: number | null;
     retailPrice?: number | null;
     unit: string;
+    category?: string;
   }) => {
     setCartItems((prev) => {
       const existing = prev.find((i) => i.id === product.id);
@@ -81,6 +82,7 @@ export default function Home() {
           retailPrice: product.retailPrice ?? null, // RRP for savings comparison
           unit: product.unit,
           qty: 1,
+          category: product.category,
         },
       ];
     });
