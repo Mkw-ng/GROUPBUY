@@ -340,6 +340,16 @@ export async function getAllPaidActiveOrders(): Promise<(typeof orders.$inferSel
     .orderBy(asc(orders.createdAt));
 }
 
+export async function getAllNonArchivedOrders(): Promise<(typeof orders.$inferSelect)[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(orders)
+    .where(eq(orders.archived, false))
+    .orderBy(asc(orders.createdAt));
+}
+
 export async function getAllPickupAvailableActiveOrders(): Promise<(typeof orders.$inferSelect)[]> {
   const db = await getDb();
   if (!db) return [];

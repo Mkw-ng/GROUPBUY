@@ -10,7 +10,7 @@ import { Router } from "express";
 import type { Application } from "express";
 import PDFDocument from "pdfkit";
 import { sdk } from "./_core/sdk";
-import { getAllPaidActiveOrders, getAllPickupAvailableActiveOrders } from "./db";
+import { getAllPaidActiveOrders, getAllPickupAvailableActiveOrders, getAllNonArchivedOrders } from "./db";
 
 interface OrderItem {
   id: number;
@@ -1271,6 +1271,63 @@ export function registerInvoiceRoutes(app: Application) {
       console.error("[items-ordered] error:", err instanceof Error ? err.message : err);
       if (!res.headersSent) {
         res.status(500).json({ error: "Failed to generate items ordered list" });
+      }
+    }
+  });
+
+  // ── Items Ordered CSV (all non-archived orders) ──────────────────────────────
+  router.get("/api/admin/items-ordered/download-csv", async (req, res) => {
+    try {
+      let user;
+      try {
+        user = await sdk.authenticateRequest(req as any);
+      } catch {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
+      if (!user || user.role !== "admin") {
+        res.status(403).json({ error: "Forbidden" });
+        return;
+      }
+
+      const allOrders = (await getAllNonArchivedOrders()) as PaidOrder[];
+
+      if (allOrders.length === 0) {
+        res.status(404).json({ error: "No orders found" });
+        return;
+      }
+
+      const csvEscape = (v: unknown): string => {
+        const str = v == null ? "" : String(v);
+        return `"${str.replace(/"/g, '""')}"`;
+      };
+
+      const headers = ["Item Name", "Cut", "Qty Ordered"];
+      const rows: string[] = [headers.map(csvEscape).join(",")];
+
+      for (const order of allOrders) {
+        const items = parseItems(order.items);
+        for (const item of items) {
+          rows.push([
+            csvEscape(item.name),
+            csvEscape(item.cut),
+            csvEscape(item.qty),
+          ].join(","));
+        }
+      }
+
+      const csvContent = rows.join("\r\n");
+      const dateStr = new Date().toISOString().slice(0, 10);
+      res.setHeader("Content-Type", "text/csv");
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="items-ordered-${dateStr}.csv"`
+      );
+      res.send(csvContent);
+    } catch (err) {
+      console.error("[items-ordered-csv] error:", err instanceof Error ? err.message : err);
+      if (!res.headersSent) {
+        res.status(500).json({ error: "Failed to generate items ordered CSV" });
       }
     }
   });

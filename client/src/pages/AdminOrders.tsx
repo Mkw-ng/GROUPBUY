@@ -1472,6 +1472,7 @@ export default function AdminOrders() {
   const [downloadingSchedule, setDownloadingSchedule] = useState(false);
   const [downloadingItems, setDownloadingItems] = useState(false);
   const [downloadingAllSlips, setDownloadingAllSlips] = useState(false);
+  const [downloadingItemsCsv, setDownloadingItemsCsv] = useState(false);
 
   async function handleDownloadAllSlips() {
     setDownloadingAllSlips(true);
@@ -1495,6 +1496,31 @@ export default function AdminOrders() {
       toast.error("Download failed");
     } finally {
       setDownloadingAllSlips(false);
+    }
+  }
+
+  async function handleDownloadItemsCsv() {
+    setDownloadingItemsCsv(true);
+    try {
+      const res = await fetch(`/api/admin/items-ordered/download-csv`, { credentials: "include" });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "Unknown error" }));
+        toast.error(err.error || "Download failed");
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const timestamp = new Date().toISOString().slice(0, 10);
+      a.href = url;
+      a.download = `items-ordered-${timestamp}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err);
+      toast.error("Download failed");
+    } finally {
+      setDownloadingItemsCsv(false);
     }
   }
 
@@ -1834,6 +1860,16 @@ export default function AdminOrders() {
           >
             <FileDown size={13} />
             {downloadingSchedule ? "Generating…" : `Schedule List${counts.pickup_available > 0 ? ` (${counts.pickup_available})` : ""}`}
+          </button>
+          <div className="w-px h-4 bg-white/10" />
+          <button
+            onClick={handleDownloadItemsCsv}
+            disabled={downloadingItemsCsv}
+            className="flex items-center gap-1.5 font-mono-brand text-[10px] text-[#8a857c] hover:text-[#f5f2ec] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            title="Download all items ordered (CSV) from all non-archived orders"
+          >
+            <FileDown size={13} />
+            {downloadingItemsCsv ? "Generating…" : "Items Ordered CSV"}
           </button>
           <div className="w-px h-4 bg-white/10" />
           <button
