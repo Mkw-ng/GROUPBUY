@@ -247,6 +247,14 @@ function OrderCard({
   const [confirmSaveDelivery, setConfirmSaveDelivery] = useState(false);
   const [confirmInvoice, setConfirmInvoice] = useState(false);
   const [confirmMarkRemittance, setConfirmMarkRemittance] = useState(false);
+  // Add Item form state
+  const [showAddItem, setShowAddItem] = useState(false);
+  const [newItemName, setNewItemName] = useState("");
+  const [newItemCut, setNewItemCut] = useState("");
+  const [newItemQty, setNewItemQty] = useState("1");
+  const [newItemPrice, setNewItemPrice] = useState("");
+  const [newItemUnit, setNewItemUnit] = useState("/ kg");
+  const [newItemNote, setNewItemNote] = useState("");
   const [confirmMarkPaid, setConfirmMarkPaid] = useState(false);
   const [confirmMarkInProgress, setConfirmMarkInProgress] = useState(false);
   const [confirmMarkPickupAvailable, setConfirmMarkPickupAvailable] = useState(false);
@@ -492,7 +500,7 @@ Here's how to lock it in:
                 return (
                   <React.Fragment key={idx}>
                   <div
-                    className="grid grid-cols-[1fr_auto_auto_auto] gap-3 items-center text-[12px]"
+                    className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-3 items-center text-[12px]"
                   >
                     {/* Item name */}
                     <div>
@@ -529,6 +537,20 @@ Here's how to lock it in:
                     <span className="font-mono-brand text-[#f5f2ec] text-right font-bold">
                       {"$"}{lineTotal.toFixed(2)}
                     </span>
+
+                    {/* Remove item button */}
+                    <button
+                      type="button"
+                      title="Remove item"
+                      className="text-[#8a857c] hover:text-[#c73e3a] transition-colors"
+                      onClick={() => {
+                        const updated = items.filter((_, i) => i !== idx);
+                        setItems(updated);
+                        updateItems.mutate({ id: order.id, items: updated });
+                      }}
+                    >
+                      <X size={12} />
+                    </button>
                   </div>
                   {/* Per-item customer request note */}
                   {item.note && (
@@ -541,6 +563,138 @@ Here's how to lock it in:
                 );
               })}
             </div>
+
+            {/* Add Item form */}
+            {showAddItem ? (
+              <div className="mt-3 border border-white/15 bg-white/3 p-4 space-y-3">
+                <p className="font-display text-[10px] tracking-widest text-[#8a857c]">ADD ITEM</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="font-display text-[9px] tracking-widest text-[#8a857c] block mb-1">NAME *</label>
+                    <input
+                      type="text"
+                      value={newItemName}
+                      onChange={(e) => setNewItemName(e.target.value)}
+                      placeholder="e.g. Wagyu Ribeye"
+                      className="w-full bg-transparent border border-white/15 text-[#f5f2ec] font-mono-brand text-[11px] px-2 py-1.5 focus:outline-none focus:border-[#c73e3a]/60"
+                    />
+                  </div>
+                  <div>
+                    <label className="font-display text-[9px] tracking-widest text-[#8a857c] block mb-1">CUT / DESCRIPTION</label>
+                    <input
+                      type="text"
+                      value={newItemCut}
+                      onChange={(e) => setNewItemCut(e.target.value)}
+                      placeholder="e.g. MS7+"
+                      className="w-full bg-transparent border border-white/15 text-[#f5f2ec] font-mono-brand text-[11px] px-2 py-1.5 focus:outline-none focus:border-[#c73e3a]/60"
+                    />
+                  </div>
+                  <div>
+                    <label className="font-display text-[9px] tracking-widest text-[#8a857c] block mb-1">QTY *</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.001"
+                      value={newItemQty}
+                      onChange={(e) => setNewItemQty(e.target.value)}
+                      className="w-full bg-transparent border border-white/15 text-[#f5f2ec] font-mono-brand text-[11px] px-2 py-1.5 focus:outline-none focus:border-[#c73e3a]/60"
+                    />
+                  </div>
+                  <div>
+                    <label className="font-display text-[9px] tracking-widest text-[#8a857c] block mb-1">PRICE *</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={newItemPrice}
+                      onChange={(e) => setNewItemPrice(e.target.value)}
+                      placeholder="e.g. 42.00"
+                      className="w-full bg-transparent border border-white/15 text-[#f5f2ec] font-mono-brand text-[11px] px-2 py-1.5 focus:outline-none focus:border-[#c73e3a]/60"
+                    />
+                  </div>
+                  <div>
+                    <label className="font-display text-[9px] tracking-widest text-[#8a857c] block mb-1">UNIT</label>
+                    <input
+                      type="text"
+                      value={newItemUnit}
+                      onChange={(e) => setNewItemUnit(e.target.value)}
+                      placeholder="e.g. / kg"
+                      className="w-full bg-transparent border border-white/15 text-[#f5f2ec] font-mono-brand text-[11px] px-2 py-1.5 focus:outline-none focus:border-[#c73e3a]/60"
+                    />
+                  </div>
+                  <div>
+                    <label className="font-display text-[9px] tracking-widest text-[#8a857c] block mb-1">NOTE (OPTIONAL)</label>
+                    <input
+                      type="text"
+                      value={newItemNote}
+                      onChange={(e) => setNewItemNote(e.target.value)}
+                      placeholder="e.g. Extra trim please"
+                      className="w-full bg-transparent border border-white/15 text-[#f5f2ec] font-mono-brand text-[11px] px-2 py-1.5 focus:outline-none focus:border-[#c73e3a]/60"
+                    />
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    className="font-display text-[10px] tracking-widest bg-[#c73e3a] hover:bg-[#a83330] text-white"
+                    disabled={!newItemName.trim() || !newItemPrice || !newItemQty || updateItems.isPending}
+                    onClick={() => {
+                      const newItem: OrderItem = {
+                        id: Date.now(),
+                        name: newItemName.trim(),
+                        cut: newItemCut.trim(),
+                        qty: parseFloat(newItemQty) || 1,
+                        price: parseFloat(newItemPrice).toFixed(2),
+                        unit: newItemUnit.trim() || "/ kg",
+                        ...(newItemNote.trim() ? { note: newItemNote.trim() } : {}),
+                      };
+                      const updated = [...items, newItem];
+                      setItems(updated);
+                      updateItems.mutate({ id: order.id, items: updated }, {
+                        onSuccess: () => {
+                          toast.success("Item added");
+                          setShowAddItem(false);
+                          setNewItemName("");
+                          setNewItemCut("");
+                          setNewItemQty("1");
+                          setNewItemPrice("");
+                          setNewItemUnit("/ kg");
+                          setNewItemNote("");
+                        },
+                        onError: () => toast.error("Failed to add item"),
+                      });
+                    }}
+                  >
+                    {updateItems.isPending ? "Saving…" : "Add Item"}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="font-display text-[10px] tracking-widest text-[#8a857c] hover:text-[#f5f2ec]"
+                    onClick={() => {
+                      setShowAddItem(false);
+                      setNewItemName("");
+                      setNewItemCut("");
+                      setNewItemQty("1");
+                      setNewItemPrice("");
+                      setNewItemUnit("/ kg");
+                      setNewItemNote("");
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <Button
+                size="sm"
+                variant="outline"
+                className="mt-3 font-display text-[10px] tracking-widest border-white/20 text-[#f5f2ec] hover:bg-white/10 gap-1.5"
+                onClick={() => setShowAddItem(true)}
+              >
+                <span className="text-[#c73e3a] font-bold">+</span> Add Item
+              </Button>
+            )}
 
             <AlertDialog open={confirmSaveWeights} onOpenChange={setConfirmSaveWeights}>
               <AlertDialogTrigger asChild>
