@@ -718,18 +718,11 @@ function generatePackingSlipPDF(order: PaidOrder): Promise<Buffer> {
       .text("GROUPBUY — Packing Slip", { align: "left" });
 
     doc
-      .font("Helvetica")
-      .fontSize(9)
-      .fillColor("#666666")
-      .text(`Generated: ${dateGenerated}`, { align: "left" })
-      .moveDown(0.6);
-
-    doc
       .moveTo(50, doc.y).lineTo(545, doc.y)
       .strokeColor("#000000").lineWidth(1.5).stroke();
     doc.moveDown(0.8);
 
-    // ── Customer details ──────────────────────────────────────────────────────
+    // ── Customer details ───────────────────────────────────────────────────
     doc.font("Helvetica-Bold").fontSize(11).fillColor("#000000").text("Customer Details");
     doc.moveDown(0.3);
 
@@ -740,9 +733,6 @@ function generatePackingSlipPDF(order: PaidOrder): Promise<Buffer> {
     ];
     if (order.location.toLowerCase() === "delivery" && order.deliveryAddress) {
       details.push(["Delivery Address", order.deliveryAddress]);
-    }
-    if (order.pickupDate) {
-      details.push(["Pickup Date", order.pickupDate]);
     }
     if (order.specialInstructions) {
       details.push(["Special Instructions", order.specialInstructions]);
@@ -928,14 +918,10 @@ function generateAllPackingSlipsPDF(orders: PaidOrder[]): Promise<Buffer> {
       doc
         .font("Helvetica-Bold").fontSize(20).fillColor("#000000")
         .text("GROUPBUY \u2014 Packing Slip", { align: "left" });
-      doc
-        .font("Helvetica").fontSize(9).fillColor("#666666")
-        .text(`Generated: ${dateGenerated}`, { align: "left" })
-        .moveDown(0.6);
       doc.moveTo(50, doc.y).lineTo(545, doc.y).strokeColor("#000000").lineWidth(1.5).stroke();
       doc.moveDown(0.8);
 
-      // ── Customer details ─────────────────────────────────────────────────────
+      // ── Customer details ───────────────────────────────────────────────────
       doc.font("Helvetica-Bold").fontSize(11).fillColor("#000000").text("Customer Details");
       doc.moveDown(0.3);
 
@@ -947,7 +933,6 @@ function generateAllPackingSlipsPDF(orders: PaidOrder[]): Promise<Buffer> {
       if (order.location.toLowerCase() === "delivery" && order.deliveryAddress) {
         details.push(["Delivery Address", order.deliveryAddress]);
       }
-      if (order.pickupDate) details.push(["Pickup Date", order.pickupDate]);
       if (order.specialInstructions) details.push(["Special Instructions", order.specialInstructions]);
 
       for (const [label, value] of details) {
