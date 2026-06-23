@@ -1302,18 +1302,34 @@ export function registerInvoiceRoutes(app: Application) {
         return `"${str.replace(/"/g, '""')}"`;
       };
 
-      const headers = ["Item Name", "Cut", "Qty Ordered"];
-      const rows: string[] = [headers.map(csvEscape).join(",")];
-
+      // Aggregate quantities by item name + cut
+      const aggregated = new Map<string, { name: string; cut: string; qty: number }>();
       for (const order of allOrders) {
         const items = parseItems(order.items);
         for (const item of items) {
-          rows.push([
-            csvEscape(item.name),
-            csvEscape(item.cut),
-            csvEscape(item.qty),
-          ].join(","));
+          const key = `${item.name}|||${item.cut ?? ""}`;
+          const existing = aggregated.get(key);
+          if (existing) {
+            existing.qty += Number(item.qty) || 0;
+          } else {
+            aggregated.set(key, { name: item.name, cut: item.cut ?? "", qty: Number(item.qty) || 0 });
+          }
         }
+      }
+
+      // Sort alphabetically by name then cut
+      const sorted = Array.from(aggregated.values()).sort((a, b) =>
+        a.name.localeCompare(b.name) || a.cut.localeCompare(b.cut)
+      );
+
+      const headers = ["Item Name", "Cut", "Total Qty Ordered"];
+      const rows: string[] = [headers.map(csvEscape).join(",")];
+      for (const item of sorted) {
+        rows.push([
+          csvEscape(item.name),
+          csvEscape(item.cut),
+          csvEscape(item.qty),
+        ].join(","));
       }
 
       const csvContent = rows.join("\r\n");
