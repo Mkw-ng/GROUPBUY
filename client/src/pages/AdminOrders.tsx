@@ -971,7 +971,7 @@ Here's how to lock it in:
                     disabled={markInProgress.isPending}
                   >
                     <Loader2 size={13} />
-                    {markInProgress.isPending ? "Saving…" : "In Progress"}
+                    {markInProgress.isPending ? "Saving…" : "Move to In Progress"}
                   </Button>
                 </AlertDialogTrigger>
                 <AlertDialogContent className="section-ink border-white/10">
@@ -990,7 +990,7 @@ Here's how to lock it in:
                         markInProgress.mutate({ id: order.id });
                       }}
                     >
-                      Mark as In Progress
+                      Move to In Progress
                     </AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
