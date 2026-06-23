@@ -349,11 +349,12 @@ export async function getActiveOrderCounts(): Promise<{
   pending: number;
   invoice_issued: number;
   paid: number;
+  in_progress: number;
   pickup_available: number;
   cancelled: number;
 }> {
   const db = await getDb();
-  if (!db) return { all: 0, pending: 0, invoice_issued: 0, paid: 0, pickup_available: 0, cancelled: 0 };
+  if (!db) return { all: 0, pending: 0, invoice_issued: 0, paid: 0, in_progress: 0, pickup_available: 0, cancelled: 0 };
   const rows = await db
     .select({ status: orders.status, cnt: count() })
     .from(orders)
@@ -366,6 +367,7 @@ export async function getActiveOrderCounts(): Promise<{
     pending: map["pending"] ?? 0,
     invoice_issued: map["invoice_issued"] ?? 0,
     paid: map["paid"] ?? 0,
+    in_progress: map["in_progress"] ?? 0,
     pickup_available: map["pickup_available"] ?? 0,
     cancelled: map["cancelled"] ?? 0,
   };
@@ -458,7 +460,7 @@ export async function updateOrderDeliveryCharge(id: number, deliveryCharge: stri
   await db.update(orders).set({ deliveryCharge }).where(eq(orders.id, id));
 }
 
-export async function updateOrderStatus(id: number, status: "pending" | "invoice_issued" | "paid" | "pickup_available" | "cancelled"): Promise<void> {
+export async function updateOrderStatus(id: number, status: "pending" | "invoice_issued" | "paid" | "in_progress" | "pickup_available" | "cancelled"): Promise<void> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   await db.update(orders).set({ status }).where(eq(orders.id, id));

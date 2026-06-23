@@ -11,6 +11,7 @@ import { Link } from "wouter";
 import {
   MessageCircle,
   CheckCircle2,
+  Loader2,
   Trash2,
   Archive,
   ArchiveRestore,
@@ -66,7 +67,7 @@ interface Order {
   items: string;
   specialInstructions: string | null;
   deliveryCharge: string | null;
-  status: "pending" | "invoice_issued" | "paid" | "pickup_available" | "cancelled";
+  status: "pending" | "invoice_issued" | "paid" | "in_progress" | "pickup_available" | "cancelled";
   isPowerDrop: boolean;
   archived: boolean | null;
   customerName: string | null;
@@ -74,7 +75,7 @@ interface Order {
   createdAt: Date;
 }
 
-type StatusFilter = "all" | "pending" | "invoice_issued" | "paid" | "pickup_available" | "cancelled" | "archived";
+type StatusFilter = "all" | "pending" | "invoice_issued" | "paid" | "in_progress" | "pickup_available" | "cancelled" | "archived";
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -241,6 +242,7 @@ function OrderCard({
   const [confirmSaveDelivery, setConfirmSaveDelivery] = useState(false);
   const [confirmInvoice, setConfirmInvoice] = useState(false);
   const [confirmMarkPaid, setConfirmMarkPaid] = useState(false);
+  const [confirmMarkInProgress, setConfirmMarkInProgress] = useState(false);
   const [confirmMarkPickupAvailable, setConfirmMarkPickupAvailable] = useState(false);
   const [confirmFinalCall, setConfirmFinalCall] = useState(false);
   const defaultOpening = order.isPowerDrop
@@ -313,6 +315,14 @@ Here's how to lock it in:
       onRefresh();
     },
     onError: () => toast.error("Failed to mark as paid"),
+  });
+
+  const markInProgress = trpc.admin.orders.markInProgress.useMutation({
+    onSuccess: () => {
+      toast.success("Order marked as In Progress ✓");
+      onRefresh();
+    },
+    onError: () => toast.error("Failed to update order status"),
   });
 
   const markPickupAvailable = trpc.admin.orders.markPickupAvailable.useMutation({
@@ -389,6 +399,7 @@ Here's how to lock it in:
     pending: "bg-amber-500/20 text-amber-400 border-amber-500/30",
     invoice_issued: "bg-blue-500/20 text-blue-300 border-blue-500/30",
     paid: "bg-green-500/20 text-green-400 border-green-500/30",
+    in_progress: "bg-orange-500/20 text-orange-300 border-orange-500/30",
     pickup_available: "bg-purple-500/20 text-purple-300 border-purple-500/30",
     cancelled: "bg-red-500/20 text-red-400 border-red-500/30",
   };
@@ -397,6 +408,7 @@ Here's how to lock it in:
     pending: <Clock size={11} />,
     invoice_issued: <MessageCircle size={11} />,
     paid: <CheckCircle2 size={11} />,
+    in_progress: <Loader2 size={11} />,
     pickup_available: <Package size={11} />,
     cancelled: <Ban size={11} />,
   };
@@ -949,8 +961,44 @@ Here's how to lock it in:
               </AlertDialogContent>
             </AlertDialog>
 
-            {/* Mark as Pick up Available */}
+            {/* Mark as In Progress */}
             {order.status === "paid" && (
+              <AlertDialog open={confirmMarkInProgress} onOpenChange={setConfirmMarkInProgress}>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    size="sm"
+                    className="font-display text-[10px] tracking-widest bg-orange-700 hover:bg-orange-600 text-white gap-1.5"
+                    disabled={markInProgress.isPending}
+                  >
+                    <Loader2 size={13} />
+                    {markInProgress.isPending ? "Saving…" : "In Progress"}
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent className="section-ink border-white/10">
+                  <AlertDialogHeader>
+                    <AlertDialogTitle className="font-display tracking-widest text-[#f5f2ec]">Mark order as In Progress?</AlertDialogTitle>
+                    <AlertDialogDescription className="font-mono-brand text-[#8a857c]">
+                      Order #{order.phone} will be moved to the In Progress tab. Use this to indicate the order is being prepared.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel className="font-display text-[10px] tracking-widest">Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      className="font-display text-[10px] tracking-widest bg-orange-700 hover:bg-orange-600"
+                      onClick={() => {
+                        setConfirmMarkInProgress(false);
+                        markInProgress.mutate({ id: order.id });
+                      }}
+                    >
+                      Mark as In Progress
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
+
+            {/* Mark as Pick up Available */}
+            {(order.status === "paid" || order.status === "in_progress") && (
               <AlertDialog open={confirmMarkPickupAvailable} onOpenChange={setConfirmMarkPickupAvailable}>
                 <AlertDialogTrigger asChild>
                   <Button
@@ -1445,6 +1493,7 @@ export default function AdminOrders() {
     pending: serverCounts?.pending ?? allOrders.filter((o) => o.status === "pending").length,
     invoice_issued: serverCounts?.invoice_issued ?? allOrders.filter((o) => o.status === "invoice_issued").length,
     paid: serverCounts?.paid ?? allOrders.filter((o) => o.status === "paid").length,
+    in_progress: serverCounts?.in_progress ?? allOrders.filter((o) => o.status === "in_progress").length,
     pickup_available: serverCounts?.pickup_available ?? allOrders.filter((o) => o.status === "pickup_available").length,
     cancelled: serverCounts?.cancelled ?? allOrders.filter((o) => o.status === "cancelled").length,
     archived: allArchived.length,
@@ -1457,6 +1506,7 @@ export default function AdminOrders() {
     { key: "pending", label: "Pending" },
     { key: "invoice_issued", label: "Invoice Issued" },
     { key: "paid", label: "Paid" },
+    { key: "in_progress", label: "In Progress" },
     { key: "pickup_available", label: "Pick up Available" },
     { key: "cancelled", label: "Cancelled" },
     { key: "archived", label: "Archived" },

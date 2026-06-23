@@ -496,6 +496,13 @@ export const appRouter = router({
           return { success: true };
         }),
 
+      markInProgress: adminProcedure
+        .input(z.object({ id: z.number() }))
+        .mutation(async ({ input }) => {
+          await updateOrderStatus(input.id, "in_progress");
+          return { success: true };
+        }),
+
       markPickupAvailable: adminProcedure
         .input(z.object({ id: z.number() }))
         .mutation(async ({ input }) => {
