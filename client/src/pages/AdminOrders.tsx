@@ -67,7 +67,7 @@ interface Order {
   items: string;
   specialInstructions: string | null;
   deliveryCharge: string | null;
-  status: "pending" | "invoice_issued" | "paid" | "in_progress" | "pickup_available" | "cancelled";
+  status: "pending" | "invoice_issued" | "paid" | "in_progress" | "pickup_available" | "cancelled"; // cancelled kept for DB compat
   isPowerDrop: boolean;
   archived: boolean | null;
   customerName: string | null;
@@ -75,7 +75,7 @@ interface Order {
   createdAt: Date;
 }
 
-type StatusFilter = "all" | "pending" | "invoice_issued" | "paid" | "in_progress" | "pickup_available" | "cancelled" | "archived";
+type StatusFilter = "all" | "pending" | "invoice_issued" | "paid" | "in_progress" | "pickup_available" | "archived";
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -337,14 +337,6 @@ Here's how to lock it in:
     onError: () => toast.error("Failed to update order status"),
   });
 
-  const cancelOrder = trpc.admin.orders.cancel.useMutation({
-    onSuccess: () => {
-      toast.success("Order cancelled");
-      onRefresh();
-    },
-    onError: () => toast.error("Failed to cancel order"),
-  });
-
   const deleteOrder = trpc.admin.orders.delete.useMutation({
     onSuccess: () => {
       toast.success("Order deleted");
@@ -405,7 +397,6 @@ Here's how to lock it in:
     paid: "bg-green-500/20 text-green-400 border-green-500/30",
     in_progress: "bg-orange-500/20 text-orange-300 border-orange-500/30",
     pickup_available: "bg-purple-500/20 text-purple-300 border-purple-500/30",
-    cancelled: "bg-red-500/20 text-red-400 border-red-500/30",
   };
 
   const statusIcons: Record<string, React.ReactNode> = {
@@ -414,7 +405,6 @@ Here's how to lock it in:
     paid: <CheckCircle2 size={11} />,
     in_progress: <Loader2 size={11} />,
     pickup_available: <Package size={11} />,
-    cancelled: <Ban size={11} />,
   };
 
   const createdDate = new Date(order.createdAt).toLocaleDateString("en-AU", {
@@ -809,7 +799,7 @@ Here's how to lock it in:
             </AlertDialog>
 
             {/* Final Call reminder */}
-            {order.status !== "paid" && order.status !== "cancelled" && (
+            {order.status !== "paid" && (
               <AlertDialog open={confirmFinalCall} onOpenChange={setConfirmFinalCall}>
                 <AlertDialogTrigger asChild>
                   <Button
@@ -848,7 +838,7 @@ Here's how to lock it in:
               </AlertDialog>
             )}
             {/* Mark as Paid */}
-            {order.status !== "paid" && order.status !== "cancelled" && (
+            {order.status !== "paid" && (
               <AlertDialog open={confirmMarkPaid} onOpenChange={setConfirmMarkPaid}>
                 <AlertDialogTrigger asChild>
                   <Button
@@ -1049,8 +1039,8 @@ Here's how to lock it in:
               {downloadingSlip ? "Generating…" : "Packing Slip"}
             </Button>
 
-            {/* Cancel Order */}
-            {order.status === "pending" && (
+            {/* Cancel Order removed */}
+            {false && (
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button
@@ -1104,7 +1094,7 @@ Here's how to lock it in:
                     </AlertDialogCancel>
                     <AlertDialogAction
                       className="font-display text-[10px] tracking-widest bg-amber-600 hover:bg-amber-500"
-                      onClick={() => cancelOrder.mutate({ id: order.id })}
+                      onClick={() => {}}
                     >
                       Cancel Order
                     </AlertDialogAction>
@@ -1144,7 +1134,7 @@ Here's how to lock it in:
                     Archive this order?
                   </AlertDialogTitle>
                   <AlertDialogDescription className="font-mono-brand text-[#8a857c]">
-                    Order #{order.phone} will be hidden from the active tabs (All, Pending, Paid, Cancelled) but kept for analytics. You can restore it from the Archived tab.
+                    Order #{order.phone} will be hidden from the active tabs but kept for analytics. You can restore it from the Archived tab.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -1499,7 +1489,6 @@ export default function AdminOrders() {
     paid: serverCounts?.paid ?? allOrders.filter((o) => o.status === "paid").length,
     in_progress: serverCounts?.in_progress ?? allOrders.filter((o) => o.status === "in_progress").length,
     pickup_available: serverCounts?.pickup_available ?? allOrders.filter((o) => o.status === "pickup_available").length,
-    cancelled: serverCounts?.cancelled ?? allOrders.filter((o) => o.status === "cancelled").length,
     archived: allArchived.length,
   };
   // No longer needed — counts come from the server
@@ -1512,7 +1501,6 @@ export default function AdminOrders() {
     { key: "paid", label: "Paid" },
     { key: "in_progress", label: "In Progress" },
     { key: "pickup_available", label: "Pick up Available" },
-    { key: "cancelled", label: "Cancelled" },
     { key: "archived", label: "Archived" },
   ];
   const sortedFiltered = (() => {
