@@ -13,6 +13,7 @@ import {
   getOrdersPage,
   updateOrderItems,
   updateOrderPhone,
+  updateOrderLocation,
   updateOrderDeliveryCharge,
   updateOrderStatus,
   deleteOrder,
@@ -480,6 +481,17 @@ export const appRouter = router({
         .input(z.object({ id: z.number(), phone: z.string().min(1) }))
         .mutation(async ({ input }) => {
           await updateOrderPhone(input.id, input.phone);
+          return { success: true };
+        }),
+
+      updateLocation: adminProcedure
+        .input(z.object({
+          id: z.number(),
+          location: z.string().min(1),
+          deliveryAddress: z.string().optional(),
+        }))
+        .mutation(async ({ input }) => {
+          await updateOrderLocation(input.id, input.location, input.deliveryAddress ?? null);
           return { success: true };
         }),
 

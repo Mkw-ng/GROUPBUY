@@ -490,6 +490,12 @@ export async function updateOrderPhone(id: number, phone: string): Promise<void>
   await db.update(orders).set({ phone }).where(eq(orders.id, id));
 }
 
+export async function updateOrderLocation(id: number, location: string, deliveryAddress: string | null): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(orders).set({ location, deliveryAddress }).where(eq(orders.id, id));
+}
+
 export async function updateOrderDeliveryCharge(id: number, deliveryCharge: string): Promise<void> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");

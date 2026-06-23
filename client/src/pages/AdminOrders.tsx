@@ -223,6 +223,9 @@ function OrderCard({
   const [deliveryCharge, setDeliveryCharge] = useState(order.deliveryCharge ?? "0");
   const [editPhone, setEditPhone] = useState(order.phone);
   const [editingPhone, setEditingPhone] = useState(false);
+  const [editLocation, setEditLocation] = useState(order.location);
+  const [editDeliveryAddress, setEditDeliveryAddress] = useState(order.deliveryAddress ?? "");
+  const [editingLocation, setEditingLocation] = useState(false);
   const [specialInstructions, setSpecialInstructions] = useState(order.specialInstructions ?? "");
   const [editingInstructions, setEditingInstructions] = useState(false);
   const updateSpecialInstructions = trpc.admin.orders.updateSpecialInstructions.useMutation({
@@ -232,6 +235,15 @@ function OrderCard({
       onRefresh();
     },
     onError: () => toast.error("Failed to save special instructions"),
+  });
+
+  const updateLocation = trpc.admin.orders.updateLocation.useMutation({
+    onSuccess: () => {
+      toast.success("Location updated");
+      setEditingLocation(false);
+      onRefresh();
+    },
+    onError: () => toast.error("Failed to update location"),
   });
 
   const updatePhone = trpc.admin.orders.updatePhone.useMutation({
@@ -794,6 +806,66 @@ Here's how to lock it in:
                   )}
                 </span>
                 <span className="font-mono-brand text-[10px] text-[#8a857c] group-hover:text-[#c73e3a] shrink-0">✎</span>
+              </div>
+            )}
+          </div>
+
+          {/* Location / Delivery Address — editable */}
+          <div>
+            <p className="font-display text-[10px] tracking-widest text-[#8a857c] mb-2">
+              LOCATION
+            </p>
+            {editingLocation ? (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <select
+                    value={editLocation}
+                    onChange={(e) => setEditLocation(e.target.value)}
+                    className="flex-1 bg-[#1a1a1a] border border-white/15 text-[#f5f2ec] font-mono-brand text-[12px] px-3 py-2 focus:outline-none focus:border-[#c73e3a]/60"
+                  >
+                    <option value="cranbourne">Cranbourne</option>
+                    <option value="clayton">Clayton</option>
+                    <option value="delivery">Delivery</option>
+                  </select>
+                </div>
+                {editLocation === "delivery" && (
+                  <input
+                    type="text"
+                    value={editDeliveryAddress}
+                    onChange={(e) => setEditDeliveryAddress(e.target.value)}
+                    placeholder="Delivery address"
+                    className="w-full bg-transparent border border-white/15 text-[#f5f2ec] font-mono-brand text-[12px] px-3 py-2 focus:outline-none focus:border-[#c73e3a]/60"
+                  />
+                )}
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="font-display text-[10px] tracking-widest border-white/20 text-[#f5f2ec] hover:bg-white/10"
+                    disabled={updateLocation.isPending || (editLocation === "delivery" && !editDeliveryAddress.trim())}
+                    onClick={() => updateLocation.mutate({ id: order.id, location: editLocation, deliveryAddress: editLocation === "delivery" ? editDeliveryAddress.trim() : undefined })}
+                  >
+                    {updateLocation.isPending ? "Saving…" : "Save"}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="font-display text-[10px] tracking-widest text-[#8a857c] hover:text-[#f5f2ec]"
+                    onClick={() => { setEditLocation(order.location); setEditDeliveryAddress(order.deliveryAddress ?? ""); setEditingLocation(false); }}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div
+                className="flex items-center gap-2 cursor-pointer group"
+                onClick={() => setEditingLocation(true)}
+              >
+                <span className="font-mono-brand text-[12px] text-[#f5f2ec]/80 group-hover:text-[#f5f2ec]">
+                  {locationLabel(editLocation, editLocation === "delivery" ? editDeliveryAddress || null : null)}
+                </span>
+                <span className="font-mono-brand text-[10px] text-[#8a857c] group-hover:text-[#c73e3a]">✎</span>
               </div>
             )}
           </div>
