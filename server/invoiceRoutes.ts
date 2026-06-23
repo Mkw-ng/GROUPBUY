@@ -858,6 +858,25 @@ function generatePackingSlipPDF(order: PaidOrder): Promise<Buffer> {
     doc.font("Helvetica-Bold").fontSize(10).fillColor("#000000")
       .text(`Total: $${grandTotal.toFixed(2)}`, LEFT, rowY, { align: "right", width: 495 });
 
+    // ── Staff Input Section ───────────────────────────────────────────────────
+    const staffY = rowY + 36;
+    doc.moveTo(LEFT, staffY).lineTo(545, staffY).strokeColor("#cccccc").lineWidth(0.75).stroke();
+    doc.font("Helvetica-Bold").fontSize(11).fillColor("#000000")
+      .text("Staff Input", LEFT, staffY + 8);
+
+    const FIELD_TOP = staffY + 28;
+    const FIELD_W = 130;
+    const FIELD_H = 28;
+    const FIELD_GAP = 20;
+    const fields = ["Bag Quantity:", "Box Quantity:", "Freezer Quantity:"];
+    let fx = LEFT;
+    for (const label of fields) {
+      doc.font("Helvetica").fontSize(9).fillColor("#333333").text(label, fx, FIELD_TOP);
+      const boxY = FIELD_TOP + 14;
+      doc.rect(fx, boxY, FIELD_W, FIELD_H).strokeColor("#000000").lineWidth(0.8).stroke();
+      fx += FIELD_W + FIELD_GAP;
+    }
+
     doc.end();
   });
 }
@@ -1008,6 +1027,25 @@ function generateAllPackingSlipsPDF(orders: PaidOrder[]): Promise<Buffer> {
       }
       doc.font("Helvetica-Bold").fontSize(10).fillColor("#000000")
         .text(`Total: $${grandTotal.toFixed(2)}`, LEFT, totY, { align: "right", width: 495 });
+
+      // ── Staff Input Section ────────────────────────────────────────────
+      const staffY = totY + 36;
+      doc.moveTo(LEFT, staffY).lineTo(545, staffY).strokeColor("#cccccc").lineWidth(0.75).stroke();
+      doc.font("Helvetica-Bold").fontSize(11).fillColor("#000000")
+        .text("Staff Input", LEFT, staffY + 8);
+
+      const FIELD_TOP = staffY + 28;
+      const FIELD_W = 130;
+      const FIELD_H = 28;
+      const FIELD_GAP = 20;
+      const staffFields = ["Bag Quantity:", "Box Quantity:", "Freezer Quantity:"];
+      let sfx = LEFT;
+      for (const label of staffFields) {
+        doc.font("Helvetica").fontSize(9).fillColor("#333333").text(label, sfx, FIELD_TOP);
+        const boxY = FIELD_TOP + 14;
+        doc.rect(sfx, boxY, FIELD_W, FIELD_H).strokeColor("#000000").lineWidth(0.8).stroke();
+        sfx += FIELD_W + FIELD_GAP;
+      }
     }
 
     doc.end();
