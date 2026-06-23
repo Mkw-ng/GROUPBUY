@@ -655,8 +655,8 @@ function generatePackingSheetCSV(orders: PaidOrder[]): string {
     "Cut",
     "Final Weight/Qty",
     "Unit",
-    "Special Instructions",
     "Item Request/Note",
+    "Special Instructions",
   ];
 
   const rows: string[] = [headers.map(csvEscape).join(",")];
@@ -684,8 +684,8 @@ function generatePackingSheetCSV(orders: PaidOrder[]): string {
         csvEscape(item.cut),
         csvEscape(displayFinalQty),
         csvEscape(item.unit),
-        csvEscape(order.specialInstructions),
         csvEscape(item.note ?? ""),
+        csvEscape(order.specialInstructions),
       ];
       rows.push(row.join(","));
     }
