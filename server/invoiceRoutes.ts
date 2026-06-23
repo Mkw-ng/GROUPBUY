@@ -653,9 +653,8 @@ function generatePackingSheetCSV(orders: PaidOrder[]): string {
     "Delivery Address",
     "Item Name",
     "Cut",
-    "Quantity Ordered",
-    "Unit",
     "Final Weight/Qty",
+    "Unit",
     "Special Instructions",
     "Item Request/Note",
   ];
@@ -683,9 +682,8 @@ function generatePackingSheetCSV(orders: PaidOrder[]): string {
         csvEscape(order.deliveryAddress),
         csvEscape(item.name),
         csvEscape(item.cut),
-        csvEscape(item.qty),
-        csvEscape(item.unit),
         csvEscape(displayFinalQty),
+        csvEscape(item.unit),
         csvEscape(order.specialInstructions),
         csvEscape(item.note ?? ""),
       ];
