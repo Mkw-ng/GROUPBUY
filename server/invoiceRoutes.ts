@@ -10,7 +10,7 @@ import { Router } from "express";
 import type { Application } from "express";
 import PDFDocument from "pdfkit";
 import { sdk } from "./_core/sdk";
-import { getAllPaidActiveOrders } from "./db";
+import { getAllPaidActiveOrders, getAllPickupAvailableActiveOrders } from "./db";
 
 interface OrderItem {
   id: number;
@@ -1217,11 +1217,11 @@ export function registerInvoiceRoutes(app: Application) {
         return;
       }
 
-      // Fetch all paid orders
-      const paidOrders = (await getAllPaidActiveOrders()) as PaidOrder[];
+      // Fetch all pickup_available orders
+      const paidOrders = (await getAllPickupAvailableActiveOrders()) as PaidOrder[];
 
       if (paidOrders.length === 0) {
-        res.status(404).json({ error: "No paid orders found" });
+        res.status(404).json({ error: "No pickup available orders found" });
         return;
       }
 

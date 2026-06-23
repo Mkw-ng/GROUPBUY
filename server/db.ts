@@ -340,6 +340,16 @@ export async function getAllPaidActiveOrders(): Promise<(typeof orders.$inferSel
     .orderBy(asc(orders.createdAt));
 }
 
+export async function getAllPickupAvailableActiveOrders(): Promise<(typeof orders.$inferSelect)[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(orders)
+    .where(and(eq(orders.archived, false), eq(orders.status, "pickup_available")))
+    .orderBy(asc(orders.createdAt));
+}
+
 /**
  * Returns accurate counts for active (non-archived) orders by status.
  * Used by the admin UI so filter tab counts are never capped by pagination.
