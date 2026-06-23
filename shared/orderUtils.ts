@@ -7,10 +7,11 @@ export interface OrderLineItem {
 
 export function calcLineItemTotal(item: OrderLineItem): number {
   const price = parseFloat(item.price) || 0;
-  const isKg = (item.unit || "").toLowerCase().includes("kg");
-  const weight = parseFloat(item.finalWeightKg || "") || 0;
-  if (isKg && weight > 0) return price * weight;
-  if (isKg) return price * item.qty;
+  const hasOverride = item.finalWeightKg !== undefined && item.finalWeightKg !== null && item.finalWeightKg !== "";
+  if (hasOverride) {
+    const weight = parseFloat(item.finalWeightKg!) || 0;
+    return price * weight;
+  }
   return price * item.qty;
 }
 

@@ -574,10 +574,11 @@ function generateItemsOrderedPDF(orders: PaidOrder[]): Promise<Buffer> {
 
         // One line per customer — includes special instructions when present
         for (const li of productItems) {
-          const weight = parseFloat(li.finalWeightKg || "") || 0;
+          const hasOvr = li.finalWeightKg !== undefined && li.finalWeightKg !== null && li.finalWeightKg !== "";
+          const weight = hasOvr ? (parseFloat(li.finalWeightKg!) || 0) : null;
           const isKg = (li.unit || "").toLowerCase().includes("kg");
           let qtyStr: string;
-          if (weight > 0) {
+          if (weight !== null) {
             qtyStr = `${weight.toFixed(1)} kg`;
           } else if (isKg) {
             qtyStr = `${li.qty} kg`;
@@ -803,13 +804,14 @@ function generatePackingSlipPDF(order: PaidOrder): Promise<Buffer> {
 
     for (const item of items) {
       const price = parseFloat(item.price) || 0;
-      const weight = parseFloat(item.finalWeightKg || "") || 0;
+      const hasWtOverride = item.finalWeightKg !== undefined && item.finalWeightKg !== null && item.finalWeightKg !== "";
+      const weight = hasWtOverride ? (parseFloat(item.finalWeightKg!) || 0) : null;
       const isKg = (item.unit || "").toLowerCase().includes("kg");
-      const finalQty = weight > 0 ? weight : item.qty;
-      const lineTotal = weight > 0 ? weight * price : item.qty * price;
+      const finalQty = weight !== null ? weight : item.qty;
+      const lineTotal = weight !== null ? weight * price : item.qty * price;
       const itemLabel = item.cut ? `${item.name} — ${item.cut}` : item.name;
       const orderedStr = `${item.qty}${item.unit ? ` ${item.unit}` : ""}`;
-      const finalStr = weight > 0 ? `${weight.toFixed(2)} kg` : (isKg ? `${finalQty} kg` : `${finalQty}`);
+      const finalStr = weight !== null ? `${weight.toFixed(2)} kg` : (isKg ? `${finalQty} kg` : `${finalQty}`);
 
       // Row border
       doc.rect(LEFT, rowY, 495, ROW_H).strokeColor("#cccccc").lineWidth(0.4).stroke();
@@ -958,13 +960,14 @@ function generateAllPackingSlipsPDF(orders: PaidOrder[]): Promise<Buffer> {
 
       for (const item of items) {
         const price = parseFloat(item.price) || 0;
-        const weight = parseFloat(item.finalWeightKg || "") || 0;
+        const hasWtOvr = item.finalWeightKg !== undefined && item.finalWeightKg !== null && item.finalWeightKg !== "";
+        const weight = hasWtOvr ? (parseFloat(item.finalWeightKg!) || 0) : null;
         const isKg = (item.unit || "").toLowerCase().includes("kg");
-        const finalQty = weight > 0 ? weight : item.qty;
-        const lineTotal = weight > 0 ? weight * price : item.qty * price;
-        const itemLabel = item.cut ? `${item.name} \u2014 ${item.cut}` : item.name;
+        const finalQty = weight !== null ? weight : item.qty;
+        const lineTotal = weight !== null ? weight * price : item.qty * price;
+        const itemLabel = item.cut ? `${item.name} — ${item.cut}` : item.name;
         const orderedStr = `${item.qty}${item.unit ? ` ${item.unit}` : ""}`;
-        const finalStr = weight > 0 ? `${weight.toFixed(2)} kg` : (isKg ? `${finalQty} kg` : `${finalQty}`);
+        const finalStr = weight !== null ? `${weight.toFixed(2)} kg` : (isKg ? `${finalQty} kg` : `${finalQty}`);
 
         doc.rect(LEFT, rowY, 495, ROW_H).strokeColor("#cccccc").lineWidth(0.4).stroke();
         doc.rect(LEFT + 4, rowY + 5, 12, 12).strokeColor("#000000").lineWidth(0.8).stroke();

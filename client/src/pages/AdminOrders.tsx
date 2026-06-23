@@ -96,9 +96,12 @@ function locationLabel(location: string, address: string | null): string {
 
 function calcItemTotal(item: OrderItem): number {
   const price = parseFloat(item.price) || 0;
-  const weight = parseFloat(item.finalWeightKg || "") || 0;
-  // If a final weight/qty override is entered, use it; otherwise fall back to ordered qty
-  if (weight > 0) return price * weight;
+  // If a final weight/qty override is entered (including 0), use it; otherwise fall back to ordered qty
+  const hasOverride = item.finalWeightKg !== undefined && item.finalWeightKg !== null && item.finalWeightKg !== "";
+  if (hasOverride) {
+    const weight = parseFloat(item.finalWeightKg!) || 0;
+    return price * weight;
+  }
   return price * item.qty;
 }
 
@@ -117,11 +120,12 @@ function buildInvoiceMessage(
   const itemLines = items.map((item) => {
     const price = parseFloat(item.price) || 0;
     const isPerKg = item.unit?.toLowerCase().includes("kg");
-    const weight = parseFloat(item.finalWeightKg || "") || 0;
+    const hasOverride = item.finalWeightKg !== undefined && item.finalWeightKg !== null && item.finalWeightKg !== "";
+    const weight = hasOverride ? (parseFloat(item.finalWeightKg!) || 0) : null;
     const total = calcItemTotal(item);
-    // Use final entered value if set; otherwise fall back to original ordered qty
-    const finalVal = weight > 0 ? weight : item.qty;
-    const unit = isPerKg && weight > 0 ? "kg" : "";
+    // Use final entered value if set (including 0); otherwise fall back to original ordered qty
+    const finalVal = weight !== null ? weight : item.qty;
+    const unit = isPerKg && weight !== null ? "kg" : "";
     const weightStr = ` × ${finalVal}${unit}`;
     return `${item.name}${weightStr} @ $${price.toFixed(2)}${item.unit} = *$${total.toFixed(2)}*`;
   });
