@@ -338,7 +338,7 @@ function generateScheduleListPDF(orders: PaidOrder[]): Promise<Buffer> {
       const textY = y + 4;
       doc.font("Helvetica-Bold").fontSize(8).fillColor("#000000");
       doc.text("Location",         x + 3,                                        textY, { width: COL_LOCATION - 6, lineBreak: false });
-      doc.text("Date",             x + COL_LOCATION + 3,                         textY, { width: COL_DATE - 6,     lineBreak: false });
+      doc.text("Invoice",          x + COL_LOCATION + 3,                         textY, { width: COL_DATE - 6,     lineBreak: false });
       doc.text("Phone Number",     x + COL_LOCATION + COL_DATE + 3,              textY, { width: COL_PHONE - 6,    lineBreak: false });
       doc.text("Delivery Address", x + COL_LOCATION + COL_DATE + COL_PHONE + 3,  textY, { width: COL_ADDRESS - 6,  lineBreak: false });
       doc.text("To Receive",       x + COL_LOCATION + COL_DATE + COL_PHONE + COL_ADDRESS + 3, textY, { width: COL_RECEIVE - 6, lineBreak: false });
@@ -361,7 +361,7 @@ function generateScheduleListPDF(orders: PaidOrder[]): Promise<Buffer> {
     function drawDataRow(
       y: number,
       locShort: string,
-      pickupDate: string,
+      invoiceNum: string,
       phone: string,
       address: string,
       rowHeight: number,
@@ -380,7 +380,7 @@ function generateScheduleListPDF(orders: PaidOrder[]): Promise<Buffer> {
       const textY = y + 6;
       doc.font("Helvetica").fontSize(8).fillColor("#000000");
       doc.text(locShort,    x + 3,                                       textY, { width: COL_LOCATION - 6, lineBreak: false });
-      doc.text(pickupDate,  x + COL_LOCATION + 3,                        textY, { width: COL_DATE - 6,     lineBreak: false });
+      doc.text(invoiceNum,  x + COL_LOCATION + 3,                        textY, { width: COL_DATE - 6,     lineBreak: false });
       doc.text(phone,       x + COL_LOCATION + COL_DATE + 3,             textY, { width: COL_PHONE - 6,    lineBreak: false });
       if (address) {
         doc.text(address,   x + COL_LOCATION + COL_DATE + COL_PHONE + 3, textY, { width: COL_ADDRESS - 6 });
@@ -450,7 +450,8 @@ function generateScheduleListPDF(orders: PaidOrder[]): Promise<Buffer> {
         if (order.pickupFreezerBags) unitParts.push(`${order.pickupFreezerBags} Frz Bag${order.pickupFreezerBags !== 1 ? 's' : ''}`);
         if (order.pickupFreezerBoxes) unitParts.push(`${order.pickupFreezerBoxes} Frz Box${order.pickupFreezerBoxes !== 1 ? 'es' : ''}`);
         const receiveText = unitParts.join(', ');
-        curY = drawDataRow(curY, locShort, order.pickupDate, order.phone, address, rowH, receiveText);
+        const invNum = order.invoiceNumber ?? `GB-${String(order.id).padStart(5, '0')}`;
+        curY = drawDataRow(curY, locShort, invNum, order.phone, address, rowH, receiveText);
       }
     }
 
