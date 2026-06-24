@@ -1136,7 +1136,7 @@ Here's how to lock it in:
                       This will send the following message to {order.phone}:
                     </AlertDialogDescription>
                     <div className="mt-3 bg-white/5 border border-white/10 px-4 py-3 font-mono-brand text-[12px] text-[#f5f2ec] whitespace-pre-line">
-                      {"Final Call (Just a reminder)\n\nTo lock in your GroupBuy Power-Drop order for next week.\nPayment is due by Saturday night - send through your remittance to secure it.\n\nCheers!"}
+                      {"POWERDROP FINAL CALL\n\nJust a quick reminder — the 24-hour window to lock in your GroupBuy Power-Drop order is almost up.\n\nIf you no longer require the order, no stress at all. Simply let the invoice lapse tonight and we'll catch you on the next Power-Drop\n\nIf you'd like to keep your order:\n\n1. Settle the invoice\n2. Send me a screenshot of the remittance\n\nOnce I receive the remittance, I'll get your order locked in and moved through to processing.\n\nCheers!"}
                     </div>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
@@ -1146,7 +1146,7 @@ Here's how to lock it in:
                       onClick={() => {
                         setConfirmFinalCall(false);
                         const intlPhone = order.phone.replace(/\D/g, "").replace(/^0/, "61");
-                        const msg = "Final Call (Just a reminder)\n\nTo lock in your GroupBuy Power-Drop order for next week.\nPayment is due by Saturday night - send through your remittance to secure it.\n\nCheers!";
+                        const msg = "POWERDROP FINAL CALL\n\nJust a quick reminder — the 24-hour window to lock in your GroupBuy Power-Drop order is almost up.\n\nIf you no longer require the order, no stress at all. Simply let the invoice lapse tonight and we'll catch you on the next Power-Drop\n\nIf you'd like to keep your order:\n\n1. Settle the invoice\n2. Send me a screenshot of the remittance\n\nOnce I receive the remittance, I'll get your order locked in and moved through to processing.\n\nCheers!";
                         window.open(`https://wa.me/${intlPhone}?text=${encodeURIComponent(msg)}`, "_blank");
                       }}
                     >
