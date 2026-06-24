@@ -900,13 +900,24 @@ function generatePackingSlipPDF(order: PaidOrder): Promise<Buffer> {
 
     doc.moveDown(0.5);
     const tearDetailY = tearContentY + 22;
-    doc.font("Helvetica-Bold").fontSize(10).fillColor("#333333")
+        doc.font("Helvetica-Bold").fontSize(10).fillColor("#333333")
       .text(`Invoice #: `, LEFT, tearDetailY, { continued: true, width: 495, align: "left" })
       .font("Helvetica").text(invoiceNum);
     doc.font("Helvetica-Bold").fontSize(10).fillColor("#333333")
       .text(`Phone: `, LEFT, tearDetailY + 18, { continued: true, width: 495, align: "left" })
       .font("Helvetica").text(order.phone);
-
+    // Bag/Box/Freezer input boxes in tear-off
+    const tearBoxY = tearDetailY + 44;
+    const tearBoxLabels = ["Bag Qty:", "Box Qty:", "Freezer Qty:"];
+    const tearBoxW = 80;
+    const tearBoxH = 22;
+    const tearBoxGap = 110;
+    doc.font("Helvetica-Bold").fontSize(9).fillColor("#333333");
+    tearBoxLabels.forEach((label, i) => {
+      const bx = LEFT + i * tearBoxGap;
+      doc.text(label, bx, tearBoxY, { width: tearBoxGap - 4 });
+      doc.rect(bx + 44, tearBoxY - 2, tearBoxW, tearBoxH).strokeColor("#555555").lineWidth(0.6).stroke();
+    });
     doc.end();
   });
 }
@@ -1086,14 +1097,25 @@ function generateAllPackingSlipsPDF(orders: PaidOrder[]): Promise<Buffer> {
         .text("COLLECTION RECEIPT", LEFT, tearContentY, { width: 495, align: "center" });
 
       const tearDetailY = tearContentY + 22;
-      doc.font("Helvetica-Bold").fontSize(10).fillColor("#333333")
+            doc.font("Helvetica-Bold").fontSize(10).fillColor("#333333")
         .text(`Invoice #: `, LEFT, tearDetailY, { continued: true, width: 495, align: "left" })
         .font("Helvetica").text(invoiceNum);
       doc.font("Helvetica-Bold").fontSize(10).fillColor("#333333")
         .text(`Phone: `, LEFT, tearDetailY + 18, { continued: true, width: 495, align: "left" })
         .font("Helvetica").text(order.phone);
+      // Bag/Box/Freezer input boxes in tear-off
+      const tearBoxY2 = tearDetailY + 44;
+      const tearBoxLabels2 = ["Bag Qty:", "Box Qty:", "Freezer Qty:"];
+      const tearBoxW2 = 80;
+      const tearBoxH2 = 22;
+      const tearBoxGap2 = 110;
+      doc.font("Helvetica-Bold").fontSize(9).fillColor("#333333");
+      tearBoxLabels2.forEach((label, i) => {
+        const bx = LEFT + i * tearBoxGap2;
+        doc.text(label, bx, tearBoxY2, { width: tearBoxGap2 - 4 });
+        doc.rect(bx + 44, tearBoxY2 - 2, tearBoxW2, tearBoxH2).strokeColor("#555555").lineWidth(0.6).stroke();
+      });
     }
-
     doc.end();
   });
 }
