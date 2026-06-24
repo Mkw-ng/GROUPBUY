@@ -124,7 +124,7 @@ export const orders = mysqlTable("orders", {
   specialInstructions: text("specialInstructions"),
   /** Delivery charge in dollars — admin sets this after reviewing the order */
   deliveryCharge: decimal("deliveryCharge", { precision: 10, scale: 2 }).default("0.00"),
-  status: mysqlEnum("status", ["pending", "invoice_issued", "remittance", "paid", "in_progress", "pickup_available", "cancelled"]).notNull().default("pending"),
+  status: mysqlEnum("status", ["pending", "invoice_issued", "remittance", "paid", "in_progress", "pickup_available", "completed", "cancelled"]).notNull().default("pending"),
   /** Whether this order was placed during a Power Drop event */
   isPowerDrop: boolean("isPowerDrop").notNull().default(false),
   /** FK to drops table — which drop this order belongs to (null = unassigned) */

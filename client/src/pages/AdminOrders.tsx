@@ -68,7 +68,7 @@ interface Order {
   items: string;
   specialInstructions: string | null;
   deliveryCharge: string | null;
-  status: "pending" | "invoice_issued" | "remittance" | "paid" | "in_progress" | "pickup_available" | "cancelled"; // cancelled kept for DB compat
+  status: "pending" | "invoice_issued" | "remittance" | "paid" | "in_progress" | "pickup_available" | "completed" | "cancelled"; // cancelled kept for DB compat
   isPowerDrop: boolean;
   archived: boolean | null;
   customerName: string | null;
@@ -80,7 +80,7 @@ interface Order {
   createdAt: Date;
 }
 
-type StatusFilter = "all" | "pending" | "invoice_issued" | "remittance" | "paid" | "in_progress" | "pickup_available" | "archived";
+type StatusFilter = "all" | "pending" | "invoice_issued" | "remittance" | "paid" | "in_progress" | "pickup_available" | "completed" | "archived";
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -278,6 +278,7 @@ function OrderCard({
   const [confirmMarkPaid, setConfirmMarkPaid] = useState(false);
   const [confirmMarkInProgress, setConfirmMarkInProgress] = useState(false);
   const [confirmMarkPickupAvailable, setConfirmMarkPickupAvailable] = useState(false);
+  const [confirmMarkCompleted, setConfirmMarkCompleted] = useState(false);
   const [confirmFinalCall, setConfirmFinalCall] = useState(false);
   // Pickup unit inputs
   const [pickupBags, setPickupBags] = useState<string>(order.pickupBags != null ? String(order.pickupBags) : "");
@@ -380,6 +381,14 @@ Here's how to lock it in:
     onError: () => toast.error("Failed to update order status"),
   });
 
+  const markCompleted = trpc.admin.orders.markCompleted.useMutation({
+    onSuccess: () => {
+      toast.success("Order marked as Completed ✓");
+      onRefresh();
+    },
+    onError: () => toast.error("Failed to update order status"),
+  });
+
   const deleteOrder = trpc.admin.orders.delete.useMutation({
     onSuccess: () => {
       toast.success("Order deleted");
@@ -441,6 +450,7 @@ Here's how to lock it in:
     paid: "bg-green-500/20 text-green-400 border-green-500/30",
     in_progress: "bg-orange-500/20 text-orange-300 border-orange-500/30",
     pickup_available: "bg-purple-500/20 text-purple-300 border-purple-500/30",
+    completed: "bg-emerald-500/20 text-emerald-300 border-emerald-500/30",
   };
 
   const statusIcons: Record<string, React.ReactNode> = {
@@ -450,6 +460,7 @@ Here's how to lock it in:
     paid: <CheckCircle2 size={11} />,
     in_progress: <Loader2 size={11} />,
     pickup_available: <Package size={11} />,
+    completed: <CheckCircle2 size={11} />,
   };
 
   const createdDate = new Date(order.createdAt).toLocaleDateString("en-AU", {
@@ -1409,6 +1420,42 @@ Here's how to lock it in:
               </AlertDialog>
             )}
 
+            {/* Mark as Completed */}
+            {order.status === "pickup_available" && (
+              <AlertDialog open={confirmMarkCompleted} onOpenChange={setConfirmMarkCompleted}>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    size="sm"
+                    className="font-display text-[10px] tracking-widest bg-emerald-700 hover:bg-emerald-600 text-white gap-1.5"
+                    disabled={markCompleted.isPending}
+                  >
+                    <CheckCircle2 size={13} />
+                    {markCompleted.isPending ? "Saving…" : "Mark as Completed"}
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent className="section-ink border-white/10">
+                  <AlertDialogHeader>
+                    <AlertDialogTitle className="font-display tracking-widest text-[#f5f2ec]">Mark order as Completed?</AlertDialogTitle>
+                    <AlertDialogDescription className="font-mono-brand text-[#8a857c]">
+                      Order #{order.phone} will be moved to the Completed tab. This confirms the customer has picked up or received their order.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel className="font-display text-[10px] tracking-widest">Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      className="font-display text-[10px] tracking-widest bg-emerald-700 hover:bg-emerald-600"
+                      onClick={() => {
+                        setConfirmMarkCompleted(false);
+                        markCompleted.mutate({ id: order.id });
+                      }}
+                    >
+                      Mark as Completed
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
+
             {/* Packing Slip PDF */}
             <Button
               size="sm"
@@ -1914,6 +1961,7 @@ export default function AdminOrders() {
     paid: serverCounts?.paid ?? allOrders.filter((o) => o.status === "paid").length,
     in_progress: serverCounts?.in_progress ?? allOrders.filter((o) => o.status === "in_progress").length,
     pickup_available: serverCounts?.pickup_available ?? allOrders.filter((o) => o.status === "pickup_available").length,
+    completed: serverCounts?.completed ?? allOrders.filter((o) => o.status === "completed").length,
     archived: allArchived.length,
   };
   // No longer needed — counts come from the server
@@ -1927,6 +1975,7 @@ export default function AdminOrders() {
     { key: "paid", label: "Paid" },
     { key: "in_progress", label: "In Progress" },
     { key: "pickup_available", label: "Pick up Available" },
+    { key: "completed", label: "Completed" },
     { key: "archived", label: "Archived" },
   ];
   const sortedFiltered = (() => {
@@ -2168,7 +2217,7 @@ export default function AdminOrders() {
           <div className="flex flex-col items-center justify-center py-24 gap-3">
             <Package size={40} className="text-[#8a857c]/30" />
             <p className="font-display text-[11px] tracking-widest text-[#8a857c]">
-              {statusFilter === "all" ? "NO ORDERS YET" : statusFilter === "archived" ? "NO ARCHIVED ORDERS" : statusFilter === "invoice_issued" ? "NO INVOICE ISSUED ORDERS" : statusFilter === "pickup_available" ? "NO PICK UP AVAILABLE ORDERS" : `NO ${statusFilter.toUpperCase()} ORDERS`}
+              {statusFilter === "all" ? "NO ORDERS YET" : statusFilter === "archived" ? "NO ARCHIVED ORDERS" : statusFilter === "invoice_issued" ? "NO INVOICE ISSUED ORDERS" : statusFilter === "pickup_available" ? "NO PICK UP AVAILABLE ORDERS" : statusFilter === "completed" ? "NO COMPLETED ORDERS" : `NO ${statusFilter.toUpperCase()} ORDERS`}
             </p>
             <p className="font-mono-brand text-[11px] text-[#8a857c]/60">
               {statusFilter === "all"

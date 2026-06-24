@@ -545,6 +545,13 @@ export const appRouter = router({
           return { success: true };
         }),
 
+      markCompleted: adminProcedure
+        .input(z.object({ id: z.number() }))
+        .mutation(async ({ input }) => {
+          await updateOrderStatus(input.id, "completed");
+          return { success: true };
+        }),
+
       cancel: adminProcedure
         .input(z.object({ id: z.number() }))
         .mutation(async ({ input }) => {

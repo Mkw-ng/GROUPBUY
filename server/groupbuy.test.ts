@@ -76,6 +76,7 @@ vi.mock("./db", () => ({
     paid: 3,
     in_progress: 1,
     pickup_available: 1,
+    completed: 0,
     cancelled: 1,
   }),
   getUnassignedOrders: vi.fn().mockResolvedValue(
