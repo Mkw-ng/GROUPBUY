@@ -1699,7 +1699,7 @@ export default function AdminOrders() {
   }, [phoneSearch]);
 
     // Detect if query looks like a total-due amount: optional $, digits, optional decimal (e.g. "45", "$45.50")
-  const isTotalSearch = /^\$?\d+(\.\d{0,2})?$/.test(debouncedPhoneSearch.trim());
+  const isTotalSearch = /^\$\d+(\.\d{0,2})?$/.test(debouncedPhoneSearch.trim());
   // Treat as active phone/invoice search only when NOT a total search
   const isSearchingPhone = !isTotalSearch && (debouncedPhoneSearch.replace(/\D/g, "").length > 0 || /^GB-?\d*/i.test(debouncedPhoneSearch.trim()));
   const { data: phoneSearchResults, isLoading: isPhoneSearchLoading } =
@@ -2044,7 +2044,7 @@ export default function AdminOrders() {
             type="text"
             value={phoneSearch}
             onChange={(e) => setPhoneSearch(e.target.value)}
-            placeholder="Search phone, invoice (GB-…), or total ($45.50)…"
+            placeholder="Search phone, invoice (GB-…), or total due ($45.50)…"
             className="flex-1 bg-transparent text-[#f5f2ec] font-mono-brand text-[12px] placeholder-[#8a857c] focus:outline-none"
           />
           {phoneSearch && (
