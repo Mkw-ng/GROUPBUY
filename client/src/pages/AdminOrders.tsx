@@ -4,7 +4,7 @@
  * Admin can: enter final weights per item, set delivery charge,
  * issue a WhatsApp invoice, mark as paid, or cancel/delete the order.
  */
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Link } from "wouter";
@@ -216,10 +216,16 @@ function OrderCard({
   order,
   bankDetails,
   onRefresh,
+  selectable,
+  selected,
+  onToggleSelect,
 }: {
   order: Order;
   bankDetails: string;
   onRefresh: () => void;
+  selectable?: boolean;
+  selected?: boolean;
+  onToggleSelect?: (id: number) => void;
 }) {
   const utils = trpc.useUtils();
   const [expanded, setExpanded] = useState(true);
@@ -479,6 +485,15 @@ Here's how to lock it in:
         onClick={() => setExpanded((v) => !v)}
       >
         <div className="flex items-center gap-3 min-w-0">
+          {selectable && (
+            <input
+              type="checkbox"
+              checked={selected ?? false}
+              onChange={() => onToggleSelect?.(order.id)}
+              onClick={(e) => e.stopPropagation()}
+              className="accent-[#c73e3a] w-4 h-4 shrink-0 cursor-pointer"
+            />
+          )}
           <div className="flex flex-col">
             <div className="flex items-center gap-2">
               <span className="font-mono-brand text-[13px] font-bold text-[#f5f2ec]">
@@ -1796,6 +1811,24 @@ export default function AdminOrders() {
     }
   }
 
+  // ─── Bulk selection state (scoped to pickup_available tab) ──────────────────
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+
+  // Clear selection when switching tabs
+  useEffect(() => { setSelectedIds(new Set()); }, [statusFilter]);
+
+  const [confirmBulkComplete, setConfirmBulkComplete] = useState(false);
+
+  const bulkMarkCompleted = trpc.admin.orders.bulkMarkCompleted.useMutation({
+    onSuccess: (result) => {
+      toast.success(`Marked ${result.count} order${result.count === 1 ? "" : "s"} as Completed ✓`);
+      setSelectedIds(new Set());
+      handleRefresh();
+      utils.admin.orders.counts.invalidate();
+    },
+    onError: () => toast.error("Failed to mark orders as completed"),
+  });
+
   // ─── Bulk transfer paid → in_progress mutation ──────────────────────────────
   const transferPaidToPickupAvailable = trpc.admin.orders.transferPaidToPickupAvailable.useMutation({
     onSuccess: (result) => {
@@ -1996,6 +2029,42 @@ export default function AdminOrders() {
     }
     return result;
   })();
+
+  // Derived selection helpers — must come after sortedFiltered
+  const pickupAvailableOrders = useMemo<Order[]>(
+    () => (sortedFiltered as Order[]).filter((o) => o.status === "pickup_available"),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [sortedFiltered]
+  );
+  const allPickupSelected =
+    pickupAvailableOrders.length > 0 &&
+    pickupAvailableOrders.every((o: Order) => selectedIds.has(o.id));
+  const somePickupSelected = pickupAvailableOrders.some((o: Order) => selectedIds.has(o.id));
+
+  function toggleSelectAll() {
+    if (allPickupSelected) {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        pickupAvailableOrders.forEach((o: Order) => next.delete(o.id));
+        return next;
+      });
+    } else {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        pickupAvailableOrders.forEach((o: Order) => next.add(o.id));
+        return next;
+      });
+    }
+  }
+
+  function toggleOneOrder(id: number) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
 
   return (
     <div className="min-h-screen section-ink">
@@ -2227,12 +2296,73 @@ export default function AdminOrders() {
           </div>
         ) : (
           <div className="space-y-3">
+            {/* Bulk action toolbar — only visible in pickup_available tab when ≥1 order is selected */}
+            {statusFilter === "pickup_available" && selectedIds.size > 0 && (
+              <div className="flex items-center justify-between px-4 py-2.5 bg-emerald-900/30 border border-emerald-500/30">
+                <span className="font-mono-brand text-[11px] text-emerald-300">
+                  {selectedIds.size} order{selectedIds.size !== 1 ? "s" : ""} selected
+                </span>
+                <AlertDialog open={confirmBulkComplete} onOpenChange={setConfirmBulkComplete}>
+                  <AlertDialogTrigger asChild>
+                    <button
+                      disabled={bulkMarkCompleted.isPending}
+                      className="flex items-center gap-1.5 font-display text-[10px] tracking-widest px-3 py-1.5 bg-emerald-700 hover:bg-emerald-600 text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      <CheckCircle2 size={12} />
+                      {bulkMarkCompleted.isPending ? "Marking…" : `Mark ${selectedIds.size} as Completed`}
+                    </button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent className="section-ink border-white/10">
+                    <AlertDialogHeader>
+                      <AlertDialogTitle className="font-display tracking-widest text-[#f5f2ec]">
+                        Mark {selectedIds.size} order{selectedIds.size !== 1 ? "s" : ""} as Completed?
+                      </AlertDialogTitle>
+                      <AlertDialogDescription className="font-mono-brand text-[#8a857c]">
+                        This will move all {selectedIds.size} selected order{selectedIds.size !== 1 ? "s" : ""} to the Completed tab. This confirms the customers have picked up or received their orders.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel className="font-display text-[10px] tracking-widest">Cancel</AlertDialogCancel>
+                      <AlertDialogAction
+                        className="font-display text-[10px] tracking-widest bg-emerald-700 hover:bg-emerald-600"
+                        onClick={() => {
+                          setConfirmBulkComplete(false);
+                          bulkMarkCompleted.mutate({ ids: Array.from(selectedIds) });
+                        }}
+                      >
+                        Confirm
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
+            )}
+
+            {/* Select-all row — only visible in pickup_available tab */}
+            {statusFilter === "pickup_available" && pickupAvailableOrders.length > 0 && (
+              <div className="flex items-center gap-3 px-4 py-2 border border-white/10 bg-white/[0.02]">
+                <input
+                  type="checkbox"
+                  checked={allPickupSelected}
+                  ref={(el) => { if (el) el.indeterminate = somePickupSelected && !allPickupSelected; }}
+                  onChange={toggleSelectAll}
+                  className="accent-[#c73e3a] w-4 h-4 shrink-0 cursor-pointer"
+                />
+                <span className="font-mono-brand text-[11px] text-[#8a857c]">
+                  {allPickupSelected ? "Deselect all" : `Select all ${pickupAvailableOrders.length}`}
+                </span>
+              </div>
+            )}
+
             {sortedFiltered.map((order) => (
               <OrderCard
                 key={order.id}
                 order={order as Order}
                 bankDetails={bankDetails}
                 onRefresh={handleRefresh}
+                selectable={statusFilter === "pickup_available"}
+                selected={selectedIds.has(order.id)}
+                onToggleSelect={toggleOneOrder}
               />
             ))}
           </div>

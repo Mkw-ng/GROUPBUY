@@ -552,6 +552,13 @@ export const appRouter = router({
           return { success: true };
         }),
 
+      bulkMarkCompleted: adminProcedure
+        .input(z.object({ ids: z.array(z.number()).min(1) }))
+        .mutation(async ({ input }) => {
+          await Promise.all(input.ids.map((id) => updateOrderStatus(id, "completed")));
+          return { success: true, count: input.ids.length };
+        }),
+
       cancel: adminProcedure
         .input(z.object({ id: z.number() }))
         .mutation(async ({ input }) => {
