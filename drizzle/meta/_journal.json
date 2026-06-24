@@ -134,6 +134,13 @@
       "when": 1782248525244,
       "tag": "0018_special_mentor",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "5",
+      "when": 1782289567074,
+      "tag": "0019_tough_aaron_stack",
+      "breakpoints": true
     }
   ]
 }

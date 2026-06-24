@@ -76,6 +76,10 @@ type PaidOrder = {
   isPowerDrop: boolean;
   createdAt: Date;
   status: string;
+  pickupBags: number | null;
+  pickupBoxes: number | null;
+  pickupFreezerBags: number | null;
+  pickupFreezerBoxes: number | null;
 };
 
 function generatePackingSheetPDF(orders: PaidOrder[]): Promise<Buffer> {
@@ -360,7 +364,8 @@ function generateScheduleListPDF(orders: PaidOrder[]): Promise<Buffer> {
       pickupDate: string,
       phone: string,
       address: string,
-      rowHeight: number
+      rowHeight: number,
+      receiveText: string
     ): number {
       const x = LEFT;
       // Outer border
@@ -380,7 +385,11 @@ function generateScheduleListPDF(orders: PaidOrder[]): Promise<Buffer> {
       if (address) {
         doc.text(address,   x + COL_LOCATION + COL_DATE + COL_PHONE + 3, textY, { width: COL_ADDRESS - 6 });
       }
-      // To Receive cell is intentionally empty (staff writes here)
+      // To Receive cell — show saved pickup units if available
+      if (receiveText) {
+        doc.font("Helvetica").fontSize(7).fillColor("#000000");
+        doc.text(receiveText, x + COL_LOCATION + COL_DATE + COL_PHONE + COL_ADDRESS + 3, textY, { width: COL_RECEIVE - 6 });
+      }
       return y + rowHeight;
     }
 
@@ -434,7 +443,14 @@ function generateScheduleListPDF(orders: PaidOrder[]): Promise<Buffer> {
           curY = drawTableHeader(curY);
         }
 
-        curY = drawDataRow(curY, locShort, order.pickupDate, order.phone, address, rowH);
+        // Build "To Receive" text from saved pickup units
+        const unitParts: string[] = [];
+        if (order.pickupBags) unitParts.push(`${order.pickupBags} Bag${order.pickupBags !== 1 ? 's' : ''}`);
+        if (order.pickupBoxes) unitParts.push(`${order.pickupBoxes} Box${order.pickupBoxes !== 1 ? 'es' : ''}`);
+        if (order.pickupFreezerBags) unitParts.push(`${order.pickupFreezerBags} Frz Bag${order.pickupFreezerBags !== 1 ? 's' : ''}`);
+        if (order.pickupFreezerBoxes) unitParts.push(`${order.pickupFreezerBoxes} Frz Box${order.pickupFreezerBoxes !== 1 ? 'es' : ''}`);
+        const receiveText = unitParts.join(', ');
+        curY = drawDataRow(curY, locShort, order.pickupDate, order.phone, address, rowH, receiveText);
       }
     }
 
@@ -1126,6 +1142,10 @@ export function registerInvoiceRoutes(app: Application) {
         isPowerDrop: order.isPowerDrop ?? false,
         createdAt: order.createdAt,
         status: order.status,
+        pickupBags: order.pickupBags ?? null,
+        pickupBoxes: order.pickupBoxes ?? null,
+        pickupFreezerBags: order.pickupFreezerBags ?? null,
+        pickupFreezerBoxes: order.pickupFreezerBoxes ?? null,
       };
 
       const pdfBuffer = await generatePackingSlipPDF(paidOrder);

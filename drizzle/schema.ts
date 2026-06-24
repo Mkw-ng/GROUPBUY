@@ -135,6 +135,11 @@ export const orders = mysqlTable("orders", {
   customerName: varchar("customerName", { length: 255 }),
   /** Auto-generated invoice number in format GB-XXXX (4 random digits) */
   invoiceNumber: varchar("invoiceNumber", { length: 16 }).unique(),
+  /** Pickup/delivery unit counts — filled in by admin when order is in pickup_available status */
+  pickupBags: int("pickupBags"),
+  pickupBoxes: int("pickupBoxes"),
+  pickupFreezerBags: int("pickupFreezerBags"),
+  pickupFreezerBoxes: int("pickupFreezerBoxes"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

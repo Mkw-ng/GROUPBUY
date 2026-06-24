@@ -14,6 +14,7 @@ import {
   updateOrderItems,
   updateOrderPhone,
   updateOrderLocation,
+  updateOrderPickupUnits,
   updateOrderDeliveryCharge,
   updateOrderStatus,
   deleteOrder,
@@ -492,6 +493,20 @@ export const appRouter = router({
         }))
         .mutation(async ({ input }) => {
           await updateOrderLocation(input.id, input.location, input.deliveryAddress ?? null);
+          return { success: true };
+        }),
+
+      updatePickupUnits: adminProcedure
+        .input(z.object({
+          id: z.number(),
+          pickupBags: z.number().int().min(0).nullable().optional(),
+          pickupBoxes: z.number().int().min(0).nullable().optional(),
+          pickupFreezerBags: z.number().int().min(0).nullable().optional(),
+          pickupFreezerBoxes: z.number().int().min(0).nullable().optional(),
+        }))
+        .mutation(async ({ input }) => {
+          const { id, ...units } = input;
+          await updateOrderPickupUnits(id, units);
           return { success: true };
         }),
 

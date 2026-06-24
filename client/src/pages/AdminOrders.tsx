@@ -73,6 +73,10 @@ interface Order {
   archived: boolean | null;
   customerName: string | null;
   invoiceNumber: string | null;
+  pickupBags: number | null;
+  pickupBoxes: number | null;
+  pickupFreezerBags: number | null;
+  pickupFreezerBoxes: number | null;
   createdAt: Date;
 }
 
@@ -237,6 +241,10 @@ function OrderCard({
     onError: () => toast.error("Failed to save special instructions"),
   });
 
+  const updatePickupUnits = trpc.admin.orders.updatePickupUnits.useMutation({
+    onSuccess: () => toast.success("Pickup units saved ✓"),
+    onError: () => toast.error("Failed to save pickup units"),
+  });
   const updateLocation = trpc.admin.orders.updateLocation.useMutation({
     onSuccess: () => {
       toast.success("Location updated");
@@ -271,6 +279,11 @@ function OrderCard({
   const [confirmMarkInProgress, setConfirmMarkInProgress] = useState(false);
   const [confirmMarkPickupAvailable, setConfirmMarkPickupAvailable] = useState(false);
   const [confirmFinalCall, setConfirmFinalCall] = useState(false);
+  // Pickup unit inputs
+  const [pickupBags, setPickupBags] = useState<string>(order.pickupBags != null ? String(order.pickupBags) : "");
+  const [pickupBoxes, setPickupBoxes] = useState<string>(order.pickupBoxes != null ? String(order.pickupBoxes) : "");
+  const [pickupFreezerBags, setPickupFreezerBags] = useState<string>(order.pickupFreezerBags != null ? String(order.pickupFreezerBags) : "");
+  const [pickupFreezerBoxes, setPickupFreezerBoxes] = useState<string>(order.pickupFreezerBoxes != null ? String(order.pickupFreezerBoxes) : "");
   const defaultOpening = order.isPowerDrop
     ? `We got your GroupBuy Power-Drop order!
 
@@ -982,6 +995,48 @@ Here's how to lock it in:
               <span className="text-[#f5f2ec]">${grandTotal.toFixed(2)}</span>
             </div>
           </div>
+
+          {/* Pickup units — only shown for pickup_available orders */}
+          {order.status === "pickup_available" && (
+            <div className="border border-purple-500/30 bg-purple-500/5 p-4 space-y-3">
+              <p className="font-display text-[10px] tracking-widest text-purple-300 mb-2">PICKUP UNITS</p>
+              <div className="grid grid-cols-2 gap-3">
+                {([
+                  { label: "Bags", value: pickupBags, setter: setPickupBags },
+                  { label: "Boxes", value: pickupBoxes, setter: setPickupBoxes },
+                  { label: "Freezer Bags", value: pickupFreezerBags, setter: setPickupFreezerBags },
+                  { label: "Freezer Boxes", value: pickupFreezerBoxes, setter: setPickupFreezerBoxes },
+                ] as { label: string; value: string; setter: (v: string) => void }[]).map(({ label, value, setter }) => (
+                  <div key={label}>
+                    <label className="font-display text-[9px] tracking-widest text-[#8a857c] block mb-1">{label.toUpperCase()}</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={value}
+                      onChange={(e) => setter(e.target.value)}
+                      placeholder="0"
+                      className="w-full bg-transparent border border-white/15 text-[#f5f2ec] font-mono-brand text-[12px] px-3 py-2 focus:outline-none focus:border-purple-500/60"
+                    />
+                  </div>
+                ))}
+              </div>
+              <Button
+                size="sm"
+                className="font-display text-[10px] tracking-widest bg-purple-700 hover:bg-purple-600 text-white"
+                disabled={updatePickupUnits.isPending}
+                onClick={() => updatePickupUnits.mutate({
+                  id: order.id,
+                  pickupBags: pickupBags !== "" ? parseInt(pickupBags, 10) : null,
+                  pickupBoxes: pickupBoxes !== "" ? parseInt(pickupBoxes, 10) : null,
+                  pickupFreezerBags: pickupFreezerBags !== "" ? parseInt(pickupFreezerBags, 10) : null,
+                  pickupFreezerBoxes: pickupFreezerBoxes !== "" ? parseInt(pickupFreezerBoxes, 10) : null,
+                })}
+              >
+                {updatePickupUnits.isPending ? "Saving…" : "Save Pickup Units"}
+              </Button>
+            </div>
+          )}
 
           {/* Action buttons */}
           <div className="flex flex-wrap gap-2 pt-1">
