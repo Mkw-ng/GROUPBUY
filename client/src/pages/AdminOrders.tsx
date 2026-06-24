@@ -1223,10 +1223,17 @@ Here's how to lock it in:
                     This will send the following message to {order.phone}:
                   </AlertDialogDescription>
                   <div className="mt-3 bg-white/5 border border-white/10 px-4 py-3 font-mono-brand text-[12px] text-[#f5f2ec] whitespace-pre-line">
-                    {order.location === "delivery"
-                      ? `Great news! Your GroupBuy order is ready.\n\nOur driver will be in contact shortly to confirm a delivery schedule for your order.`
-                      : `Great news! Your GroupBuy order is available for pick up at ${locationLabel(order.location, order.deliveryAddress)} from tomorrow onwards.\n\nSee you soon!`
-                    }
+                    {(() => {
+                      const locLine = locationLabel(order.location, order.deliveryAddress);
+                      const inv = order.invoiceNumber ?? `GB-${String(order.id).padStart(5, '0')}`;
+                      const unitParts: string[] = [];
+                      if (order.pickupBags) unitParts.push(`${order.pickupBags} Bag${order.pickupBags !== 1 ? 's' : ''}`);
+                      if (order.pickupBoxes) unitParts.push(`${order.pickupBoxes} Box${order.pickupBoxes !== 1 ? 'es' : ''}`);
+                      if (order.pickupFreezerBags) unitParts.push(`${order.pickupFreezerBags} Frz Bag${order.pickupFreezerBags !== 1 ? 's' : ''}`);
+                      if (order.pickupFreezerBoxes) unitParts.push(`${order.pickupFreezerBoxes} Frz Box${order.pickupFreezerBoxes !== 1 ? 'es' : ''}`);
+                      const unitsStr = unitParts.length > 0 ? ` ${unitParts.join(', ')}` : '';
+                      return `*GROUPBUY POWER-DROP ORDER IS READY!*\n\n*PICK-UP / DELIVERY STATUS*\nYour order has been prepared and will be ready from your selected hub from *Tomorrow* onwards.\n\n*YOUR SELECTED LOCATION*\n${locLine}\n\n*PICKING UP YOUR ORDER*\npresent these details to the crew upon collection.\n\n*ORDER DETAILS*\nPhone: *${order.phone}*\nInvoice: *${inv}*\nPick up Units:${unitsStr}\n\n*PICK-UP HUBS*\nClayton — BQ Direct\n126 Fairbank Rd, Clayton South VIC 3169\n\nCranbourne — Mitchells Quality Meat\nCranbourne Park Shopping Centre\n\nHours: Monday – Saturday | 9:00am – 5:00pm\n\n*DELIVERY*\nIf delivery was selected, your driver will contact you to arrange scheduling.\n\nPlease allow a full-day delivery window.\n\nIf nobody will be home, reply with safe-drop instructions.`;
+                    })()}
                   </div>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -1236,9 +1243,15 @@ Here's how to lock it in:
                     onClick={() => {
                       setConfirmPickupAvailableMsg(false);
                       const intlPhone = order.phone.replace(/\D/g, "").replace(/^0/, "61");
-                      const msg = order.location === "delivery"
-                        ? `Great news! Your GroupBuy order is ready.\n\nOur driver will be in contact shortly to confirm a delivery schedule for your order.`
-                        : `Great news! Your GroupBuy order is available for pick up at ${locationLabel(order.location, order.deliveryAddress)} from tomorrow onwards.\n\nSee you soon!`;
+                      const locLine = locationLabel(order.location, order.deliveryAddress);
+                      const inv = order.invoiceNumber ?? `GB-${String(order.id).padStart(5, '0')}`;
+                      const unitParts: string[] = [];
+                      if (order.pickupBags) unitParts.push(`${order.pickupBags} Bag${order.pickupBags !== 1 ? 's' : ''}`);
+                      if (order.pickupBoxes) unitParts.push(`${order.pickupBoxes} Box${order.pickupBoxes !== 1 ? 'es' : ''}`);
+                      if (order.pickupFreezerBags) unitParts.push(`${order.pickupFreezerBags} Frz Bag${order.pickupFreezerBags !== 1 ? 's' : ''}`);
+                      if (order.pickupFreezerBoxes) unitParts.push(`${order.pickupFreezerBoxes} Frz Box${order.pickupFreezerBoxes !== 1 ? 'es' : ''}`);
+                      const unitsStr = unitParts.length > 0 ? ` ${unitParts.join(', ')}` : '';
+                      const msg = `*GROUPBUY POWER-DROP ORDER IS READY!*\n\n*PICK-UP / DELIVERY STATUS*\nYour order has been prepared and will be ready from your selected hub from *Tomorrow* onwards.\n\n*YOUR SELECTED LOCATION*\n${locLine}\n\n*PICKING UP YOUR ORDER*\npresent these details to the crew upon collection.\n\n*ORDER DETAILS*\nPhone: *${order.phone}*\nInvoice: *${inv}*\nPick up Units:${unitsStr}\n\n*PICK-UP HUBS*\nClayton — BQ Direct\n126 Fairbank Rd, Clayton South VIC 3169\n\nCranbourne — Mitchells Quality Meat\nCranbourne Park Shopping Centre\n\nHours: Monday – Saturday | 9:00am – 5:00pm\n\n*DELIVERY*\nIf delivery was selected, your driver will contact you to arrange scheduling.\n\nPlease allow a full-day delivery window.\n\nIf nobody will be home, reply with safe-drop instructions.`;
                       window.open(`https://wa.me/${intlPhone}?text=${encodeURIComponent(msg)}`, "_blank");
                     }}
                   >
