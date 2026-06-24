@@ -1698,9 +1698,10 @@ export default function AdminOrders() {
     return () => clearTimeout(timer);
   }, [phoneSearch]);
 
-  // Treat as active search if query has digits OR looks like an invoice number (GB-...)
-  const isSearchingPhone = debouncedPhoneSearch.replace(/\D/g, "").length > 0 || /^GB-?\d*/i.test(debouncedPhoneSearch.trim());
-
+    // Detect if query looks like a total-due amount: optional $, digits, optional decimal (e.g. "45", "$45.50")
+  const isTotalSearch = /^\$?\d+(\.\d{0,2})?$/.test(debouncedPhoneSearch.trim());
+  // Treat as active phone/invoice search only when NOT a total search
+  const isSearchingPhone = !isTotalSearch && (debouncedPhoneSearch.replace(/\D/g, "").length > 0 || /^GB-?\d*/i.test(debouncedPhoneSearch.trim()));
   const { data: phoneSearchResults, isLoading: isPhoneSearchLoading } =
     trpc.admin.orders.searchByPhone.useQuery(
       { phoneQuery: debouncedPhoneSearch, archived: statusFilter === "archived" },
@@ -1804,17 +1805,32 @@ export default function AdminOrders() {
   // When searching by phone, use server search results instead of paginated list.
   // Status filter still applies to search results (except archived which is handled server-side).
   const searchResults = (phoneSearchResults as Order[] | undefined) ?? [];
+
+  // Helper: compute order total for total-due search
+  function getOrderTotal(o: Order): number {
+    const items = parseItems(o.items);
+    const subtotal = items.reduce((sum, i) => sum + calcItemTotal(i), 0);
+    return subtotal + (parseFloat(o.deliveryCharge ?? "0") || 0);
+  }
+
+  const baseOrders = statusFilter === "archived"
+    ? allArchived
+    : statusFilter === "all"
+    ? allOrders
+    : allOrders.filter((o) => o.status === statusFilter);
+
   const filtered = isSearchingPhone
     ? statusFilter === "archived"
       ? searchResults
       : statusFilter === "all"
       ? searchResults
       : searchResults.filter((o) => o.status === statusFilter)
-    : statusFilter === "archived"
-      ? allArchived
-      : statusFilter === "all"
-      ? allOrders
-      : allOrders.filter((o) => o.status === statusFilter);
+    : isTotalSearch
+      ? (() => {
+          const target = parseFloat(debouncedPhoneSearch.replace("$", ""));
+          return baseOrders.filter((o) => Math.abs(getOrderTotal(o) - target) < 0.005);
+        })()
+    : baseOrders;
 
   // Use server-provided counts for filter tabs and export buttons — never capped by pagination.
   // Fall back to loaded-order counts while the server count query is still loading.
@@ -2028,7 +2044,7 @@ export default function AdminOrders() {
             type="text"
             value={phoneSearch}
             onChange={(e) => setPhoneSearch(e.target.value)}
-            placeholder="Search phone or invoice (GB-…)…"
+            placeholder="Search phone, invoice (GB-…), or total ($45.50)…"
             className="flex-1 bg-transparent text-[#f5f2ec] font-mono-brand text-[12px] placeholder-[#8a857c] focus:outline-none"
           />
           {phoneSearch && (
