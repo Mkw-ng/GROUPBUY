@@ -663,12 +663,13 @@ function csvEscape(value: string | number | null | undefined): string {
   return `"${str.replace(/"/g, '""')}"`;
 }
 
-function generatePackingSheetCSV(orders: PaidOrder[]): string {
+function generatePackingSheetCSV(orders: PaidOrder[], productCategoryMap?: Map<number, string>): string {
   const headers = [
     "Invoice Number",
     "Phone Number",
     "Location",
     "Delivery Address",
+    "Category",
     "Item Name",
     "Cut",
     "Final Weight/Qty",
@@ -692,12 +693,14 @@ function generatePackingSheetCSV(orders: PaidOrder[]): string {
         ? finalWeightKg.toFixed(2)
         : String(item.qty);
       const lineTotal = calcLineItemTotal(item);
+      const category = item.category ?? (item.id && productCategoryMap ? productCategoryMap.get(item.id) ?? "" : "");
 
       const row = [
         csvEscape(invoiceNum),
         csvEscape(order.phone),
         csvEscape(locLabel),
         csvEscape(order.deliveryAddress),
+        csvEscape(category),
         csvEscape(item.name),
         csvEscape(item.cut),
         csvEscape(displayFinalQty),
@@ -1211,7 +1214,14 @@ export function registerInvoiceRoutes(app: Application) {
         return;
       }
 
-      const csvContent = generatePackingSheetCSV(paidOrders);
+      // Build category lookup for items that may not have category stored inline
+      const allProducts = await getAllProducts();
+      const productCategoryMap = new Map<number, string>();
+      for (const p of allProducts) {
+        productCategoryMap.set(p.id, p.category ?? "");
+      }
+
+      const csvContent = generatePackingSheetCSV(paidOrders, productCategoryMap);
       const dateStr = new Date().toISOString().slice(0, 10);
       res.setHeader("Content-Type", "text/csv; charset=utf-8");
       res.setHeader(
