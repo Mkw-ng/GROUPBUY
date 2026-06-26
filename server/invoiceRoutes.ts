@@ -874,21 +874,28 @@ function generatePackingSlipPDF(order: PaidOrder): Promise<Buffer> {
     doc.font("Helvetica-Bold").fontSize(11).fillColor("#000000")
       .text("Staff Input", LEFT, staffY + 8);
 
+    // 4 fields in a 2x2 grid
     const FIELD_TOP = staffY + 28;
-    const FIELD_W = 130;
+    const FIELD_W = 110;
     const FIELD_H = 28;
-    const FIELD_GAP = 20;
-    const fields = ["Bag Quantity:", "Box Quantity:", "Freezer Quantity:"];
-    let fx = LEFT;
-    for (const label of fields) {
-      doc.font("Helvetica").fontSize(9).fillColor("#333333").text(label, fx, FIELD_TOP);
-      const boxY = FIELD_TOP + 14;
-      doc.rect(fx, boxY, FIELD_W, FIELD_H).strokeColor("#000000").lineWidth(0.8).stroke();
-      fx += FIELD_W + FIELD_GAP;
-    }
+    const FIELD_COL_STRIDE = 248; // column stride (field + gap)
+    const FIELD_ROW_STRIDE = 56;  // row stride (label + box + gap)
+    const staffFields4 = [
+      "Bag Quantity:", "Box Quantity:",
+      "Freezer Bag Quantity:", "Freezer Box Quantity:",
+    ];
+    staffFields4.forEach((label, i) => {
+      const col = i % 2;
+      const row = Math.floor(i / 2);
+      const fx2 = LEFT + col * FIELD_COL_STRIDE;
+      const fy2 = FIELD_TOP + row * FIELD_ROW_STRIDE;
+      doc.font("Helvetica").fontSize(9).fillColor("#333333").text(label, fx2, fy2);
+      doc.rect(fx2, fy2 + 14, FIELD_W, FIELD_H).strokeColor("#000000").lineWidth(0.8).stroke();
+    });
+    const STAFF_SECTION_H = 2 * FIELD_ROW_STRIDE + FIELD_H;
 
-    // ── Tear-off section ────────────────────────────────────────────
-    const tearY = FIELD_TOP + FIELD_H + 36;
+    // ── Tear-off section ──────────────────────────────────────────────
+    const tearY = FIELD_TOP + STAFF_SECTION_H + 36;
     // Dashed cut line
     doc.save();
     doc.dash(4, { space: 4 });
@@ -904,24 +911,27 @@ function generatePackingSlipPDF(order: PaidOrder): Promise<Buffer> {
 
     doc.moveDown(0.5);
     const tearDetailY = tearContentY + 22;
-        doc.font("Helvetica-Bold").fontSize(10).fillColor("#333333")
+    doc.font("Helvetica-Bold").fontSize(10).fillColor("#333333")
       .text(`Invoice #: `, LEFT, tearDetailY, { continued: true, width: 495, align: "left" })
       .font("Helvetica").text(invoiceNum);
     doc.font("Helvetica-Bold").fontSize(10).fillColor("#333333")
       .text(`Phone: `, LEFT, tearDetailY + 18, { continued: true, width: 495, align: "left" })
       .font("Helvetica").text(order.phone);
-    // Bag/Box/Freezer input boxes in tear-off — label above box, evenly spaced
+    // 4 qty boxes in tear-off — 2x2 grid
     const tearBoxLabelY = tearDetailY + 44;
-    const tearBoxRectY = tearBoxLabelY + 14;
-    const tearBoxLabels = ["Bag Qty:", "Box Qty:", "Freezer Qty:"];
-    const tearBoxW = 130;
+    const tearBoxW = 100;
     const tearBoxH = 22;
-    const tearBoxGap = 155;
+    const tearBoxColStride = 248;
+    const tearBoxRowStride = 50;
+    const tearBoxLabels4 = ["Bag Qty:", "Box Qty:", "Freezer Bag Qty:", "Freezer Box Qty:"];
     doc.font("Helvetica-Bold").fontSize(9).fillColor("#333333");
-    tearBoxLabels.forEach((label, i) => {
-      const bx = LEFT + i * tearBoxGap;
-      doc.text(label, bx, tearBoxLabelY, { width: tearBoxW });
-      doc.rect(bx, tearBoxRectY, tearBoxW, tearBoxH).strokeColor("#555555").lineWidth(0.6).stroke();
+    tearBoxLabels4.forEach((label, i) => {
+      const col = i % 2;
+      const row = Math.floor(i / 2);
+      const bx = LEFT + col * tearBoxColStride;
+      const by = tearBoxLabelY + row * tearBoxRowStride;
+      doc.text(label, bx, by, { width: tearBoxColStride - 4 });
+      doc.rect(bx, by + 14, tearBoxW, tearBoxH).strokeColor("#555555").lineWidth(0.6).stroke();
     });
     doc.end();
   });
@@ -1075,21 +1085,28 @@ function generateAllPackingSlipsPDF(orders: PaidOrder[]): Promise<Buffer> {
       doc.font("Helvetica-Bold").fontSize(11).fillColor("#000000")
         .text("Staff Input", LEFT, staffY + 8);
 
+      // 4 fields in a 2x2 grid
       const FIELD_TOP = staffY + 28;
-      const FIELD_W = 130;
+      const FIELD_W = 110;
       const FIELD_H = 28;
-      const FIELD_GAP = 20;
-      const staffFields = ["Bag Quantity:", "Box Quantity:", "Freezer Quantity:"];
-      let sfx = LEFT;
-      for (const label of staffFields) {
-        doc.font("Helvetica").fontSize(9).fillColor("#333333").text(label, sfx, FIELD_TOP);
-        const boxY = FIELD_TOP + 14;
-        doc.rect(sfx, boxY, FIELD_W, FIELD_H).strokeColor("#000000").lineWidth(0.8).stroke();
-        sfx += FIELD_W + FIELD_GAP;
-      }
+      const FIELD_COL_STRIDE2 = 248;
+      const FIELD_ROW_STRIDE2 = 56;
+      const staffFields4b = [
+        "Bag Quantity:", "Box Quantity:",
+        "Freezer Bag Quantity:", "Freezer Box Quantity:",
+      ];
+      staffFields4b.forEach((label, i) => {
+        const col = i % 2;
+        const row = Math.floor(i / 2);
+        const sfx2 = LEFT + col * FIELD_COL_STRIDE2;
+        const sfy2 = FIELD_TOP + row * FIELD_ROW_STRIDE2;
+        doc.font("Helvetica").fontSize(9).fillColor("#333333").text(label, sfx2, sfy2);
+        doc.rect(sfx2, sfy2 + 14, FIELD_W, FIELD_H).strokeColor("#000000").lineWidth(0.8).stroke();
+      });
+      const STAFF_SECTION_H2 = 2 * FIELD_ROW_STRIDE2 + FIELD_H;
 
-      // ── Tear-off section ─────────────────────────────────────────
-      const tearY = FIELD_TOP + FIELD_H + 36;
+      // ── Tear-off section ─────────────────────────────────────────────────────
+      const tearY = FIELD_TOP + STAFF_SECTION_H2 + 36;
       doc.save();
       doc.dash(4, { space: 4 });
       doc.moveTo(LEFT, tearY).lineTo(545, tearY).strokeColor("#555555").lineWidth(0.8).stroke();
@@ -1102,24 +1119,27 @@ function generateAllPackingSlipsPDF(orders: PaidOrder[]): Promise<Buffer> {
         .text("COLLECTION RECEIPT", LEFT, tearContentY, { width: 495, align: "center" });
 
       const tearDetailY = tearContentY + 22;
-            doc.font("Helvetica-Bold").fontSize(10).fillColor("#333333")
+      doc.font("Helvetica-Bold").fontSize(10).fillColor("#333333")
         .text(`Invoice #: `, LEFT, tearDetailY, { continued: true, width: 495, align: "left" })
         .font("Helvetica").text(invoiceNum);
       doc.font("Helvetica-Bold").fontSize(10).fillColor("#333333")
         .text(`Phone: `, LEFT, tearDetailY + 18, { continued: true, width: 495, align: "left" })
         .font("Helvetica").text(order.phone);
-      // Bag/Box/Freezer input boxes in tear-off — label above box, evenly spaced
+      // 4 qty boxes in tear-off — 2x2 grid
       const tearBoxLabelY2 = tearDetailY + 44;
-      const tearBoxRectY2 = tearBoxLabelY2 + 14;
-      const tearBoxLabels2 = ["Bag Qty:", "Box Qty:", "Freezer Qty:"];
-      const tearBoxW2 = 130;
+      const tearBoxW2 = 100;
       const tearBoxH2 = 22;
-      const tearBoxGap2 = 155;
+      const tearBoxColStride2 = 248;
+      const tearBoxRowStride2 = 50;
+      const tearBoxLabels4b = ["Bag Qty:", "Box Qty:", "Freezer Bag Qty:", "Freezer Box Qty:"];
       doc.font("Helvetica-Bold").fontSize(9).fillColor("#333333");
-      tearBoxLabels2.forEach((label, i) => {
-        const bx = LEFT + i * tearBoxGap2;
-        doc.text(label, bx, tearBoxLabelY2, { width: tearBoxW2 });
-        doc.rect(bx, tearBoxRectY2, tearBoxW2, tearBoxH2).strokeColor("#555555").lineWidth(0.6).stroke();
+      tearBoxLabels4b.forEach((label, i) => {
+        const col = i % 2;
+        const row = Math.floor(i / 2);
+        const bx = LEFT + col * tearBoxColStride2;
+        const by = tearBoxLabelY2 + row * tearBoxRowStride2;
+        doc.text(label, bx, by, { width: tearBoxColStride2 - 4 });
+        doc.rect(bx, by + 14, tearBoxW2, tearBoxH2).strokeColor("#555555").lineWidth(0.6).stroke();
       });
     }
     doc.end();
