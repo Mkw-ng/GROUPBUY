@@ -1270,6 +1270,8 @@ Here's how to lock it in:
                     className="font-display text-[10px] tracking-widest bg-[#25D366] hover:bg-[#1da851] text-white"
                     onClick={() => {
                       setConfirmPickupAvailableMsg(false);
+                      // Auto-advance to completed when pickup message is sent
+                      markCompleted.mutate({ id: order.id });
                       const intlPhone = order.phone.replace(/\D/g, "").replace(/^0/, "61");
                       const locLine = locationLabel(order.location, order.deliveryAddress);
                       const inv = order.invoiceNumber ?? `GB-${String(order.id).padStart(5, '0')}`;
