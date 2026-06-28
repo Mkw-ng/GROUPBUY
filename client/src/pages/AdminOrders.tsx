@@ -1022,8 +1022,8 @@ Here's how to lock it in:
             </div>
           </div>
 
-          {/* Pickup units — only shown for pickup_available orders */}
-          {order.status === "pickup_available" && (
+          {/* Pickup units — shown for in_progress and pickup_available orders */}
+          {(order.status === "in_progress" || order.status === "pickup_available") && (
             <div className="border border-purple-500/30 bg-purple-500/5 p-4 space-y-3">
               <p className="font-display text-[10px] tracking-widest text-purple-300 mb-2">PICKUP UNITS</p>
               <div className="grid grid-cols-2 gap-3">
