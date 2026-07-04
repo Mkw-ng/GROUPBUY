@@ -47,6 +47,12 @@ import {
   transferAllPaidToInProgress,
   getOrderedQtyByProduct,
   bulkUpdateProducts,
+  getAllCategories,
+  getCategoryBySlug,
+  upsertCategory,
+  reorderCategories,
+  deleteCategory,
+  getCategoryProductCounts,
 } from "./db";
 import { OrderItem } from "../drizzle/schema";
 import {
@@ -121,28 +127,8 @@ const productInput = z.object({
   id: z.number().optional(),
   name: z.string().min(1),
   cut: z.string().default(""),
-  category: z.enum([
-    "limited-offer",
-    "featured-deals",
-    "m3atfr3ak",
-    "beef",
-    "pork",
-    "lamb",
-    "poultry",
-    "seafood",
-    "whole-slabs",
-    "whole-animal",
-    "box-deals",
-    "mince",
-    "offal-tallow",
-    "value-added",
-    "korean-bbq-hotpot",
-    "burger-sausages",
-    "bbq-packs",
-    "quick-meals",
-    "freezer",
-    "other",
-  ]),
+  /** Category slug — validated server-side against the categories table */
+  category: z.string().min(1),
   description: z.string().optional(),
   price: z.string().regex(/^\d+(\.\d{1,2})?$/),
   powerDropPrice: z.string().regex(/^\d+(\.\d{1,2})?$/).optional(),
@@ -291,6 +277,14 @@ export const appRouter = router({
         const isSoldOutByStock = stockLimit != null && remainingQty != null && remainingQty <= 0;
         return { ...p, orderedQty, remainingQty, isSoldOutByStock };
       });
+    }),
+  }),
+
+  // ─── Public: Categories ──────────────────────────────────────────────────────────────
+
+  categories: router({
+    list: publicProcedure.query(async () => {
+      return getAllCategories();
     }),
   }),
 
@@ -443,6 +437,14 @@ export const appRouter = router({
   admin: router({
     products: router({
       upsert: adminProcedure.input(productInput).mutation(async ({ input }) => {
+        // Validate that the category slug exists in the categories table
+        const cat = await getCategoryBySlug(input.category);
+        if (!cat) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: `Category "${input.category}" does not exist. Please select a valid category.`,
+          });
+        }
         const id = await upsertProduct({
           ...input,
           description: input.description ?? null,
@@ -498,6 +500,88 @@ export const appRouter = router({
         .mutation(async ({ input }) => {
           const updated = await bulkUpdateProducts(input.ids, input.set);
           return { updated };
+        }),
+    }),
+
+    categories: router({
+      list: adminProcedure.query(async () => {
+        const cats = await getAllCategories();
+        const counts = await getCategoryProductCounts();
+        return cats.map((c) => ({ ...c, productCount: counts.get(c.slug) ?? 0 }));
+      }),
+
+      create: adminProcedure
+        .input(
+          z.object({
+            name: z.string().min(1).max(64),
+            powerDropName: z.string().max(64).optional().nullable(),
+            emoji: z.string().max(16).optional().nullable(),
+          })
+        )
+        .mutation(async ({ input }) => {
+          // Auto-generate slug from name: lowercase, kebab-case, deduplicated
+          const baseSlug = input.name
+            .toLowerCase()
+            .trim()
+            .replace(/[^a-z0-9]+/g, "-")
+            .replace(/^-+|-+$/g, "");
+          // Find max sortOrder to append at the end
+          const allCats = await getAllCategories();
+          const maxSort = allCats.reduce((m, c) => Math.max(m, c.sortOrder), -1);
+          // Deduplicate slug
+          let slug = baseSlug;
+          let attempt = 1;
+          const existingSlugs = new Set(allCats.map((c) => c.slug));
+          while (existingSlugs.has(slug)) {
+            slug = `${baseSlug}-${++attempt}`;
+          }
+          const cat = await upsertCategory({
+            slug,
+            name: input.name,
+            powerDropName: input.powerDropName ?? null,
+            emoji: input.emoji ?? null,
+            sortOrder: maxSort + 1,
+          });
+          return cat;
+        }),
+
+      update: adminProcedure
+        .input(
+          z.object({
+            id: z.number().int().positive(),
+            name: z.string().min(1).max(64),
+            powerDropName: z.string().max(64).optional().nullable(),
+            emoji: z.string().max(16).optional().nullable(),
+          })
+        )
+        .mutation(async ({ input }) => {
+          const cat = await upsertCategory({
+            id: input.id,
+            name: input.name,
+            powerDropName: input.powerDropName ?? null,
+            emoji: input.emoji ?? null,
+          });
+          return cat;
+        }),
+
+      reorder: adminProcedure
+        .input(z.object({ orderedIds: z.array(z.number().int().positive()) }))
+        .mutation(async ({ input }) => {
+          await reorderCategories(input.orderedIds);
+          return { success: true };
+        }),
+
+      delete: adminProcedure
+        .input(z.object({ id: z.number().int().positive() }))
+        .mutation(async ({ input }) => {
+          const result = await deleteCategory(input.id);
+          if (result.blocked) {
+            throw new TRPCError({
+              code: "CONFLICT",
+              message: `Cannot delete: ${result.productCount} product${result.productCount === 1 ? " is" : "s are"} still assigned to this category. Reassign them first.`,
+            });
+          }
+          return { success: true };
         }),
     }),
 

@@ -9,6 +9,25 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 vi.mock("./db", () => ({
   bulkUpdateProducts: vi.fn().mockResolvedValue(3),
 
+  getAllCategories: vi.fn().mockResolvedValue([
+    { id: 1, slug: "beef", name: "Beef", powerDropName: "PD Beef", emoji: "🥩", sortOrder: 0, createdAt: new Date(), updatedAt: new Date() },
+    { id: 2, slug: "lamb", name: "Lamb", powerDropName: null, emoji: "🐑", sortOrder: 1, createdAt: new Date(), updatedAt: new Date() },
+  ]),
+  getCategoryBySlug: vi.fn().mockResolvedValue(null),
+  upsertCategory: vi.fn().mockImplementation(async (data: { id?: number; slug?: string; name: string }) => ({
+    id: data.id ?? 99,
+    slug: data.slug ?? data.name.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+    name: data.name,
+    powerDropName: null,
+    emoji: null,
+    sortOrder: 0,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  })),
+  deleteCategory: vi.fn().mockResolvedValue({ blocked: false, productCount: 0 }),
+  getCategoryProductCounts: vi.fn().mockResolvedValue(new Map([["beef", 3], ["lamb", 1]])),
+  reorderCategories: vi.fn().mockResolvedValue(undefined),
+
   getAllProducts: vi.fn().mockResolvedValue([
     {
       id: 1,
@@ -133,6 +152,10 @@ import {
   getActiveOrderCounts,
   getUnassignedOrders,
   bulkUpdateProducts,
+  getAllCategories,
+  upsertCategory,
+  deleteCategory,
+  getCategoryProductCounts,
 } from "./db";
 
 // ─── Settings tests ───────────────────────────────────────────────────────────
@@ -484,5 +507,63 @@ describe("bulkUpdateProducts helper", () => {
     vi.mocked(bulkUpdateProducts).mockResolvedValueOnce(0);
     const result = await bulkUpdateProducts([], { available: true });
     expect(result).toBe(0);
+  });
+});
+
+// ─── Category helpers tests ───────────────────────────────────────────────────
+
+describe("Category helpers", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("getAllCategories returns categories ordered by sortOrder", async () => {
+    const result = await getAllCategories();
+    expect(result).toHaveLength(2);
+    expect(result[0].slug).toBe("beef");
+    expect(result[1].slug).toBe("lamb");
+  });
+
+  it("upsertCategory creates a new category and auto-generates a slug", async () => {
+    const result = await upsertCategory({ name: "Korean BBQ / Hotpot" });
+    expect(result).toBeDefined();
+    // The mock returns a slug derived from the name
+    expect(result.name).toBe("Korean BBQ / Hotpot");
+  });
+
+  it("upsertCategory updates an existing category by id", async () => {
+    vi.mocked(upsertCategory).mockResolvedValueOnce({
+      id: 1,
+      slug: "beef",
+      name: "Premium Beef",
+      powerDropName: "PD Premium Beef",
+      emoji: "🥩",
+      sortOrder: 0,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    const result = await upsertCategory({ id: 1, name: "Premium Beef", powerDropName: "PD Premium Beef" });
+    expect(result.name).toBe("Premium Beef");
+    expect(result.powerDropName).toBe("PD Premium Beef");
+    expect(upsertCategory).toHaveBeenCalledWith({ id: 1, name: "Premium Beef", powerDropName: "PD Premium Beef" });
+  });
+
+  it("deleteCategory returns blocked=true when products reference the category", async () => {
+    vi.mocked(deleteCategory).mockResolvedValueOnce({ blocked: true, productCount: 3 });
+    const result = await deleteCategory(1);
+    expect(result.blocked).toBe(true);
+    expect(result.productCount).toBe(3);
+  });
+
+  it("deleteCategory returns blocked=false when no products reference the category", async () => {
+    vi.mocked(deleteCategory).mockResolvedValueOnce({ blocked: false, productCount: 0 });
+    const result = await deleteCategory(2);
+    expect(result.blocked).toBe(false);
+    expect(result.productCount).toBe(0);
+  });
+
+  it("getCategoryProductCounts returns a map of slug to count", async () => {
+    const counts = await getCategoryProductCounts();
+    expect(counts.get("beef")).toBe(3);
+    expect(counts.get("lamb")).toBe(1);
+    expect(counts.get("pork")).toBeUndefined();
   });
 });

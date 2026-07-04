@@ -193,7 +193,7 @@ interface ProductForm {
   id?: number;
   name: string;
   cut: string;
-  category: Category;
+  category: string;
   description: string;
   price: string;
   powerDropPrice: string;
@@ -210,7 +210,7 @@ interface ProductForm {
 const EMPTY_FORM: ProductForm = {
   name: "",
   cut: "",
-  category: "beef",
+  category: "",
   description: "",
   price: "",
   powerDropPrice: "",
@@ -225,6 +225,93 @@ const EMPTY_FORM: ProductForm = {
 };
 
 // ─── Admin Guard ──────────────────────────────────────────────────────────────
+
+
+// ─── Category Row (sortable) ────────────────────────────────────────────────
+
+interface CategoryRowProps {
+  cat: { id: number; slug: string; name: string; emoji?: string | null; powerDropName?: string | null };
+  isEditing: boolean;
+  editName: string;
+  editEmoji: string;
+  editPdName: string;
+  productCount: number;
+  onStartEdit: () => void;
+  onCancelEdit: () => void;
+  onSaveEdit: () => void;
+  onEditNameChange: (v: string) => void;
+  onEditEmojiChange: (v: string) => void;
+  onEditPdNameChange: (v: string) => void;
+  onDelete: () => void;
+  isSaving: boolean;
+}
+
+function CategoryRow({
+  cat,
+  isEditing,
+  editName,
+  editEmoji,
+  editPdName,
+  productCount,
+  onStartEdit,
+  onCancelEdit,
+  onSaveEdit,
+  onEditNameChange,
+  onEditEmojiChange,
+  onEditPdNameChange,
+  onDelete,
+  isSaving,
+}: CategoryRowProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: cat.id });
+  const style: React.CSSProperties = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
+
+  return (
+    <div ref={setNodeRef} style={style} className="flex items-start gap-2 rounded-md border bg-card p-2">
+      <button {...attributes} {...listeners} className="mt-1 cursor-grab text-muted-foreground hover:text-foreground shrink-0">
+        <GripVertical className="h-4 w-4" />
+      </button>
+      {isEditing ? (
+        <div className="flex-1 space-y-2">
+          <div className="flex gap-2">
+            <Input value={editEmoji} onChange={(e) => onEditEmojiChange(e.target.value)} placeholder="📦" className="w-16 text-center" maxLength={4} />
+            <Input value={editName} onChange={(e) => onEditNameChange(e.target.value)} placeholder="Name" className="flex-1" />
+          </div>
+          <Input value={editPdName} onChange={(e) => onEditPdNameChange(e.target.value)} placeholder="Power Drop name (optional, e.g. PD Beef)" />
+          <div className="flex gap-2">
+            <Button size="sm" onClick={onSaveEdit} disabled={!editName.trim() || isSaving}>Save</Button>
+            <Button size="sm" variant="outline" onClick={onCancelEdit}>Cancel</Button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex-1 flex items-center gap-2 min-w-0">
+          <span className="text-base">{cat.emoji ?? "📦"}</span>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium truncate">{cat.name}</p>
+            {cat.powerDropName && <p className="text-xs text-muted-foreground truncate">PD: {cat.powerDropName}</p>}
+          </div>
+          <span className="text-xs text-muted-foreground shrink-0">{productCount} products</span>
+        </div>
+      )}
+      {!isEditing && (
+        <div className="flex gap-1 shrink-0">
+          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={onStartEdit}>
+            <Pencil className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-7 w-7 text-destructive hover:text-destructive"
+            onClick={onDelete}
+            disabled={productCount > 0}
+            title={productCount > 0 ? `${productCount} products assigned` : "Delete category"}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function AdminGuard({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -303,6 +390,9 @@ interface ProductCardProps {
   isUpdatingAvailability: boolean;
   onSetVisibility: (v: "regular_only" | "always" | "power_drop_only") => void;
   isUpdatingVisibility: boolean;
+  // Category display (resolved from live DB)
+  categoryEmoji?: string;
+  categoryName?: string;
   // Selection mode
   selectMode?: boolean;
   selected?: boolean;
@@ -329,6 +419,8 @@ function SortableProductCard({
   isUpdatingAvailability,
   onSetVisibility,
   isUpdatingVisibility,
+  categoryEmoji,
+  categoryName,
   selectMode = false,
   selected = false,
   onToggleSelect,
@@ -407,10 +499,10 @@ function SortableProductCard({
           <span className="text-xs opacity-50">No image</span>
         </div>
 
-        {/* Category emoji pill */}
+        {/* Category emoji pill — resolved at call site via categoryMap prop */}
         <div className="absolute bottom-2 left-2 bg-background/90 backdrop-blur-sm rounded-full px-2 py-0.5 text-xs font-medium capitalize flex items-center gap-1">
-          <span>{CATEGORY_EMOJI[product.category] ?? "📦"}</span>
-          <span>{product.category}</span>
+          <span>{categoryEmoji ?? "📦"}</span>
+          <span>{categoryName ?? product.category}</span>
         </div>
 
         {/* Badge chip */}
@@ -603,6 +695,34 @@ function AdminContent() {
   const [localAnnouncement, setLocalAnnouncement] = useState<string | null>(null);
   const displayAnnouncement = localAnnouncement ?? announcementMessage;
 
+  // ─── Categories ─────────────────────────────────────────────────────────────
+  const { data: categories = [], isLoading: categoriesLoading } = trpc.categories.list.useQuery();
+  const [manageCatsOpen, setManageCatsOpen] = useState(false);
+  const [newCatName, setNewCatName] = useState("");
+  const [newCatEmoji, setNewCatEmoji] = useState("");
+  const [editCatId, setEditCatId] = useState<number | null>(null);
+  const [editCatName, setEditCatName] = useState("");
+  const [editCatEmoji, setEditCatEmoji] = useState("");
+  const [editCatPdName, setEditCatPdName] = useState("");
+  const [deleteCatId, setDeleteCatId] = useState<number | null>(null);
+
+  const createCategory = trpc.admin.categories.create.useMutation({
+    onSuccess: () => { utils.categories.list.invalidate(); setNewCatName(""); setNewCatEmoji(""); },
+    onError: (err) => toast.error(err.message),
+  });
+  const updateCategory = trpc.admin.categories.update.useMutation({
+    onSuccess: () => { utils.categories.list.invalidate(); setEditCatId(null); },
+    onError: (err) => toast.error(err.message),
+  });
+  const reorderCategories = trpc.admin.categories.reorder.useMutation({
+    onSuccess: () => utils.categories.list.invalidate(),
+    onError: (err) => toast.error(err.message),
+  });
+  const deleteCategory = trpc.admin.categories.delete.useMutation({
+    onSuccess: () => { utils.categories.list.invalidate(); setDeleteCatId(null); toast.success("Category deleted"); },
+    onError: (err) => { toast.error(err.message); setDeleteCatId(null); },
+  });
+
   // ─── Products ────────────────────────────────────────────────────────────────
   const { data: products, isLoading: productsLoading } = trpc.products.list.useQuery(undefined, {
     staleTime: 10_000,
@@ -705,7 +825,7 @@ function AdminContent() {
   });
 
   // ─── Filter & sort state ─────────────────────────────────────────────────────
-  const [activeCategory, setActiveCategory] = useState<Category | "all">("all");
+  const [activeCategory, setActiveCategory] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [sortField, setSortField] = useState<SortField>("custom");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
@@ -756,11 +876,12 @@ function AdminContent() {
     });
   }, [orderedProducts, activeCategory, searchQuery, sortField, sortDir]);
 
-  // Category counts
+  // Category counts (keyed by slug)
   const categoryCounts = useMemo(() => {
     const counts: Record<string, number> = { all: products?.length ?? 0 };
     for (const p of products ?? []) {
-      counts[p.category] = (counts[p.category] ?? 0) + 1;
+      const slug = p.category;
+      counts[slug] = (counts[slug] ?? 0) + 1;
     }
     return counts;
   }, [products]);
@@ -857,7 +978,7 @@ function AdminContent() {
         id: p.id,
         name: p.name,
         cut: p.cut,
-        category: p.category as Category,
+        category: p.category,
         description: p.description ?? "",
         price: p.price,
         powerDropPrice: p.powerDropPrice ?? "",
@@ -1216,6 +1337,10 @@ function AdminContent() {
               <Upload className="h-4 w-4 mr-1.5" />
               Import CSV
             </Button>
+            <Button size="sm" variant="outline" onClick={() => setManageCatsOpen(true)}>
+              <Tag className="h-4 w-4 mr-1.5" />
+              Categories
+            </Button>
             <Button size="sm" onClick={openAddModal}>
               <Plus className="h-4 w-4 mr-1.5" />
               Add Product
@@ -1281,23 +1406,26 @@ function AdminContent() {
 
         {/* Category filter tabs */}
         <div className="flex flex-wrap gap-1.5">
-          {CATEGORIES.map((cat) => {
-            const count = categoryCounts[cat.value] ?? 0;
-            const isActive = activeCategory === cat.value;
+          {/* All tab */}
+          {([{ slug: "all", name: "All", emoji: null as string | null }] as { slug: string; name: string; emoji: string | null }[]).concat(
+            categories.map((c) => ({ slug: c.slug, name: c.name, emoji: c.emoji }))
+          ).map((cat) => {
+            const count = categoryCounts[cat.slug] ?? 0;
+            const isActive = activeCategory === cat.slug;
             return (
               <button
-                key={cat.value}
-                onClick={() => setActiveCategory(cat.value as Category | "all")}
+                key={cat.slug}
+                onClick={() => setActiveCategory(cat.slug)}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors border ${
                   isActive
                     ? "bg-foreground text-background border-foreground"
                     : "bg-transparent text-muted-foreground border-border hover:border-foreground/40 hover:text-foreground"
                 }`}
               >
-                {cat.value !== "all" && (
-                  <span>{CATEGORY_EMOJI[cat.value]}</span>
+                {cat.slug !== "all" && cat.emoji && (
+                  <span>{cat.emoji}</span>
                 )}
-                {cat.label}
+                {cat.name}
                 <span
                   className={`rounded-full px-1.5 py-0 text-[10px] font-semibold ${
                     isActive ? "bg-background/20" : "bg-muted"
@@ -1346,13 +1474,15 @@ function AdminContent() {
         ) : filteredProducts.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
             <div className="text-5xl opacity-30">
-              {activeCategory !== "all" ? CATEGORY_EMOJI[activeCategory] : "📦"}
+              {activeCategory !== "all"
+                ? (categories.find((c) => c.slug === activeCategory)?.emoji ?? "📦")
+                : "📦"}
             </div>
             <p className="font-medium text-sm">
               {searchQuery
                 ? `No products match "${searchQuery}"`
                 : activeCategory !== "all"
-                ? `No ${activeCategory} products yet`
+                ? `No ${categories.find((c) => c.slug === activeCategory)?.name ?? activeCategory} products yet`
                 : "No products yet"}
             </p>
             <p className="text-xs text-muted-foreground">
@@ -1376,10 +1506,14 @@ function AdminContent() {
               strategy={rectSortingStrategy}
             >
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-                {filteredProducts.map((p) => (
+                {filteredProducts.map((p) => {
+                  const catEntry = categories.find((c) => c.slug === p.category);
+                  return (
                   <SortableProductCard
                     key={p.id}
                     product={p}
+                    categoryEmoji={catEntry?.emoji ?? undefined}
+                    categoryName={catEntry?.name ?? undefined}
                     onEdit={() => openEditModal(p)}
                     onDelete={() => setDeleteConfirmId(p.id)}
                     onToggleAvailability={(available) =>
@@ -1410,7 +1544,8 @@ function AdminContent() {
                     selected={selectedIds.has(p.id)}
                     onToggleSelect={() => toggleOneProduct(p.id)}
                   />
-                ))}
+                  );
+                })}
               </div>
             </SortableContext>
           </DndContext>
@@ -1621,6 +1756,127 @@ function AdminContent() {
         </DialogContent>
       </Dialog>
 
+      {/* ─── Manage Categories Dialog ───────────────────────────────────────── */}
+      <Dialog open={manageCatsOpen} onOpenChange={setManageCatsOpen}>
+        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Manage Categories</DialogTitle>
+            <DialogDescription>
+              Add, rename, or reorder product categories. Drag the grip handle to reorder.
+              Deleting a category is blocked if products are assigned to it.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-2 py-2">
+            {categoriesLoading ? (
+              <div className="space-y-2">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <Skeleton key={i} className="h-10 w-full" />
+                ))}
+              </div>
+            ) : (
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={(event) => {
+                  const { active, over } = event;
+                  if (!over || active.id === over.id) return;
+                  const oldIdx = categories.findIndex((c) => c.id === active.id);
+                  const newIdx = categories.findIndex((c) => c.id === over.id);
+                  const reordered = arrayMove(categories, oldIdx, newIdx);
+                  reorderCategories.mutate({ orderedIds: reordered.map((c) => c.id) });
+                }}
+              >
+                <SortableContext items={categories.map((c) => c.id)} strategy={rectSortingStrategy}>
+                  <div className="space-y-1">
+                    {categories.map((cat) => (
+                      <CategoryRow
+                        key={cat.id}
+                        cat={cat}
+                        isEditing={editCatId === cat.id}
+                        editName={editCatName}
+                        editEmoji={editCatEmoji}
+                        editPdName={editCatPdName}
+                        productCount={categoryCounts[cat.slug] ?? 0}
+                        onStartEdit={() => {
+                          setEditCatId(cat.id);
+                          setEditCatName(cat.name);
+                          setEditCatEmoji(cat.emoji ?? "");
+                          setEditCatPdName(cat.powerDropName ?? "");
+                        }}
+                        onCancelEdit={() => setEditCatId(null)}
+                        onSaveEdit={() => updateCategory.mutate({ id: cat.id, name: editCatName, emoji: editCatEmoji || undefined, powerDropName: editCatPdName || undefined })}
+                        onEditNameChange={setEditCatName}
+                        onEditEmojiChange={setEditCatEmoji}
+                        onEditPdNameChange={setEditCatPdName}
+                        onDelete={() => setDeleteCatId(cat.id)}
+                        isSaving={updateCategory.isPending}
+                      />
+                    ))}
+                  </div>
+                </SortableContext>
+              </DndContext>
+            )}
+
+            {/* Add new category */}
+            <div className="border-t pt-3 mt-3 space-y-2">
+              <p className="text-xs font-medium text-muted-foreground">Add new category</p>
+              <div className="flex gap-2">
+                <Input
+                  value={newCatEmoji}
+                  onChange={(e) => setNewCatEmoji(e.target.value)}
+                  placeholder="📦"
+                  className="w-16 text-center"
+                  maxLength={4}
+                />
+                <Input
+                  value={newCatName}
+                  onChange={(e) => setNewCatName(e.target.value)}
+                  placeholder="Category name"
+                  className="flex-1"
+                  onKeyDown={(e) => { if (e.key === "Enter" && newCatName.trim()) createCategory.mutate({ name: newCatName.trim(), emoji: newCatEmoji || undefined }); }}
+                />
+                <Button
+                  size="sm"
+                  disabled={!newCatName.trim() || createCategory.isPending}
+                  onClick={() => createCategory.mutate({ name: newCatName.trim(), emoji: newCatEmoji || undefined })}
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete category confirmation */}
+      <AlertDialog open={deleteCatId !== null} onOpenChange={(open) => { if (!open) setDeleteCatId(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete category?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteCatId !== null && (() => {
+                const cat = categories.find((c) => c.id === deleteCatId);
+                const count = categoryCounts[cat?.slug ?? ""] ?? 0;
+                if (count > 0) return `Cannot delete “${cat?.name}” — ${count} product${count !== 1 ? "s are" : " is"} assigned to it. Reassign those products first.`;
+                return `Delete “${cat?.name}”? This cannot be undone.`;
+              })()}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            {deleteCatId !== null && (categoryCounts[categories.find((c) => c.id === deleteCatId)?.slug ?? ""] ?? 0) === 0 && (
+              <AlertDialogAction
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                onClick={() => deleteCatId !== null && deleteCategory.mutate({ id: deleteCatId })}
+              >
+                Delete
+              </AlertDialogAction>
+            )}
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* ─── Product Add/Edit Modal ───────────────────────────────────────────── */}
       <Dialog open={productModalOpen} onOpenChange={setProductModalOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -1724,16 +1980,16 @@ function AdminContent() {
                   <Select
                     value={editingProduct.category}
                     onValueChange={(v) =>
-                      setEditingProduct((p) => ({ ...p, category: v as Category }))
+                      setEditingProduct((p) => ({ ...p, category: v }))
                     }
                   >
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {CATEGORIES.filter((cat) => cat.value !== "all").map((cat) => (
-                        <SelectItem key={cat.value} value={cat.value}>
-                          {CATEGORY_EMOJI[cat.value]} {cat.label}
+                      {categories.map((cat) => (
+                        <SelectItem key={cat.slug} value={cat.slug}>
+                          {cat.emoji} {cat.name}
                         </SelectItem>
                       ))}
                     </SelectContent>

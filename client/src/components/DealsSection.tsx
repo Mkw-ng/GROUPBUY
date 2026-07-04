@@ -98,7 +98,7 @@ const PLACEHOLDER_PRODUCTS = [
 
 type Product = {
   id: number;
-  category: "beef" | "pork" | "lamb" | "poultry" | "seafood" | "other";
+  category: string;
   name: string;
   cut: string;
   price: string;
@@ -228,6 +228,18 @@ export default function DealsSection({ onAddToCart, powerDropActive = false }: D
   const { data: dbProducts, isLoading } = trpc.products.list.useQuery(undefined, {
     staleTime: 30_000,
   });
+  const { data: dbCategories = [] } = trpc.categories.list.useQuery(undefined, {
+    staleTime: 60_000,
+  });
+
+  // Build category list from DB, falling back to hardcoded list if DB is empty
+  const liveCategories = dbCategories.length > 0
+    ? dbCategories.map((c) => ({
+        id: c.slug,
+        label: (powerDropActive && c.powerDropName) ? c.powerDropName : c.name,
+        emoji: c.emoji,
+      }))
+    : CATEGORIES.map((c) => ({ id: c.id, label: c.label, emoji: null }));
 
   // Use DB products if available, otherwise show placeholders
   const allProducts: Product[] = (dbProducts && dbProducts.length > 0)
@@ -244,7 +256,7 @@ export default function DealsSection({ onAddToCart, powerDropActive = false }: D
   });
 
   // Derive which categories have at least one visible product
-  const categoriesWithProducts = new Set(visibleProducts.map((p) => p.category));
+  const categoriesWithProducts = new Set<string>(visibleProducts.map((p) => p.category));
 
   const filtered = visibleProducts.filter((p) => {
     const matchCat = activeCategory === "all" || p.category === activeCategory;
@@ -328,21 +340,32 @@ export default function DealsSection({ onAddToCart, powerDropActive = false }: D
                 Category
               </p>
               <nav className="flex flex-row flex-wrap lg:flex-col gap-1">
-                {CATEGORIES.filter((cat) =>
-                  cat.id === "all" || categoriesWithProducts.has(cat.id as Product["category"])
-                ).map((cat) => (
-                  <button
-                    key={cat.id}
-                    onClick={() => setActiveCategory(cat.id)}
-                    className={`cat-tab text-left font-body text-[13px] font-medium px-3 py-2 transition-colors ${
-                      activeCategory === cat.id
-                        ? "active text-[#0a0a0a] bg-[#eae3d2]"
-                        : "text-[#8a857c] hover:text-[#0a0a0a]"
-                    }`}
-                  >
-                    {cat.label}
-                  </button>
-                ))}
+                {/* All tab */}
+                <button
+                  onClick={() => setActiveCategory("all")}
+                  className={`cat-tab text-left font-body text-[13px] font-medium px-3 py-2 transition-colors ${
+                    activeCategory === "all"
+                      ? "active text-[#0a0a0a] bg-[#eae3d2]"
+                      : "text-[#8a857c] hover:text-[#0a0a0a]"
+                  }`}
+                >
+                  All Drops
+                </button>
+                {liveCategories
+                  .filter((cat) => categoriesWithProducts.has(cat.id))
+                  .map((cat) => (
+                    <button
+                      key={cat.id}
+                      onClick={() => setActiveCategory(cat.id)}
+                      className={`cat-tab text-left font-body text-[13px] font-medium px-3 py-2 transition-colors ${
+                        activeCategory === cat.id
+                          ? "active text-[#0a0a0a] bg-[#eae3d2]"
+                          : "text-[#8a857c] hover:text-[#0a0a0a]"
+                      }`}
+                    >
+                      {cat.emoji && <span className="mr-1">{cat.emoji}</span>}{cat.label}
+                    </button>
+                  ))}
               </nav>
             </div>
           </aside>

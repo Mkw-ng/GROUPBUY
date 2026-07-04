@@ -1,6 +1,6 @@
 import { and, asc, count, desc, eq, isNull, like, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, InsertProduct, InsertOrder, orders, products, settings, users, OrderItem, drops, Drop } from "../drizzle/schema";
+import { InsertUser, InsertProduct, InsertOrder, orders, products, settings, users, OrderItem, drops, Drop, categories, Category, InsertCategory } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -692,6 +692,127 @@ export async function getOrderedQtyByProduct(): Promise<Map<number, number>> {
       const qty = isKg && finalW > 0 ? finalW : (item.qty ?? 0);
       result.set(item.id, (result.get(item.id) ?? 0) + qty);
     }
+  }
+  return result;
+}
+
+// ─── Category helpers ─────────────────────────────────────────────────────────
+
+/** Return all categories ordered by sortOrder. */
+export async function getAllCategories(): Promise<Category[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(categories).orderBy(asc(categories.sortOrder));
+}
+
+/** Return a single category by slug, or null if not found. */
+export async function getCategoryBySlug(slug: string): Promise<Category | null> {
+  const db = await getDb();
+  if (!db) return null;
+  const rows = await db.select().from(categories).where(eq(categories.slug, slug)).limit(1);
+  return rows[0] ?? null;
+}
+
+/**
+ * Create or update a category.
+ * If id is provided, update that row; otherwise insert a new row.
+ * Returns the resulting category.
+ */
+export async function upsertCategory(data: {
+  id?: number;
+  slug?: string;
+  name: string;
+  powerDropName?: string | null;
+  emoji?: string | null;
+  sortOrder?: number;
+}): Promise<Category> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  if (data.id) {
+    // Update existing
+    await db
+      .update(categories)
+      .set({
+        name: data.name,
+        powerDropName: data.powerDropName ?? null,
+        emoji: data.emoji ?? null,
+        ...(data.sortOrder !== undefined ? { sortOrder: data.sortOrder } : {}),
+      })
+      .where(eq(categories.id, data.id));
+    const rows = await db.select().from(categories).where(eq(categories.id, data.id)).limit(1);
+    return rows[0];
+  } else {
+    // Insert new — slug required
+    if (!data.slug) throw new Error("slug is required when creating a category");
+    await db.insert(categories).values({
+      slug: data.slug,
+      name: data.name,
+      powerDropName: data.powerDropName ?? null,
+      emoji: data.emoji ?? null,
+      sortOrder: data.sortOrder ?? 0,
+    });
+    const rows = await db.select().from(categories).where(eq(categories.slug, data.slug)).limit(1);
+    return rows[0];
+  }
+}
+
+/**
+ * Reorder categories by providing an ordered array of ids.
+ * Each id gets sortOrder = its index in the array.
+ */
+export async function reorderCategories(orderedIds: number[]): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await Promise.all(
+    orderedIds.map((id, index) =>
+      db.update(categories).set({ sortOrder: index }).where(eq(categories.id, id))
+    )
+  );
+}
+
+/**
+ * Delete a category by id.
+ * Throws if any products still reference this category's slug.
+ * Returns the number of products blocking deletion (0 = deleted).
+ */
+export async function deleteCategory(id: number): Promise<{ blocked: boolean; productCount: number }> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  // Find the slug for this category
+  const rows = await db.select().from(categories).where(eq(categories.id, id)).limit(1);
+  if (!rows[0]) throw new Error("Category not found");
+  const slug = rows[0].slug;
+
+  // Count products using this slug
+  const countRows = await db
+    .select({ cnt: count() })
+    .from(products)
+    .where(eq(products.category, slug));
+  const productCount = Number(countRows[0]?.cnt ?? 0);
+
+  if (productCount > 0) {
+    return { blocked: true, productCount };
+  }
+
+  await db.delete(categories).where(eq(categories.id, id));
+  return { blocked: false, productCount: 0 };
+}
+
+/**
+ * Return a map of category slug → product count for all categories.
+ */
+export async function getCategoryProductCounts(): Promise<Map<string, number>> {
+  const db = await getDb();
+  const result = new Map<string, number>();
+  if (!db) return result;
+  const rows = await db
+    .select({ category: products.category, cnt: count() })
+    .from(products)
+    .groupBy(products.category);
+  for (const row of rows) {
+    result.set(row.category, Number(row.cnt));
   }
   return result;
 }

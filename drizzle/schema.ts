@@ -35,6 +35,25 @@ export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 
 /**
+ * Categories table — admin-managed list of product categories.
+ * slug is the stable machine id (e.g. "beef") stored on products.
+ * name is the regular display name; powerDropName overrides it during Power Drop.
+ */
+export const categories = mysqlTable("categories", {
+  id: int("id").autoincrement().primaryKey(),
+  slug: varchar("slug", { length: 64 }).notNull().unique(),
+  name: varchar("name", { length: 64 }).notNull(),
+  powerDropName: varchar("powerDropName", { length: 64 }),
+  emoji: varchar("emoji", { length: 16 }),
+  sortOrder: int("sortOrder").notNull().default(0),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Category = typeof categories.$inferSelect;
+export type InsertCategory = typeof categories.$inferInsert;
+
+/**
  * Products table — each row is a product available in the group buy.
  * powerDropPrice is the special event price shown during Power Drop events.
  */
@@ -42,30 +61,8 @@ export const products = mysqlTable("products", {
   id: int("id").autoincrement().primaryKey(),
   name: varchar("name", { length: 255 }).notNull(),
   cut: varchar("cut", { length: 255 }).notNull().default(""),
-  category: mysqlEnum("category", [
-    "limited-offer",
-    "featured-deals",
-    "m3atfr3ak",
-    "beef",
-    "pork",
-    "lamb",
-    "poultry",
-    "seafood",
-    "whole-slabs",
-    "whole-animal",
-    "box-deals",
-    "mince",
-    "offal-tallow",
-    "value-added",
-    "korean-bbq-hotpot",
-    "burger-sausages",
-    "bbq-packs",
-    "quick-meals",
-    "freezer",
-    "other",
-  ])
-    .notNull()
-    .default("beef"),
+  /** Category slug — references categories.slug (enforced at application level) */
+  category: varchar("category", { length: 64 }).notNull().default("beef"),
   description: text("description"),
   price: decimal("price", { precision: 10, scale: 2 }).notNull(),
   powerDropPrice: decimal("powerDropPrice", { precision: 10, scale: 2 }),

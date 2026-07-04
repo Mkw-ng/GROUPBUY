@@ -509,3 +509,18 @@
 - [ ] Floating action bar: confirmation dialog before each action, success toast, invalidate products, keep selection mode on after apply
 - [ ] Floating action bar: disable buttons while mutation pending
 - [ ] Tests: vitest for bulkUpdateProducts (visibility, availability, empty set rejection)
+
+## Category Management System
+- [x] DB: add categories table (slug, name, powerDropName, emoji, sortOrder, timestamps)
+- [x] DB: change products.category from mysqlEnum to varchar(64)
+- [x] DB: seed 20 categories with current names, emoji, and sort order
+- [x] DB: run pnpm db:push and verify product data intact
+- [ ] Backend: add getAllCategories, upsertCategory, reorderCategories, deleteCategory helpers in db.ts
+- [ ] Backend: public categories.list tRPC procedure
+- [ ] Backend: admin.categories router (create, update, reorder, delete with product-count guard)
+- [ ] Backend: update productInput to use z.string().min(1) + server-side slug existence check
+- [ ] Backend: update CSV import validator to check category against categories table
+- [ ] Admin UI: Manage Categories dialog with dnd-kit reorder, inline edit, add, delete
+- [ ] Admin UI: replace hardcoded CATEGORIES/CATEGORY_EMOJI maps with categories.list in product form and grid filter tabs
+- [ ] Public site: update DealsSection category tabs to use categories.list with powerDropName support
+- [ ] Tests: slug generation, delete-blocked, delete-succeeds, name resolution

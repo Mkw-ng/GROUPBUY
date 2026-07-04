@@ -12,7 +12,7 @@ import type { Application } from "express";
 import multer from "multer";
 import { z } from "zod";
 import { sdk } from "./_core/sdk";
-import { getAllProducts, upsertProduct } from "./db";
+import { getAllCategories, getAllProducts, upsertProduct } from "./db";
 import { ALL_BADGES } from "../shared/badges";
 
 // ─── CSV escaping ─────────────────────────────────────────────────────────────
@@ -114,57 +114,64 @@ export function parseCsvRows(raw: string): Record<string, string>[] {
 
 // ─── Row validator ────────────────────────────────────────────────────────────
 
-const CATEGORY_VALUES = [
+const VISIBILITY_VALUES = ["regular_only", "always", "power_drop_only"] as const;
+
+/**
+ * Build the row schema with a dynamic category allowlist fetched from the DB.
+ * Pass `allowedSlugs` as a Set of valid category slugs.
+ */
+function buildRowSchema(allowedSlugs: Set<string>) {
+  return z.object({
+    id: z.string().transform((v) => (v === "" ? undefined : Number(v))).pipe(
+      z.number().int().positive().optional()
+    ),
+    name: z.string().min(1, "name is required"),
+    cut: z.string().default(""),
+    category: z.string().min(1, "category is required").superRefine((v, ctx) => {
+      if (!allowedSlugs.has(v)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `category "${v}" is not a valid category slug`,
+        });
+      }
+    }),
+    description: z.string().transform((v) => (v === "" ? null : v)).pipe(z.string().nullable()),
+    price: z.string().regex(/^\d+(\.\d{1,2})?$/, "price must be a valid decimal number"),
+    powerDropPrice: z.string().transform((v) => (v === "" ? null : v)).pipe(
+      z.string().regex(/^\d+(\.\d{1,2})?$/, "powerDropPrice must be a valid decimal number").nullable()
+    ),
+    retailPrice: z.string().transform((v) => (v === "" ? null : v)).pipe(
+      z.string().regex(/^\d+(\.\d{1,2})?$/, "retailPrice must be a valid decimal number").nullable()
+    ),
+    unit: z.string().min(1, "unit is required"),
+    badge: z.string().transform((v) => (v === "" ? null : v)).pipe(
+      z.enum(["LIMITED", "POPULAR", "NEW", "SOLD OUT"] as const).nullable()
+    ),
+    available: z.preprocess((v) => {
+      const upper = String(v).toUpperCase();
+      if (upper === "TRUE") return true;
+      if (upper === "FALSE") return false;
+      return v; // leave as-is so the next step can produce a proper error
+    }, z.boolean({ error: "available must be TRUE or FALSE" })),
+    visibility: z.enum(VISIBILITY_VALUES).default("regular_only"),
+    stockLimit: z.string().transform((v) => (v === "" ? null : v)).pipe(
+      z.string().regex(/^\d+(\.\d{1,3})?$/, "stockLimit must be a valid decimal number").nullable()
+    ),
+    sortOrder: z.string().transform((v) => (v === "" ? 0 : Number(v))).pipe(
+      z.number().int().min(0)
+    ),
+    img: z.string().transform((v) => (v === "" ? null : v)).pipe(z.string().nullable()),
+  });
+}
+
+// Keep a static schema for unit tests (uses a broad allowlist)
+const STATIC_TEST_SLUGS = new Set([
   "limited-offer", "featured-deals", "m3atfr3ak", "beef", "pork", "lamb",
   "poultry", "seafood", "whole-slabs", "whole-animal", "box-deals", "mince",
   "offal-tallow", "value-added", "korean-bbq-hotpot", "burger-sausages",
   "bbq-packs", "quick-meals", "freezer", "other",
-] as const;
-
-const VISIBILITY_VALUES = ["regular_only", "always", "power_drop_only"] as const;
-
-const BADGE_VALUES = [...ALL_BADGES, ""] as const;
-
-const rowSchema = z.object({
-  id: z.string().transform((v) => (v === "" ? undefined : Number(v))).pipe(
-    z.number().int().positive().optional()
-  ),
-  name: z.string().min(1, "name is required"),
-  cut: z.string().default(""),
-  category: z.preprocess(
-    (v) => v,
-    z.enum(CATEGORY_VALUES, {
-      message: `category must be one of: ${CATEGORY_VALUES.join(", ")}`,
-    })
-  ),
-  // Note: z.enum in zod v4 uses 'message' not 'errorMap'
-  description: z.string().transform((v) => (v === "" ? null : v)).pipe(z.string().nullable()),
-  price: z.string().regex(/^\d+(\.\d{1,2})?$/, "price must be a valid decimal number"),
-  powerDropPrice: z.string().transform((v) => (v === "" ? null : v)).pipe(
-    z.string().regex(/^\d+(\.\d{1,2})?$/, "powerDropPrice must be a valid decimal number").nullable()
-  ),
-  retailPrice: z.string().transform((v) => (v === "" ? null : v)).pipe(
-    z.string().regex(/^\d+(\.\d{1,2})?$/, "retailPrice must be a valid decimal number").nullable()
-  ),
-  unit: z.string().min(1, "unit is required"),
-  badge: z.string().transform((v) => (v === "" ? null : v)).pipe(
-    z.enum(["LIMITED", "POPULAR", "NEW", "SOLD OUT"] as const).nullable()
-  ),
-  available: z.preprocess((v) => {
-    const upper = String(v).toUpperCase();
-    if (upper === "TRUE") return true;
-    if (upper === "FALSE") return false;
-    return v; // leave as-is so the next step can produce a proper error
-  }, z.boolean({ error: "available must be TRUE or FALSE" })),
-  visibility: z.enum(VISIBILITY_VALUES).default("regular_only"),
-  stockLimit: z.string().transform((v) => (v === "" ? null : v)).pipe(
-    z.string().regex(/^\d+(\.\d{1,3})?$/, "stockLimit must be a valid decimal number").nullable()
-  ),
-  sortOrder: z.string().transform((v) => (v === "" ? 0 : Number(v))).pipe(
-    z.number().int().min(0)
-  ),
-  img: z.string().transform((v) => (v === "" ? null : v)).pipe(z.string().nullable()),
-});
+]);
+export const rowSchema = buildRowSchema(STATIC_TEST_SLUGS);
 
 export type ValidatedProductRow = z.infer<typeof rowSchema>;
 
@@ -180,9 +187,11 @@ export interface ParseResult {
 
 /**
  * Validate all rows from parseCsvRows output.
+ * Pass `allowedSlugs` to validate category against the live DB; omits for tests (uses static set).
  * Returns validated rows (empty on any error) and error list.
  */
-export function validateProductRows(rawRows: Record<string, string>[]): ParseResult {
+export function validateProductRows(rawRows: Record<string, string>[], allowedSlugs?: Set<string>): ParseResult {
+  const schema = allowedSlugs ? buildRowSchema(allowedSlugs) : rowSchema;
   const rows: ValidatedProductRow[] = [];
   const errors: RowError[] = [];
 
@@ -209,7 +218,7 @@ export function validateProductRows(rawRows: Record<string, string>[]): ParseRes
       img: raw["img"] ?? "",
     };
 
-    const result = rowSchema.safeParse(input);
+    const result = schema.safeParse(input);
     if (result.success) {
       rows.push(result.data);
     } else {
@@ -312,7 +321,11 @@ export function registerAdminProductRoutes(app: Application) {
         return;
       }
 
-      const { rows, errors } = validateProductRows(rawRows);
+      // Fetch live category slugs for validation
+      const allCategories = await getAllCategories();
+      const allowedSlugs = new Set(allCategories.map((c) => c.slug));
+
+      const { rows, errors } = validateProductRows(rawRows, allowedSlugs);
 
       if (errors.length > 0) {
         res.json({ updates: 0, creates: 0, errors });
