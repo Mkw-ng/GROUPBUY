@@ -524,3 +524,20 @@
 - [ ] Admin UI: replace hardcoded CATEGORIES/CATEGORY_EMOJI maps with categories.list in product form and grid filter tabs
 - [ ] Public site: update DealsSection category tabs to use categories.list with powerDropName support
 - [ ] Tests: slug generation, delete-blocked, delete-succeeds, name resolution
+
+## Category Sections — Grouped Sidebar Navigation
+- [ ] DB: add categorySections table (id, name, sortOrder, timestamps)
+- [ ] DB: add sectionId (nullable int) to categories table
+- [ ] DB: run pnpm db:push — existing categories start ungrouped
+- [ ] Backend: sections DB helpers (getAllSections, upsertSection, reorderSections, deleteSection with unassign)
+- [ ] Backend: public sections.list procedure
+- [ ] Backend: categories.list (public + admin) returns sectionId
+- [ ] Backend: admin.sections router (create, rename, reorder, delete)
+- [ ] Backend: admin.categories.update gains optional sectionId field
+- [ ] Admin UI: Sections area at top of Manage Categories dialog (inline rename, dnd-kit reorder, Add Section, delete+confirm)
+- [ ] Admin UI: section dropdown on each category row in the dialog
+- [ ] Admin UI: category list grouped by section in the dialog
+- [ ] Public site: DealsSection sidebar renders grouped sections with headings, ungrouped last
+- [ ] Public site: hide sections whose categories are all hidden (no orphan headings)
+- [ ] Public site: mobile row-groups with section headings
+- [ ] Tests: delete-section unassigns categories, sections.list ordering

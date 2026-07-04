@@ -231,6 +231,9 @@ export default function DealsSection({ onAddToCart, powerDropActive = false }: D
   const { data: dbCategories = [] } = trpc.categories.list.useQuery(undefined, {
     staleTime: 60_000,
   });
+  const { data: dbSections = [] } = trpc.sections.list.useQuery(undefined, {
+    staleTime: 60_000,
+  });
 
   // Build category list from DB, falling back to hardcoded list if DB is empty
   const liveCategories = dbCategories.length > 0
@@ -238,8 +241,9 @@ export default function DealsSection({ onAddToCart, powerDropActive = false }: D
         id: c.slug,
         label: (powerDropActive && c.powerDropName) ? c.powerDropName : c.name,
         emoji: c.emoji,
+        sectionId: c.sectionId ?? null,
       }))
-    : CATEGORIES.map((c) => ({ id: c.id, label: c.label, emoji: null }));
+    : CATEGORIES.map((c) => ({ id: c.id, label: c.label, emoji: null, sectionId: null }));
 
   // Use DB products if available, otherwise show placeholders
   const allProducts: Product[] = (dbProducts && dbProducts.length > 0)
@@ -351,21 +355,94 @@ export default function DealsSection({ onAddToCart, powerDropActive = false }: D
                 >
                   All Drops
                 </button>
-                {liveCategories
-                  .filter((cat) => categoriesWithProducts.has(cat.id))
-                  .map((cat) => (
-                    <button
-                      key={cat.id}
-                      onClick={() => setActiveCategory(cat.id)}
-                      className={`cat-tab text-left font-body text-[13px] font-medium px-3 py-2 transition-colors ${
-                        activeCategory === cat.id
-                          ? "active text-[#0a0a0a] bg-[#eae3d2]"
-                          : "text-[#8a857c] hover:text-[#0a0a0a]"
-                      }`}
-                    >
-                      {cat.emoji && <span className="mr-1">{cat.emoji}</span>}{cat.label}
-                    </button>
-                  ))}
+
+                {/* Grouped sections */}
+                {dbSections.length > 0 ? (
+                  <>
+                    {/* Sections with their categories */}
+                    {dbSections.map((sec) => {
+                      const sectionCats = liveCategories.filter(
+                        (cat) => cat.sectionId === sec.id && categoriesWithProducts.has(cat.id)
+                      );
+                      if (sectionCats.length === 0) return null;
+                      return (
+                        <div key={sec.id} className="w-full">
+                          <p className="font-display text-[9px] tracking-[0.2em] text-[#8a857c] uppercase px-3 pt-3 pb-1 hidden lg:block">
+                            {sec.name}
+                          </p>
+                          {/* Mobile: section label inline */}
+                          <p className="font-display text-[9px] tracking-[0.2em] text-[#8a857c] uppercase px-3 pt-2 pb-0.5 lg:hidden">
+                            {sec.name}
+                          </p>
+                          <div className="flex flex-row flex-wrap lg:flex-col gap-1">
+                            {sectionCats.map((cat) => (
+                              <button
+                                key={cat.id}
+                                onClick={() => setActiveCategory(cat.id)}
+                                className={`cat-tab text-left font-body text-[13px] font-medium px-3 py-2 transition-colors ${
+                                  activeCategory === cat.id
+                                    ? "active text-[#0a0a0a] bg-[#eae3d2]"
+                                    : "text-[#8a857c] hover:text-[#0a0a0a]"
+                                }`}
+                              >
+                                {cat.emoji && <span className="mr-1">{cat.emoji}</span>}{cat.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    {/* Ungrouped categories (no section) — shown last */}
+                    {(() => {
+                      const ungrouped = liveCategories.filter(
+                        (cat) => cat.sectionId === null && categoriesWithProducts.has(cat.id)
+                      );
+                      if (ungrouped.length === 0) return null;
+                      return (
+                        <div className="w-full">
+                          {dbSections.length > 0 && (
+                            <p className="font-display text-[9px] tracking-[0.2em] text-[#8a857c] uppercase px-3 pt-3 pb-1 hidden lg:block">
+                              Other
+                            </p>
+                          )}
+                          <div className="flex flex-row flex-wrap lg:flex-col gap-1">
+                            {ungrouped.map((cat) => (
+                              <button
+                                key={cat.id}
+                                onClick={() => setActiveCategory(cat.id)}
+                                className={`cat-tab text-left font-body text-[13px] font-medium px-3 py-2 transition-colors ${
+                                  activeCategory === cat.id
+                                    ? "active text-[#0a0a0a] bg-[#eae3d2]"
+                                    : "text-[#8a857c] hover:text-[#0a0a0a]"
+                                }`}
+                              >
+                                {cat.emoji && <span className="mr-1">{cat.emoji}</span>}{cat.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </>
+                ) : (
+                  /* No sections — flat list (original behaviour) */
+                  liveCategories
+                    .filter((cat) => categoriesWithProducts.has(cat.id))
+                    .map((cat) => (
+                      <button
+                        key={cat.id}
+                        onClick={() => setActiveCategory(cat.id)}
+                        className={`cat-tab text-left font-body text-[13px] font-medium px-3 py-2 transition-colors ${
+                          activeCategory === cat.id
+                            ? "active text-[#0a0a0a] bg-[#eae3d2]"
+                            : "text-[#8a857c] hover:text-[#0a0a0a]"
+                        }`}
+                      >
+                        {cat.emoji && <span className="mr-1">{cat.emoji}</span>}{cat.label}
+                      </button>
+                    ))
+                )}
               </nav>
             </div>
           </aside>

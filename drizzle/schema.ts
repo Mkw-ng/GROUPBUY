@@ -35,9 +35,26 @@ export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 
 /**
+ * Category Sections table — named groups for the category sidebar.
+ * e.g. "DISCOVER", "PREMIUM", "SHOP BY PROTEIN"
+ */
+export const categorySections = mysqlTable("categorySections", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 64 }).notNull(),
+  sortOrder: int("sortOrder").notNull().default(0),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type CategorySection = typeof categorySections.$inferSelect;
+export type InsertCategorySection = typeof categorySections.$inferInsert;
+
+/**
  * Categories table — admin-managed list of product categories.
  * slug is the stable machine id (e.g. "beef") stored on products.
  * name is the regular display name; powerDropName overrides it during Power Drop.
+ * sectionId references categorySections.id (application-level, no FK constraint).
+ * NULL = ungrouped.
  */
 export const categories = mysqlTable("categories", {
   id: int("id").autoincrement().primaryKey(),
@@ -46,6 +63,8 @@ export const categories = mysqlTable("categories", {
   powerDropName: varchar("powerDropName", { length: 64 }),
   emoji: varchar("emoji", { length: 16 }),
   sortOrder: int("sortOrder").notNull().default(0),
+  /** FK to categorySections.id — null means ungrouped */
+  sectionId: int("sectionId"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

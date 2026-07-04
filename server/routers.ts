@@ -53,6 +53,10 @@ import {
   reorderCategories,
   deleteCategory,
   getCategoryProductCounts,
+  getAllSections,
+  upsertSection,
+  reorderSections,
+  deleteSection,
 } from "./db";
 import { OrderItem } from "../drizzle/schema";
 import {
@@ -285,6 +289,14 @@ export const appRouter = router({
   categories: router({
     list: publicProcedure.query(async () => {
       return getAllCategories();
+    }),
+  }),
+
+  // ─── Public: Sections ─────────────────────────────────────────────────────────────────
+
+  sections: router({
+    list: publicProcedure.query(async () => {
+      return getAllSections();
     }),
   }),
 
@@ -552,6 +564,7 @@ export const appRouter = router({
             name: z.string().min(1).max(64),
             powerDropName: z.string().max(64).optional().nullable(),
             emoji: z.string().max(16).optional().nullable(),
+            sectionId: z.number().int().positive().optional().nullable(),
           })
         )
         .mutation(async ({ input }) => {
@@ -560,6 +573,7 @@ export const appRouter = router({
             name: input.name,
             powerDropName: input.powerDropName ?? null,
             emoji: input.emoji ?? null,
+            sectionId: input.sectionId ?? null,
           });
           return cat;
         }),
@@ -581,6 +595,34 @@ export const appRouter = router({
               message: `Cannot delete: ${result.productCount} product${result.productCount === 1 ? " is" : "s are"} still assigned to this category. Reassign them first.`,
             });
           }
+          return { success: true };
+        }),
+    }),
+
+    sections: router({
+      create: adminProcedure
+        .input(z.object({ name: z.string().min(1).max(64) }))
+        .mutation(async ({ input }) => {
+          return upsertSection({ name: input.name });
+        }),
+
+      rename: adminProcedure
+        .input(z.object({ id: z.number().int().positive(), name: z.string().min(1).max(64) }))
+        .mutation(async ({ input }) => {
+          return upsertSection({ id: input.id, name: input.name });
+        }),
+
+      reorder: adminProcedure
+        .input(z.object({ orderedIds: z.array(z.number().int().positive()) }))
+        .mutation(async ({ input }) => {
+          await reorderSections(input.orderedIds);
+          return { success: true };
+        }),
+
+      delete: adminProcedure
+        .input(z.object({ id: z.number().int().positive() }))
+        .mutation(async ({ input }) => {
+          await deleteSection(input.id);
           return { success: true };
         }),
     }),

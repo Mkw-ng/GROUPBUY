@@ -162,6 +162,13 @@
       "when": 1783202107840,
       "tag": "0022_keen_tarantula",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "5",
+      "when": 1783205155782,
+      "tag": "0023_shocking_sentry",
+      "breakpoints": true
     }
   ]
 }

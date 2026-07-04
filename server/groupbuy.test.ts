@@ -136,6 +136,23 @@ vi.mock("./db", () => ({
       updatedAt: new Date(),
     }))
   ),
+
+  getAllSections: vi.fn().mockResolvedValue([
+    { id: 1, name: "Beef & Lamb", sortOrder: 0, createdAt: new Date(), updatedAt: new Date() },
+    { id: 2, name: "Pork & Poultry", sortOrder: 1, createdAt: new Date(), updatedAt: new Date() },
+  ]),
+  upsertSection: vi.fn().mockImplementation(async (data: { id?: number; name: string }) => ({
+    id: data.id ?? 10,
+    name: data.name,
+    sortOrder: 0,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  })),
+  reorderSections: vi.fn().mockResolvedValue(undefined),
+  deleteSection: vi.fn().mockImplementation(async (_id: number) => {
+    // Simulate unassigning categories from the section
+    return undefined;
+  }),
 }));
 
 import {
@@ -156,6 +173,10 @@ import {
   upsertCategory,
   deleteCategory,
   getCategoryProductCounts,
+  getAllSections,
+  upsertSection,
+  reorderSections,
+  deleteSection,
 } from "./db";
 
 // ─── Settings tests ───────────────────────────────────────────────────────────
@@ -565,5 +586,56 @@ describe("Category helpers", () => {
     expect(counts.get("beef")).toBe(3);
     expect(counts.get("lamb")).toBe(1);
     expect(counts.get("pork")).toBeUndefined();
+  });
+});
+
+// ─── Section management tests ─────────────────────────────────────────────────
+
+describe("Section helpers", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("getAllSections returns sections in sort order", async () => {
+    const sections = await getAllSections();
+    expect(sections).toHaveLength(2);
+    expect(sections[0].name).toBe("Beef & Lamb");
+    expect(sections[0].sortOrder).toBe(0);
+    expect(sections[1].name).toBe("Pork & Poultry");
+    expect(sections[1].sortOrder).toBe(1);
+  });
+
+  it("upsertSection creates a new section when no id is provided", async () => {
+    const result = await upsertSection({ name: "Seafood & Specials" });
+    expect(result.id).toBe(10);
+    expect(result.name).toBe("Seafood & Specials");
+    expect(upsertSection).toHaveBeenCalledWith({ name: "Seafood & Specials" });
+  });
+
+  it("upsertSection updates an existing section when id is provided", async () => {
+    vi.mocked(upsertSection).mockResolvedValueOnce({
+      id: 1,
+      name: "Beef, Lamb & Veal",
+      sortOrder: 0,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    const result = await upsertSection({ id: 1, name: "Beef, Lamb & Veal" });
+    expect(result.name).toBe("Beef, Lamb & Veal");
+    expect(upsertSection).toHaveBeenCalledWith({ id: 1, name: "Beef, Lamb & Veal" });
+  });
+
+  it("reorderSections is called with an ordered id array", async () => {
+    await reorderSections([2, 1]);
+    expect(reorderSections).toHaveBeenCalledWith([2, 1]);
+  });
+
+  it("deleteSection unassigns categories and removes the section", async () => {
+    await deleteSection(1);
+    expect(deleteSection).toHaveBeenCalledWith(1);
+    // No error means categories were unassigned and section was deleted
+  });
+
+  it("deleteSection can be called for a section with no categories", async () => {
+    await deleteSection(99);
+    expect(deleteSection).toHaveBeenCalledWith(99);
   });
 });

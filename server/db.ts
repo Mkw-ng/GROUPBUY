@@ -1,6 +1,6 @@
 import { and, asc, count, desc, eq, isNull, like, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, InsertProduct, InsertOrder, orders, products, settings, users, OrderItem, drops, Drop, categories, Category, InsertCategory } from "../drizzle/schema";
+import { InsertUser, InsertProduct, InsertOrder, orders, products, settings, users, OrderItem, drops, Drop, categories, Category, InsertCategory, categorySections, CategorySection } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -725,6 +725,7 @@ export async function upsertCategory(data: {
   powerDropName?: string | null;
   emoji?: string | null;
   sortOrder?: number;
+  sectionId?: number | null;
 }): Promise<Category> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
@@ -738,6 +739,7 @@ export async function upsertCategory(data: {
         powerDropName: data.powerDropName ?? null,
         emoji: data.emoji ?? null,
         ...(data.sortOrder !== undefined ? { sortOrder: data.sortOrder } : {}),
+        ...("sectionId" in data ? { sectionId: data.sectionId ?? null } : {}),
       })
       .where(eq(categories.id, data.id));
     const rows = await db.select().from(categories).where(eq(categories.id, data.id)).limit(1);
@@ -815,4 +817,89 @@ export async function getCategoryProductCounts(): Promise<Map<string, number>> {
     result.set(row.category, Number(row.cnt));
   }
   return result;
+}
+
+// ─── Category Section helpers ─────────────────────────────────────────────────
+
+/** Return all category sections ordered by sortOrder. */
+export async function getAllSections(): Promise<CategorySection[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(categorySections).orderBy(asc(categorySections.sortOrder));
+}
+
+/**
+ * Create or update a category section.
+ * If id is provided, rename that section; otherwise insert a new one.
+ */
+export async function upsertSection(data: {
+  id?: number;
+  name: string;
+  sortOrder?: number;
+}): Promise<CategorySection> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  if (data.id) {
+    await db
+      .update(categorySections)
+      .set({
+        name: data.name,
+        ...(data.sortOrder !== undefined ? { sortOrder: data.sortOrder } : {}),
+      })
+      .where(eq(categorySections.id, data.id));
+    const rows = await db
+      .select()
+      .from(categorySections)
+      .where(eq(categorySections.id, data.id))
+      .limit(1);
+    return rows[0];
+  } else {
+    // Insert — place at end by default
+    const maxRows = await db
+      .select({ m: sql<number>`MAX(sortOrder)` })
+      .from(categorySections);
+    const maxSort = Number(maxRows[0]?.m ?? -1);
+    await db.insert(categorySections).values({
+      name: data.name,
+      sortOrder: data.sortOrder ?? maxSort + 1,
+    });
+    const rows = await db
+      .select()
+      .from(categorySections)
+      .orderBy(desc(categorySections.id))
+      .limit(1);
+    return rows[0];
+  }
+}
+
+/**
+ * Reorder sections by providing an ordered array of ids.
+ * Each id gets sortOrder = its index in the array.
+ */
+export async function reorderSections(orderedIds: number[]): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await Promise.all(
+    orderedIds.map((id, index) =>
+      db.update(categorySections).set({ sortOrder: index }).where(eq(categorySections.id, id))
+    )
+  );
+}
+
+/**
+ * Delete a section by id.
+ * All categories in this section have their sectionId set to NULL (they become ungrouped).
+ * Never deletes categories.
+ */
+export async function deleteSection(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  // Unassign all categories in this section
+  await db
+    .update(categories)
+    .set({ sectionId: null })
+    .where(eq(categories.sectionId, id));
+  // Delete the section
+  await db.delete(categorySections).where(eq(categorySections.id, id));
 }

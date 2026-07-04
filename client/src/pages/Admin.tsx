@@ -229,19 +229,88 @@ const EMPTY_FORM: ProductForm = {
 
 // ─── Category Row (sortable) ────────────────────────────────────────────────
 
+// ─── SectionRow — sortable section row in Manage Categories dialog ───────────
+
+interface SectionRowProps {
+  section: { id: number; name: string };
+  isEditing: boolean;
+  editName: string;
+  onStartEdit: () => void;
+  onCancelEdit: () => void;
+  onSaveEdit: () => void;
+  onEditNameChange: (v: string) => void;
+  onDelete: () => void;
+  isSaving: boolean;
+}
+
+function SectionRow({
+  section,
+  isEditing,
+  editName,
+  onStartEdit,
+  onCancelEdit,
+  onSaveEdit,
+  onEditNameChange,
+  onDelete,
+  isSaving,
+}: SectionRowProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: `section-${section.id}` });
+  const style: React.CSSProperties = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
+
+  return (
+    <div ref={setNodeRef} style={style} className="flex items-center gap-2 rounded-md border bg-muted/40 px-2 py-1.5">
+      <button {...attributes} {...listeners} className="cursor-grab text-muted-foreground hover:text-foreground shrink-0">
+        <GripVertical className="h-4 w-4" />
+      </button>
+      {isEditing ? (
+        <div className="flex flex-1 items-center gap-2">
+          <Input
+            value={editName}
+            onChange={(e) => onEditNameChange(e.target.value)}
+            placeholder="Section name"
+            className="flex-1 h-7 text-xs"
+            onKeyDown={(e) => { if (e.key === "Enter" && editName.trim()) onSaveEdit(); if (e.key === "Escape") onCancelEdit(); }}
+            autoFocus
+          />
+          <Button size="sm" className="h-7 text-xs px-2" onClick={onSaveEdit} disabled={!editName.trim() || isSaving}>Save</Button>
+          <Button size="sm" variant="outline" className="h-7 text-xs px-2" onClick={onCancelEdit}>Cancel</Button>
+        </div>
+      ) : (
+        <>
+          <span className="flex-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{section.name}</span>
+          <Button size="icon" variant="ghost" className="h-6 w-6" onClick={onStartEdit}>
+            <Pencil className="h-3 w-3" />
+          </Button>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-6 w-6 text-destructive hover:text-destructive"
+            onClick={onDelete}
+            title="Delete section (categories become ungrouped)"
+          >
+            <Trash2 className="h-3 w-3" />
+          </Button>
+        </>
+      )}
+    </div>
+  );
+}
+
 interface CategoryRowProps {
-  cat: { id: number; slug: string; name: string; emoji?: string | null; powerDropName?: string | null };
+  cat: { id: number; slug: string; name: string; emoji?: string | null; powerDropName?: string | null; sectionId?: number | null };
   isEditing: boolean;
   editName: string;
   editEmoji: string;
   editPdName: string;
   productCount: number;
+  sections: { id: number; name: string }[];
   onStartEdit: () => void;
   onCancelEdit: () => void;
   onSaveEdit: () => void;
   onEditNameChange: (v: string) => void;
   onEditEmojiChange: (v: string) => void;
   onEditPdNameChange: (v: string) => void;
+  onSetSection: (sectionId: number | null) => void;
   onDelete: () => void;
   isSaving: boolean;
 }
@@ -253,12 +322,14 @@ function CategoryRow({
   editEmoji,
   editPdName,
   productCount,
+  sections,
   onStartEdit,
   onCancelEdit,
   onSaveEdit,
   onEditNameChange,
   onEditEmojiChange,
   onEditPdNameChange,
+  onSetSection,
   onDelete,
   isSaving,
 }: CategoryRowProps) {
@@ -289,6 +360,23 @@ function CategoryRow({
             <p className="text-sm font-medium truncate">{cat.name}</p>
             {cat.powerDropName && <p className="text-xs text-muted-foreground truncate">PD: {cat.powerDropName}</p>}
           </div>
+          {/* Section assignment dropdown */}
+          {sections.length > 0 && (
+            <Select
+              value={cat.sectionId ? String(cat.sectionId) : "none"}
+              onValueChange={(v) => onSetSection(v === "none" ? null : Number(v))}
+            >
+              <SelectTrigger className="h-6 text-xs w-28 shrink-0">
+                <SelectValue placeholder="No section" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">No section</SelectItem>
+                {sections.map((s) => (
+                  <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
           <span className="text-xs text-muted-foreground shrink-0">{productCount} products</span>
         </div>
       )}
@@ -721,6 +809,34 @@ function AdminContent() {
   const deleteCategory = trpc.admin.categories.delete.useMutation({
     onSuccess: () => { utils.categories.list.invalidate(); setDeleteCatId(null); toast.success("Category deleted"); },
     onError: (err) => { toast.error(err.message); setDeleteCatId(null); },
+  });
+  const setCategorySection = trpc.admin.categories.update.useMutation({
+    onSuccess: () => utils.categories.list.invalidate(),
+    onError: (err) => toast.error(err.message),
+  });
+
+  // ─── Sections ────────────────────────────────────────────────────────────────
+  const { data: sections = [] } = trpc.sections.list.useQuery();
+  const [newSectionName, setNewSectionName] = useState("");
+  const [editSectionId, setEditSectionId] = useState<number | null>(null);
+  const [editSectionName, setEditSectionName] = useState("");
+  const [deleteSectionId, setDeleteSectionId] = useState<number | null>(null);
+
+  const createSection = trpc.admin.sections.create.useMutation({
+    onSuccess: () => { utils.sections.list.invalidate(); setNewSectionName(""); },
+    onError: (err) => toast.error(err.message),
+  });
+  const renameSection = trpc.admin.sections.rename.useMutation({
+    onSuccess: () => { utils.sections.list.invalidate(); setEditSectionId(null); },
+    onError: (err: { message: string }) => toast.error(err.message),
+  });
+  const reorderSections = trpc.admin.sections.reorder.useMutation({
+    onSuccess: () => utils.sections.list.invalidate(),
+    onError: (err) => toast.error(err.message),
+  });
+  const deleteSection = trpc.admin.sections.delete.useMutation({
+    onSuccess: () => { utils.sections.list.invalidate(); utils.categories.list.invalidate(); setDeleteSectionId(null); toast.success("Section deleted — categories unassigned"); },
+    onError: (err) => { toast.error(err.message); setDeleteSectionId(null); },
   });
 
   // ─── Products ────────────────────────────────────────────────────────────────
@@ -1758,65 +1874,128 @@ function AdminContent() {
 
       {/* ─── Manage Categories Dialog ───────────────────────────────────────── */}
       <Dialog open={manageCatsOpen} onOpenChange={setManageCatsOpen}>
-        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Manage Categories</DialogTitle>
+            <DialogTitle>Manage Categories &amp; Sections</DialogTitle>
             <DialogDescription>
-              Add, rename, or reorder product categories. Drag the grip handle to reorder.
-              Deleting a category is blocked if products are assigned to it.
+              Create sections to group categories in the storefront sidebar. Assign each category to a section using the dropdown. Drag to reorder.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-2 py-2">
-            {categoriesLoading ? (
-              <div className="space-y-2">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <Skeleton key={i} className="h-10 w-full" />
-                ))}
+          <div className="space-y-4 py-2">
+            {/* ── Sections area ── */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Sections</p>
               </div>
-            ) : (
               <DndContext
                 sensors={sensors}
                 collisionDetection={closestCenter}
                 onDragEnd={(event) => {
                   const { active, over } = event;
                   if (!over || active.id === over.id) return;
-                  const oldIdx = categories.findIndex((c) => c.id === active.id);
-                  const newIdx = categories.findIndex((c) => c.id === over.id);
-                  const reordered = arrayMove(categories, oldIdx, newIdx);
-                  reorderCategories.mutate({ orderedIds: reordered.map((c) => c.id) });
+                  const activeId = Number(String(active.id).replace("section-", ""));
+                  const overId = Number(String(over.id).replace("section-", ""));
+                  const oldIdx = sections.findIndex((s) => s.id === activeId);
+                  const newIdx = sections.findIndex((s) => s.id === overId);
+                  const reordered = arrayMove(sections, oldIdx, newIdx);
+                  reorderSections.mutate({ orderedIds: reordered.map((s) => s.id) });
                 }}
               >
-                <SortableContext items={categories.map((c) => c.id)} strategy={rectSortingStrategy}>
+                <SortableContext items={sections.map((s) => `section-${s.id}`)} strategy={rectSortingStrategy}>
                   <div className="space-y-1">
-                    {categories.map((cat) => (
-                      <CategoryRow
-                        key={cat.id}
-                        cat={cat}
-                        isEditing={editCatId === cat.id}
-                        editName={editCatName}
-                        editEmoji={editCatEmoji}
-                        editPdName={editCatPdName}
-                        productCount={categoryCounts[cat.slug] ?? 0}
-                        onStartEdit={() => {
-                          setEditCatId(cat.id);
-                          setEditCatName(cat.name);
-                          setEditCatEmoji(cat.emoji ?? "");
-                          setEditCatPdName(cat.powerDropName ?? "");
-                        }}
-                        onCancelEdit={() => setEditCatId(null)}
-                        onSaveEdit={() => updateCategory.mutate({ id: cat.id, name: editCatName, emoji: editCatEmoji || undefined, powerDropName: editCatPdName || undefined })}
-                        onEditNameChange={setEditCatName}
-                        onEditEmojiChange={setEditCatEmoji}
-                        onEditPdNameChange={setEditCatPdName}
-                        onDelete={() => setDeleteCatId(cat.id)}
-                        isSaving={updateCategory.isPending}
+                    {sections.map((sec) => (
+                      <SectionRow
+                        key={sec.id}
+                        section={sec}
+                        isEditing={editSectionId === sec.id}
+                        editName={editSectionName}
+                        onStartEdit={() => { setEditSectionId(sec.id); setEditSectionName(sec.name); }}
+                        onCancelEdit={() => setEditSectionId(null)}
+                        onSaveEdit={() => renameSection.mutate({ id: sec.id, name: editSectionName.trim() })}
+                        onEditNameChange={setEditSectionName}
+                        onDelete={() => setDeleteSectionId(sec.id)}
+                        isSaving={renameSection.isPending}
                       />
                     ))}
                   </div>
                 </SortableContext>
               </DndContext>
-            )}
+              {/* Add new section */}
+              <div className="flex gap-2">
+                <Input
+                  value={newSectionName}
+                  onChange={(e) => setNewSectionName(e.target.value)}
+                  placeholder="New section name (e.g. Beef, Lamb)"
+                  className="flex-1 h-8 text-sm"
+                  onKeyDown={(e) => { if (e.key === "Enter" && newSectionName.trim()) createSection.mutate({ name: newSectionName.trim() }); }}
+                />
+                <Button
+                  size="sm"
+                  className="h-8"
+                  disabled={!newSectionName.trim() || createSection.isPending}
+                  onClick={() => createSection.mutate({ name: newSectionName.trim() })}
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+
+            {/* ── Categories area ── */}
+            <div className="space-y-2 border-t pt-3">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Categories</p>
+              {categoriesLoading ? (
+                <div className="space-y-2">
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <Skeleton key={i} className="h-10 w-full" />
+                  ))}
+                </div>
+              ) : (
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={(event) => {
+                    const { active, over } = event;
+                    if (!over || active.id === over.id) return;
+                    const oldIdx = categories.findIndex((c) => c.id === active.id);
+                    const newIdx = categories.findIndex((c) => c.id === over.id);
+                    const reordered = arrayMove(categories, oldIdx, newIdx);
+                    reorderCategories.mutate({ orderedIds: reordered.map((c) => c.id) });
+                  }}
+                >
+                  <SortableContext items={categories.map((c) => c.id)} strategy={rectSortingStrategy}>
+                    <div className="space-y-1">
+                      {categories.map((cat) => (
+                        <CategoryRow
+                          key={cat.id}
+                          cat={cat}
+                          isEditing={editCatId === cat.id}
+                          editName={editCatName}
+                          editEmoji={editCatEmoji}
+                          editPdName={editCatPdName}
+                          productCount={categoryCounts[cat.slug] ?? 0}
+                          sections={sections}
+                          onStartEdit={() => {
+                            setEditCatId(cat.id);
+                            setEditCatName(cat.name);
+                            setEditCatEmoji(cat.emoji ?? "");
+                            setEditCatPdName(cat.powerDropName ?? "");
+                          }}
+                          onCancelEdit={() => setEditCatId(null)}
+                          onSaveEdit={() => updateCategory.mutate({ id: cat.id, name: editCatName, emoji: editCatEmoji || undefined, powerDropName: editCatPdName || undefined })}
+                          onEditNameChange={setEditCatName}
+                          onEditEmojiChange={setEditCatEmoji}
+                          onEditPdNameChange={setEditCatPdName}
+                          onSetSection={(sectionId) => setCategorySection.mutate({ id: cat.id, name: cat.name, sectionId })}
+                          onDelete={() => setDeleteCatId(cat.id)}
+                          isSaving={updateCategory.isPending}
+                        />
+                      ))}
+                    </div>
+                  </SortableContext>
+                </DndContext>
+              )}
+            </div>
 
             {/* Add new category */}
             <div className="border-t pt-3 mt-3 space-y-2">
@@ -1873,6 +2052,32 @@ function AdminContent() {
                 Delete
               </AlertDialogAction>
             )}
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete section confirmation */}
+      <AlertDialog open={deleteSectionId !== null} onOpenChange={(open) => { if (!open) setDeleteSectionId(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete section?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteSectionId !== null && (() => {
+                const sec = sections.find((s) => s.id === deleteSectionId);
+                const assignedCount = categories.filter((c) => c.sectionId === deleteSectionId).length;
+                return `Delete "${sec?.name}"? The ${assignedCount} categor${assignedCount !== 1 ? "ies" : "y"} assigned to it will become ungrouped. This cannot be undone.`;
+              })()}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => deleteSectionId !== null && deleteSection.mutate({ id: deleteSectionId })}
+              disabled={deleteSection.isPending}
+            >
+              Delete
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
