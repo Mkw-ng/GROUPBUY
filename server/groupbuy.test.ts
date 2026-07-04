@@ -7,6 +7,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // ─── Mock the database helpers ────────────────────────────────────────────────
 
 vi.mock("./db", () => ({
+  bulkUpdateProducts: vi.fn().mockResolvedValue(3),
+
   getAllProducts: vi.fn().mockResolvedValue([
     {
       id: 1,
@@ -130,6 +132,7 @@ import {
   getOrdersPage,
   getActiveOrderCounts,
   getUnassignedOrders,
+  bulkUpdateProducts,
 } from "./db";
 
 // ─── Settings tests ───────────────────────────────────────────────────────────
@@ -444,5 +447,42 @@ describe("Product visibility field", () => {
       });
       expect(visible.length).toBe(1);
     }
+  });
+});
+
+// ─── bulkUpdateProducts tests ─────────────────────────────────────────────────
+
+describe("bulkUpdateProducts helper", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("calls bulkUpdateProducts with the correct ids and available=true", async () => {
+    await bulkUpdateProducts([1, 2, 3], { available: true });
+    expect(bulkUpdateProducts).toHaveBeenCalledWith([1, 2, 3], { available: true });
+  });
+
+  it("calls bulkUpdateProducts with the correct ids and available=false", async () => {
+    await bulkUpdateProducts([4, 5], { available: false });
+    expect(bulkUpdateProducts).toHaveBeenCalledWith([4, 5], { available: false });
+  });
+
+  it("calls bulkUpdateProducts with visibility=power_drop_only", async () => {
+    await bulkUpdateProducts([1, 2], { visibility: "power_drop_only" });
+    expect(bulkUpdateProducts).toHaveBeenCalledWith([1, 2], { visibility: "power_drop_only" });
+  });
+
+  it("calls bulkUpdateProducts with visibility=always", async () => {
+    await bulkUpdateProducts([7], { visibility: "always" });
+    expect(bulkUpdateProducts).toHaveBeenCalledWith([7], { visibility: "always" });
+  });
+
+  it("returns the number of updated rows", async () => {
+    const result = await bulkUpdateProducts([1, 2, 3], { available: true });
+    expect(result).toBe(3);
+  });
+
+  it("handles an empty ids array without throwing", async () => {
+    vi.mocked(bulkUpdateProducts).mockResolvedValueOnce(0);
+    const result = await bulkUpdateProducts([], { available: true });
+    expect(result).toBe(0);
   });
 });

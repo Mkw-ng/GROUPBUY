@@ -46,6 +46,7 @@ import {
   transferAllPaidToPickupAvailable,
   transferAllPaidToInProgress,
   getOrderedQtyByProduct,
+  bulkUpdateProducts,
 } from "./db";
 import { OrderItem } from "../drizzle/schema";
 import {
@@ -477,6 +478,26 @@ export const appRouter = router({
         .mutation(async ({ input }) => {
           await batchReorderProducts(input.updates);
           return { success: true };
+        }),
+
+      bulkUpdate: adminProcedure
+        .input(
+          z.object({
+            ids: z.array(z.number().int().positive()).min(1).max(500),
+            set: z
+              .object({
+                visibility: z.enum(["regular_only", "always", "power_drop_only"]).optional(),
+                available: z.boolean().optional(),
+              })
+              .refine(
+                (s) => s.visibility !== undefined || s.available !== undefined,
+                { message: "At least one field (visibility or available) must be provided in set" }
+              ),
+          })
+        )
+        .mutation(async ({ input }) => {
+          const updated = await bulkUpdateProducts(input.ids, input.set);
+          return { updated };
         }),
     }),
 

@@ -303,6 +303,10 @@ interface ProductCardProps {
   isUpdatingAvailability: boolean;
   onSetVisibility: (v: "regular_only" | "always" | "power_drop_only") => void;
   isUpdatingVisibility: boolean;
+  // Selection mode
+  selectMode?: boolean;
+  selected?: boolean;
+  onToggleSelect?: () => void;
 }
 
 const VISIBILITY_LABELS: Record<string, string> = {
@@ -325,6 +329,9 @@ function SortableProductCard({
   isUpdatingAvailability,
   onSetVisibility,
   isUpdatingVisibility,
+  selectMode = false,
+  selected = false,
+  onToggleSelect,
 }: ProductCardProps) {
   const {
     attributes,
@@ -333,7 +340,7 @@ function SortableProductCard({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: product.id });
+  } = useSortable({ id: product.id, disabled: selectMode });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -348,19 +355,39 @@ function SortableProductCard({
     <div
       ref={setNodeRef}
       style={style}
-      className={`group relative rounded-xl border bg-card flex flex-col overflow-hidden transition-shadow hover:shadow-md ${
-        !product.available ? "opacity-60" : ""
+      onClick={selectMode ? onToggleSelect : undefined}
+      className={`group relative rounded-xl border bg-card flex flex-col overflow-hidden transition-shadow ${
+        selectMode ? "cursor-pointer" : "hover:shadow-md"
+      } ${
+        selected ? "ring-2 ring-red-500 border-red-500" : ""
+      } ${
+        !product.available && !selectMode ? "opacity-60" : ""
       }`}
     >
-      {/* Drag handle */}
-      <button
-        {...attributes}
-        {...listeners}
-        className="absolute top-2 left-2 z-10 p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground bg-background/80 backdrop-blur-sm"
-        aria-label="Drag to reorder"
-      >
-        <GripVertical className="h-3.5 w-3.5" />
-      </button>
+      {/* Selection checkbox (select mode only) */}
+      {selectMode && (
+        <div className="absolute top-2 left-2 z-20">
+          <input
+            type="checkbox"
+            checked={selected}
+            onChange={onToggleSelect}
+            onClick={(e) => e.stopPropagation()}
+            className="w-4 h-4 accent-red-500 cursor-pointer"
+          />
+        </div>
+      )}
+
+      {/* Drag handle (hidden in select mode) */}
+      {!selectMode && (
+        <button
+          {...attributes}
+          {...listeners}
+          className="absolute top-2 left-2 z-10 p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground bg-background/80 backdrop-blur-sm"
+          aria-label="Drag to reorder"
+        >
+          <GripVertical className="h-3.5 w-3.5" />
+        </button>
+      )}
 
       {/* Image */}
       <div className="relative h-36 bg-muted flex items-center justify-center overflow-hidden">
@@ -453,38 +480,40 @@ function SortableProductCard({
             <div className="flex items-center gap-1.5">
               <Switch
                 checked={product.available}
-                disabled={isUpdatingAvailability}
-                onCheckedChange={onToggleAvailability}
+                disabled={isUpdatingAvailability || selectMode}
+                onCheckedChange={selectMode ? undefined : onToggleAvailability}
                 className="scale-75 origin-left"
               />
               <span className="text-xs text-muted-foreground">
                 {product.available ? "Available" : "Unavailable"}
               </span>
             </div>
-            <div className="flex items-center gap-0.5">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7"
-                onClick={onEdit}
-              >
-                <Pencil className="h-3.5 w-3.5" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 text-destructive hover:text-destructive"
-                onClick={onDelete}
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </Button>
-            </div>
+            {!selectMode && (
+              <div className="flex items-center gap-0.5">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={(e) => { e.stopPropagation(); onEdit(); }}
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 text-destructive hover:text-destructive"
+                  onClick={(e) => { e.stopPropagation(); onDelete(); }}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            )}
           </div>
           {/* Row 2: quick visibility control */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
-                disabled={isUpdatingVisibility}
+                disabled={isUpdatingVisibility || selectMode}
                 className={`flex items-center gap-1 text-[11px] font-medium px-1.5 py-0.5 rounded hover:bg-muted transition-colors w-full ${
                   VISIBILITY_COLORS[product.visibility ?? "regular_only"]
                 } ${isUpdatingVisibility ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
@@ -622,6 +651,50 @@ function AdminContent() {
   // Power Drop zero-product confirmation dialog state
   const [powerDropConfirmOpen, setPowerDropConfirmOpen] = useState(false);
 
+  // ─── Bulk-select mode ────────────────────────────────────────────────────────
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [bulkConfirm, setBulkConfirm] = useState<{
+    action: "available" | "unavailable" | "visibility";
+    visibility?: "regular_only" | "always" | "power_drop_only";
+  } | null>(null);
+
+  const bulkUpdate = trpc.admin.products.bulkUpdate.useMutation({
+    onSuccess: (data) => {
+      utils.products.list.invalidate();
+      toast.success(`Updated ${data.updated} product${data.updated !== 1 ? "s" : ""}`);
+      setBulkConfirm(null);
+      // Keep selection mode on but clear selection after apply
+      setSelectedIds(new Set());
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const toggleSelectMode = () => {
+    setSelectMode((prev) => !prev);
+    setSelectedIds(new Set());
+  };
+
+  const toggleOneProduct = (id: number) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const applyBulkAction = () => {
+    if (!bulkConfirm || selectedIds.size === 0) return;
+    const ids = Array.from(selectedIds);
+    if (bulkConfirm.action === "available") {
+      bulkUpdate.mutate({ ids, set: { available: true } });
+    } else if (bulkConfirm.action === "unavailable") {
+      bulkUpdate.mutate({ ids, set: { available: false } });
+    } else if (bulkConfirm.action === "visibility" && bulkConfirm.visibility) {
+      bulkUpdate.mutate({ ids, set: { visibility: bulkConfirm.visibility } });
+    }
+  };
+
   // Batch reorder — save new sortOrder values after drag
   const batchReorder = trpc.admin.products.batchReorder.useMutation({
     onSuccess: () => utils.products.list.invalidate(),
@@ -691,6 +764,26 @@ function AdminContent() {
     }
     return counts;
   }, [products]);
+
+  // Derived selection state (depends on filteredProducts)
+  const allFilteredSelected = filteredProducts.length > 0 && filteredProducts.every((p) => selectedIds.has(p.id));
+  const someFilteredSelected = filteredProducts.some((p) => selectedIds.has(p.id));
+
+  const toggleSelectAllFiltered = () => {
+    if (allFilteredSelected) {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        filteredProducts.forEach((p) => next.delete(p.id));
+        return next;
+      });
+    } else {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        filteredProducts.forEach((p) => next.add(p.id));
+        return next;
+      });
+    }
+  };
 
   // ─── Product modal state ─────────────────────────────────────────────────────
   const [productModalOpen, setProductModalOpen] = useState(false);
@@ -1098,6 +1191,15 @@ function AdminContent() {
             </p>
           </div>
           <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant={selectMode ? "default" : "outline"}
+              onClick={toggleSelectMode}
+              className={selectMode ? "bg-red-600 hover:bg-red-700 text-white" : ""}
+            >
+              <Check className="h-4 w-4 mr-1.5" />
+              {selectMode ? "Exit Select" : "Select"}
+            </Button>
             <Button size="sm" variant="outline" onClick={handleExportCsv}>
               <Download className="h-4 w-4 mr-1.5" />
               Export CSV
@@ -1208,6 +1310,32 @@ function AdminContent() {
           })}
         </div>
 
+        {/* Select-all row (visible in select mode when there are products) */}
+        {selectMode && filteredProducts.length > 0 && (
+          <div className="flex items-center justify-between px-1">
+            <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={allFilteredSelected}
+                ref={(el) => { if (el) el.indeterminate = someFilteredSelected && !allFilteredSelected; }}
+                onChange={toggleSelectAllFiltered}
+                className="w-4 h-4 accent-red-500 cursor-pointer"
+              />
+              <span className="font-medium">
+                {allFilteredSelected ? "Deselect all" : `Select all ${filteredProducts.length}`}
+              </span>
+            </label>
+            {selectedIds.size > 0 && (
+              <button
+                className="text-xs text-muted-foreground hover:text-foreground underline"
+                onClick={() => setSelectedIds(new Set())}
+              >
+                Clear selection
+              </button>
+            )}
+          </div>
+        )}
+
         {/* Product grid */}
         {productsLoading ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -1278,6 +1406,9 @@ function AdminContent() {
                       })
                     }
                     isUpdatingVisibility={setVisibilityMutation.isPending}
+                    selectMode={selectMode}
+                    selected={selectedIds.has(p.id)}
+                    onToggleSelect={() => toggleOneProduct(p.id)}
                   />
                 ))}
               </div>
@@ -1285,6 +1416,99 @@ function AdminContent() {
           </DndContext>
         )}
       </section>
+
+      {/* ─── Floating Bulk Action Bar ──────────────────────────────────────── */}
+      {selectMode && selectedIds.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-card border border-border shadow-xl rounded-full px-4 py-2.5 text-sm">
+          <span className="font-semibold text-foreground mr-1">
+            {selectedIds.size} selected
+          </span>
+
+          {/* Set Visibility dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="sm" variant="outline" className="rounded-full gap-1.5" disabled={bulkUpdate.isPending}>
+                <Zap className="h-3.5 w-3.5" />
+                Set Visibility
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="center">
+              <DropdownMenuLabel className="text-xs">Set visibility for {selectedIds.size} products</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuRadioGroup value="">
+                <DropdownMenuRadioItem value="regular_only" onSelect={() => setBulkConfirm({ action: "visibility", visibility: "regular_only" })}>
+                  <span className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-slate-400 inline-block" />Regular only</span>
+                </DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="always" onSelect={() => setBulkConfirm({ action: "visibility", visibility: "always" })}>
+                  <span className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-green-500 inline-block" />Always visible</span>
+                </DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="power_drop_only" onSelect={() => setBulkConfirm({ action: "visibility", visibility: "power_drop_only" })}>
+                  <span className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-red-500 inline-block" />Power Drop only</span>
+                </DropdownMenuRadioItem>
+              </DropdownMenuRadioGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <Button
+            size="sm"
+            variant="outline"
+            className="rounded-full gap-1.5"
+            disabled={bulkUpdate.isPending}
+            onClick={() => setBulkConfirm({ action: "available" })}
+          >
+            Set Available
+          </Button>
+
+          <Button
+            size="sm"
+            variant="outline"
+            className="rounded-full gap-1.5"
+            disabled={bulkUpdate.isPending}
+            onClick={() => setBulkConfirm({ action: "unavailable" })}
+          >
+            Set Unavailable
+          </Button>
+
+          <button
+            className="ml-1 text-muted-foreground hover:text-foreground p-1 rounded-full hover:bg-muted transition-colors"
+            onClick={() => setSelectedIds(new Set())}
+            title="Clear selection"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {/* ─── Bulk Action Confirmation Dialog ─────────────────────────────────── */}
+      <AlertDialog open={!!bulkConfirm} onOpenChange={(open) => { if (!open) setBulkConfirm(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {bulkConfirm?.action === "available" && `Mark ${selectedIds.size} product${selectedIds.size !== 1 ? "s" : ""} as Available?`}
+              {bulkConfirm?.action === "unavailable" && `Mark ${selectedIds.size} product${selectedIds.size !== 1 ? "s" : ""} as Unavailable?`}
+              {bulkConfirm?.action === "visibility" && `Set visibility for ${selectedIds.size} product${selectedIds.size !== 1 ? "s" : ""}?`}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {bulkConfirm?.action === "available" && `This will make ${selectedIds.size} product${selectedIds.size !== 1 ? "s" : ""} available to customers immediately.`}
+              {bulkConfirm?.action === "unavailable" && `This will hide ${selectedIds.size} product${selectedIds.size !== 1 ? "s" : ""} from customers immediately.`}
+              {bulkConfirm?.action === "visibility" && `This will set the Power Drop visibility to "${
+                bulkConfirm.visibility === "regular_only" ? "Regular only" :
+                bulkConfirm.visibility === "always" ? "Always visible" : "Power Drop only"
+              }" for ${selectedIds.size} product${selectedIds.size !== 1 ? "s" : ""}.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={bulkUpdate.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={applyBulkAction}
+              disabled={bulkUpdate.isPending}
+              className={bulkConfirm?.action === "unavailable" ? "bg-destructive hover:bg-destructive/90" : ""}
+            >
+              {bulkUpdate.isPending ? "Applying…" : "Apply"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* ─── CSV Import Dialog ─────────────────────────────────────────────── */}
       {/* Hidden file input for CSV import */}

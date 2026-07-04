@@ -496,3 +496,16 @@
 - [x] Admin UI: "Export CSV" button in products toolbar — triggers download
 - [x] Admin UI: "Import CSV" button — opens dialog with file picker, dry-run preview, errors list, Apply Import button
 - [x] Tests: vitest for CSV parser/validator (valid update, valid create, bad enum, TRUE/FALSE, empty optionals → null)
+
+## Bulk-Select Mode — Admin Product Grid
+- [ ] DB: add bulkUpdateProducts(ids, set) helper — single UPDATE WHERE id IN (...)
+- [ ] Backend: admin.products.bulkUpdate tRPC procedure with zod validation (ids min 1 max 500, set must have at least one field)
+- [ ] Admin UI: "Select" toggle button in products toolbar
+- [ ] Admin UI: card checkboxes (top-left over image), click card to toggle, red ring on selected cards
+- [ ] Admin UI: disable drag-to-reorder and edit/delete/availability controls in selection mode
+- [ ] Admin UI: "Select all" (filtered list) and "Clear selection" helpers above grid
+- [ ] Admin UI: selections persist across category tab and search changes
+- [ ] Floating action bar: shown when 1+ selected — N selected, Set Visibility dropdown, Set Available/Unavailable, Clear, X to exit
+- [ ] Floating action bar: confirmation dialog before each action, success toast, invalidate products, keep selection mode on after apply
+- [ ] Floating action bar: disable buttons while mutation pending
+- [ ] Tests: vitest for bulkUpdateProducts (visibility, availability, empty set rejection)

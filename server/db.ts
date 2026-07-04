@@ -130,6 +130,25 @@ export async function setProductAvailability(id: number, available: boolean) {
   await db.update(products).set({ available }).where(eq(products.id, id));
 }
 
+/**
+ * Bulk-update visibility and/or availability for a list of product IDs.
+ * Runs a single UPDATE ... WHERE id IN (...) — no per-row looping.
+ * Returns the number of affected rows.
+ */
+export async function bulkUpdateProducts(
+  ids: number[],
+  set: { visibility?: "regular_only" | "always" | "power_drop_only"; available?: boolean }
+): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  if (ids.length === 0) return 0;
+  const result = await db
+    .update(products)
+    .set(set)
+    .where(sql`${products.id} IN (${sql.join(ids.map((id) => sql`${id}`), sql`, `)})`);
+  return (result[0] as { affectedRows: number }).affectedRows ?? ids.length;
+}
+
 // ─── Settings ─────────────────────────────────────────────────────────────────
 
 const DEFAULT_SETTINGS: Record<string, string> = {
