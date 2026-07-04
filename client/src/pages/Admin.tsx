@@ -20,6 +20,16 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -287,7 +297,21 @@ interface ProductCardProps {
   onDelete: () => void;
   onToggleAvailability: (available: boolean) => void;
   isUpdatingAvailability: boolean;
+  onSetVisibility: (v: "regular_only" | "always" | "power_drop_only") => void;
+  isUpdatingVisibility: boolean;
 }
+
+const VISIBILITY_LABELS: Record<string, string> = {
+  regular_only: "Regular",
+  always: "Always",
+  power_drop_only: "PD Only",
+};
+
+const VISIBILITY_COLORS: Record<string, string> = {
+  regular_only: "text-slate-500",
+  always: "text-green-600",
+  power_drop_only: "text-red-600",
+};
 
 function SortableProductCard({
   product,
@@ -295,6 +319,8 @@ function SortableProductCard({
   onDelete,
   onToggleAvailability,
   isUpdatingAvailability,
+  onSetVisibility,
+  isUpdatingVisibility,
 }: ProductCardProps) {
   const {
     attributes,
@@ -417,36 +443,83 @@ function SortableProductCard({
         )}
 
         {/* Footer: availability + actions */}
-        <div className="flex items-center justify-between pt-1 border-t border-border/50 mt-auto">
-          <div className="flex items-center gap-1.5">
-            <Switch
-              checked={product.available}
-              disabled={isUpdatingAvailability}
-              onCheckedChange={onToggleAvailability}
-              className="scale-75 origin-left"
-            />
-            <span className="text-xs text-muted-foreground">
-              {product.available ? "Available" : "Unavailable"}
-            </span>
+        <div className="flex flex-col gap-1.5 pt-1 border-t border-border/50 mt-auto">
+          {/* Row 1: availability toggle + edit/delete */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5">
+              <Switch
+                checked={product.available}
+                disabled={isUpdatingAvailability}
+                onCheckedChange={onToggleAvailability}
+                className="scale-75 origin-left"
+              />
+              <span className="text-xs text-muted-foreground">
+                {product.available ? "Available" : "Unavailable"}
+              </span>
+            </div>
+            <div className="flex items-center gap-0.5">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                onClick={onEdit}
+              >
+                <Pencil className="h-3.5 w-3.5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-destructive hover:text-destructive"
+                onClick={onDelete}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            </div>
           </div>
-          <div className="flex items-center gap-0.5">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7"
-              onClick={onEdit}
-            >
-              <Pencil className="h-3.5 w-3.5" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7 text-destructive hover:text-destructive"
-              onClick={onDelete}
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </Button>
-          </div>
+          {/* Row 2: quick visibility control */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                disabled={isUpdatingVisibility}
+                className={`flex items-center gap-1 text-[11px] font-medium px-1.5 py-0.5 rounded hover:bg-muted transition-colors w-full ${
+                  VISIBILITY_COLORS[product.visibility ?? "regular_only"]
+                } ${isUpdatingVisibility ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
+              >
+                <Zap className="h-3 w-3 shrink-0" />
+                <span>Visibility: {VISIBILITY_LABELS[product.visibility ?? "regular_only"]}</span>
+                <ArrowUpDown className="h-2.5 w-2.5 ml-auto shrink-0 opacity-50" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-48">
+              <DropdownMenuLabel className="text-xs">Power Drop Visibility</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuRadioGroup
+                value={product.visibility ?? "regular_only"}
+                onValueChange={(v) =>
+                  onSetVisibility(v as "regular_only" | "always" | "power_drop_only")
+                }
+              >
+                <DropdownMenuRadioItem value="regular_only">
+                  <span className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-slate-400 inline-block" />
+                    Regular only
+                  </span>
+                </DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="always">
+                  <span className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-green-500 inline-block" />
+                    Always visible
+                  </span>
+                </DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="power_drop_only">
+                  <span className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-red-500 inline-block" />
+                    Power Drop only
+                  </span>
+                </DropdownMenuRadioItem>
+              </DropdownMenuRadioGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
     </div>
@@ -535,6 +608,15 @@ function AdminContent() {
     onSuccess: () => utils.products.list.invalidate(),
     onError: (err) => toast.error(err.message),
   });
+
+  // Quick visibility change from product card (uses upsert with full product data)
+  const setVisibilityMutation = trpc.admin.products.upsert.useMutation({
+    onSuccess: () => utils.products.list.invalidate(),
+    onError: (err) => toast.error(err.message),
+  });
+
+  // Power Drop zero-product confirmation dialog state
+  const [powerDropConfirmOpen, setPowerDropConfirmOpen] = useState(false);
 
   // Batch reorder — save new sortOrder values after drag
   const batchReorder = trpc.admin.products.batchReorder.useMutation({
@@ -810,23 +892,72 @@ function AdminContent() {
           </div>
           <Switch
             checked={powerDropActive}
-            disabled={settingsLoading || setSetting.isPending}
+            disabled={settingsLoading || setSetting.isPending || setMultipleSettings.isPending}
             onCheckedChange={(checked) => {
-              const now = new Date().toISOString();
-              setMultipleSettings.mutate(
-                [
-                  { key: "powerDropActive", value: checked ? "true" : "false" },
-                  { key: "powerDropActivatedAt", value: checked ? now : "" },
-                ],
-                {
-                  onSuccess: () =>
-                    toast.success(checked ? "⚡ Power Drop is now LIVE" : "Power Drop ended"),
-                }
-              );
+              if (!checked) {
+                // Turning OFF — no confirmation needed
+                const now = new Date().toISOString();
+                setMultipleSettings.mutate(
+                  [
+                    { key: "powerDropActive", value: "false" },
+                    { key: "powerDropActivatedAt", value: now },
+                  ],
+                  { onSuccess: () => toast.success("Power Drop ended") }
+                );
+                return;
+              }
+              // Turning ON — check if any PD-visible products exist
+              const pdCount = (products ?? []).filter(
+                (p) => (p as { visibility?: string }).visibility !== "regular_only"
+              ).length;
+              if (pdCount === 0) {
+                // Show confirmation dialog
+                setPowerDropConfirmOpen(true);
+              } else {
+                const now = new Date().toISOString();
+                setMultipleSettings.mutate(
+                  [
+                    { key: "powerDropActive", value: "true" },
+                    { key: "powerDropActivatedAt", value: now },
+                  ],
+                  { onSuccess: () => toast.success("⚡ Power Drop is now LIVE") }
+                );
+              }
             }}
           />
         </div>
       </section>
+
+      {/* ─── Power Drop zero-product confirmation dialog ─────────────────────── */}
+      <AlertDialog open={powerDropConfirmOpen} onOpenChange={setPowerDropConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>No products flagged for this Power Drop</AlertDialogTitle>
+            <AlertDialogDescription>
+              No products are set to appear during a Power Drop — the store will show an empty drop
+              menu to customers. Turn on anyway?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                const now = new Date().toISOString();
+                setMultipleSettings.mutate(
+                  [
+                    { key: "powerDropActive", value: "true" },
+                    { key: "powerDropActivatedAt", value: now },
+                  ],
+                  { onSuccess: () => toast.success("⚡ Power Drop is now LIVE") }
+                );
+                setPowerDropConfirmOpen(false);
+              }}
+            >
+              Turn On
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* ─── Announcement Banner ─────────────────────────────────────────────── */}
       <section className="rounded-lg border bg-card p-6 space-y-4">
@@ -1030,6 +1161,26 @@ function AdminContent() {
                       setAvailability.mutate({ id: p.id, available })
                     }
                     isUpdatingAvailability={setAvailability.isPending}
+                    onSetVisibility={(visibility) =>
+                      setVisibilityMutation.mutate({
+                        id: p.id,
+                        name: p.name,
+                        cut: p.cut,
+                        category: p.category as Parameters<typeof setVisibilityMutation.mutate>[0]["category"],
+                        price: p.price,
+                        powerDropPrice: p.powerDropPrice ?? undefined,
+                        retailPrice: (p as { retailPrice?: string | null }).retailPrice ?? undefined,
+                        unit: p.unit,
+                        badge: p.badge as Parameters<typeof setVisibilityMutation.mutate>[0]["badge"],
+                        available: p.available,
+                        img: p.img ?? undefined,
+                        sortOrder: p.sortOrder,
+                        stockLimit: (p as { stockLimit?: string | null }).stockLimit ?? undefined,
+                        description: p.description ?? undefined,
+                        visibility,
+                      })
+                    }
+                    isUpdatingVisibility={setVisibilityMutation.isPending}
                   />
                 ))}
               </div>
