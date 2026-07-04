@@ -488,3 +488,11 @@
 - [x] Admin: show visibility chips on product cards (PD Only / Always Visible)
 - [x] Admin: show live Power Drop product count next to toggle; warn if count is 0
 - [x] Tests: vitest coverage for visibility enforcement (5 new tests, 30 total passing)
+
+## Product Bulk Edit — CSV Export/Import
+- [x] Server: GET /api/admin/products/export — UTF-8 BOM CSV, all 15 columns, admin-auth
+- [x] Server: POST /api/admin/products/import — multipart upload, CSV parser (BOM/CRLF/quotes), zod validation, dry-run mode, all-or-nothing apply
+- [x] Server: export CSV row parser/validator as a standalone helper for testability
+- [x] Admin UI: "Export CSV" button in products toolbar — triggers download
+- [x] Admin UI: "Import CSV" button — opens dialog with file picker, dry-run preview, errors list, Apply Import button
+- [x] Tests: vitest for CSV parser/validator (valid update, valid create, bad enum, TRUE/FALSE, empty optionals → null)

@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -53,6 +54,9 @@ import {
   ArrowDown,
   Check,
   Tag,
+  Download,
+  Upload,
+  FileText,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -695,6 +699,18 @@ function AdminContent() {
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // ─── CSV import dialog state ─────────────────────────────────────────────────
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importPreview, setImportPreview] = useState<{
+    updates: number;
+    creates: number;
+    errors: Array<{ row: number; message: string }>;
+  } | null>(null);
+  const [importLoading, setImportLoading] = useState(false);
+  const [importApplying, setImportApplying] = useState(false);
+  const csvImportInputRef = useRef<HTMLInputElement>(null);
+
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -765,6 +781,69 @@ function AdminContent() {
     },
     []
   );
+
+  // ─── CSV export / import handlers ─────────────────────────────────────────
+  const handleExportCsv = () => {
+    const a = document.createElement("a");
+    a.href = "/api/admin/products/export";
+    a.download = "";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
+  const handleImportFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImportFile(file);
+    setImportPreview(null);
+    setImportLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/admin/products/import?dryRun=true", {
+        method: "POST",
+        credentials: "include",
+        body: formData,
+      });
+      const data = await res.json() as { updates: number; creates: number; errors: Array<{ row: number; message: string }> };
+      setImportPreview(data);
+    } catch {
+      toast.error("Failed to read CSV file");
+    } finally {
+      setImportLoading(false);
+      if (csvImportInputRef.current) csvImportInputRef.current.value = "";
+    }
+  };
+
+  const handleApplyImport = async () => {
+    if (!importFile) return;
+    setImportApplying(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", importFile);
+      const res = await fetch("/api/admin/products/import", {
+        method: "POST",
+        credentials: "include",
+        body: formData,
+      });
+      const data = await res.json() as { updates: number; creates: number; errors: Array<{ row: number; message: string }> };
+      if (data.errors.length > 0) {
+        setImportPreview(data);
+        toast.error("Import failed — see errors below");
+      } else {
+        toast.success(`Import complete — ${data.updates} updated, ${data.creates} created`);
+        setImportDialogOpen(false);
+        setImportFile(null);
+        setImportPreview(null);
+        utils.products.list.invalidate();
+      }
+    } catch {
+      toast.error("Import failed");
+    } finally {
+      setImportApplying(false);
+    }
+  };
 
   const handleProductSubmit = () => {
     if (!editingProduct.name || !editingProduct.price) {
@@ -1018,10 +1097,28 @@ function AdminContent() {
               {products?.length ?? 0} product{products?.length !== 1 ? "s" : ""} · drag cards to reorder
             </p>
           </div>
-          <Button size="sm" onClick={openAddModal}>
-            <Plus className="h-4 w-4 mr-1.5" />
-            Add Product
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline" onClick={handleExportCsv}>
+              <Download className="h-4 w-4 mr-1.5" />
+              Export CSV
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                setImportFile(null);
+                setImportPreview(null);
+                setImportDialogOpen(true);
+              }}
+            >
+              <Upload className="h-4 w-4 mr-1.5" />
+              Import CSV
+            </Button>
+            <Button size="sm" onClick={openAddModal}>
+              <Plus className="h-4 w-4 mr-1.5" />
+              Add Product
+            </Button>
+          </div>
         </div>
 
         {/* Search + Sort row */}
@@ -1188,6 +1285,117 @@ function AdminContent() {
           </DndContext>
         )}
       </section>
+
+      {/* ─── CSV Import Dialog ─────────────────────────────────────────────── */}
+      {/* Hidden file input for CSV import */}
+      <input
+        ref={csvImportInputRef}
+        type="file"
+        accept=".csv,text/csv"
+        className="hidden"
+        onChange={handleImportFileSelect}
+      />
+
+      <Dialog
+        open={importDialogOpen}
+        onOpenChange={(open) => {
+          setImportDialogOpen(open);
+          if (!open) {
+            setImportFile(null);
+            setImportPreview(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              Import Products from CSV
+            </DialogTitle>
+            <DialogDescription>
+              Upload a CSV file exported from this panel. Rows with an id update existing products;
+              rows with a blank id create new ones. Products not in the file are left untouched.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            {/* File picker */}
+            <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => csvImportInputRef.current?.click()}
+                disabled={importLoading || importApplying}
+              >
+                <Upload className="h-4 w-4 mr-1.5" />
+                {importFile ? "Change File" : "Choose CSV File"}
+              </Button>
+              {importFile && (
+                <span className="text-sm text-muted-foreground truncate max-w-[200px]">
+                  {importFile.name}
+                </span>
+              )}
+              {importLoading && (
+                <span className="text-sm text-muted-foreground animate-pulse">Validating…</span>
+              )}
+            </div>
+
+            {/* Dry-run preview */}
+            {importPreview && !importLoading && (
+              <div className="space-y-3">
+                {importPreview.errors.length === 0 ? (
+                  <div className="rounded-md bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 px-4 py-3 text-sm">
+                    <p className="font-medium text-emerald-800 dark:text-emerald-300">Ready to import</p>
+                    <p className="text-emerald-700 dark:text-emerald-400 mt-0.5">
+                      {importPreview.updates} product{importPreview.updates !== 1 ? "s" : ""} will be
+                      updated, {importPreview.creates} will be created.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="rounded-md bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 px-4 py-3 text-sm space-y-1">
+                    <p className="font-medium text-red-800 dark:text-red-300">
+                      {importPreview.errors.length} row error{importPreview.errors.length !== 1 ? "s" : ""} — fix and re-upload
+                    </p>
+                    <div className="max-h-40 overflow-y-auto space-y-1 mt-2">
+                      {importPreview.errors.map((e) => (
+                        <p key={e.row} className="text-red-700 dark:text-red-400">
+                          <span className="font-mono">Row {e.row}:</span> {e.message}
+                        </p>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setImportDialogOpen(false);
+                setImportFile(null);
+                setImportPreview(null);
+              }}
+              disabled={importApplying}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleApplyImport}
+              disabled={
+                !importFile ||
+                !importPreview ||
+                importPreview.errors.length > 0 ||
+                importLoading ||
+                importApplying
+              }
+            >
+              {importApplying ? "Applying…" : "Apply Import"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* ─── Product Add/Edit Modal ───────────────────────────────────────────── */}
       <Dialog open={productModalOpen} onOpenChange={setProductModalOpen}>
