@@ -1,0 +1,1 @@
+ALTER TABLE `products` ADD `visibility` enum('regular_only','always','power_drop_only') DEFAULT 'regular_only' NOT NULL;

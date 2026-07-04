@@ -60,6 +60,7 @@ export default function Home() {
     retailPrice?: number | null;
     unit: string;
     category?: string;
+    visibility?: "regular_only" | "always" | "power_drop_only";
   }) => {
     setCartItems((prev) => {
       const existing = prev.find((i) => i.id === product.id);
@@ -83,6 +84,7 @@ export default function Home() {
           unit: product.unit,
           qty: 1,
           category: product.category,
+          visibility: product.visibility,
         },
       ];
     });

@@ -37,6 +37,7 @@ export interface CartItem {
   qty: number;
   note?: string; // per-item customer request
   category?: string; // product category, stored for CSV export
+  visibility?: "regular_only" | "always" | "power_drop_only"; // product visibility setting
 }
 
 interface CartDrawerProps {
@@ -461,6 +462,17 @@ export default function CartDrawer({
                           <p className="font-mono-brand text-[10px] text-[#8a857c] mt-0.5">
                             {item.cut}
                           </p>
+                          {/* Visibility warning chip */}
+                          {item.visibility === "regular_only" && powerDropActive && (
+                            <span className="inline-block mt-1 font-mono-brand text-[9px] tracking-wider px-1.5 py-0.5 bg-amber-900/40 border border-amber-600/50 text-amber-400">
+                              NOT IN THIS DROP
+                            </span>
+                          )}
+                          {item.visibility === "power_drop_only" && !powerDropActive && (
+                            <span className="inline-block mt-1 font-mono-brand text-[9px] tracking-wider px-1.5 py-0.5 bg-amber-900/40 border border-amber-600/50 text-amber-400">
+                              POWER DROP ONLY
+                            </span>
+                          )}
                           <div className="flex items-center gap-3 mt-2">
                             <div className="flex items-center border border-white/15">
                               <button

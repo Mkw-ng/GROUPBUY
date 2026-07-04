@@ -82,6 +82,16 @@ export const products = mysqlTable("products", {
    * Unit matches the product's unit (kg for weight-based, count for others).
    */
   stockLimit: decimal("stockLimit", { precision: 10, scale: 3 }),
+  /**
+   * Controls when this product is visible/orderable on the public site.
+   * regular_only  = shown only when Power Drop is OFF
+   * always        = shown in both regular and Power Drop modes
+   * power_drop_only = shown only when Power Drop is ON
+   * The admin panel always shows all products regardless of this setting.
+   */
+  visibility: mysqlEnum("visibility", ["regular_only", "always", "power_drop_only"])
+    .notNull()
+    .default("regular_only"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

@@ -152,6 +152,7 @@ const productInput = z.object({
   img: z.string().optional().nullable(),
   sortOrder: z.number().default(0),
   stockLimit: z.string().regex(/^\d+(\.\d{1,3})?$/).optional().nullable(),
+  visibility: z.enum(["regular_only", "always", "power_drop_only"]).default("regular_only"),
 });
 
 // ─── Order item schema ─────────────────────────────────────────────────────────────────
@@ -388,6 +389,33 @@ export const appRouter = router({
                   message: `"${product.name}" only has ${remaining.toFixed(isKg ? 1 : 0)}${unit} remaining. Please reduce your quantity.`,
                 });
               }
+            }
+          }
+        }
+
+        // ─── Visibility enforcement ─────────────────────────────────────────
+        // Read powerDropActive server-side — do NOT trust input.isPowerDrop.
+        {
+          const [allProducts, settings] = await Promise.all([
+            getAllProducts(),
+            getAllSettings(),
+          ]);
+          const productMap = new Map(allProducts.map((p) => [p.id, p]));
+          const powerDropActive = settings.powerDropActive === "true";
+          for (const item of parsedItems) {
+            const product = productMap.get(item.id);
+            if (!product) continue; // already caught above
+            if (powerDropActive && product.visibility === "regular_only") {
+              throw new TRPCError({
+                code: "BAD_REQUEST",
+                message: `"${product.name}" is not part of the current Power Drop.`,
+              });
+            }
+            if (!powerDropActive && product.visibility === "power_drop_only") {
+              throw new TRPCError({
+                code: "BAD_REQUEST",
+                message: `"${product.name}" is only available during a Power Drop.`,
+              });
             }
           }
         }

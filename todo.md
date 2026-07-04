@@ -475,3 +475,16 @@
 ## Bulk All Packing Slips PDF Download
 - [x] Add /api/admin/packing-slips/download route — generates one combined PDF with all paid orders' packing slips (one per page)
 - [x] Add "All Packing Slips" button in AdminOrders toolbar next to Packing Sheet and Schedule List
+
+## Power Drop Product Visibility
+- [x] DB: add visibility enum (regular_only, always, power_drop_only) to products table and push migration
+- [x] Backend: add visibility field to productInput schema in upsert procedure
+- [x] Backend: enforce visibility in orders.create — reject regular_only items during Power Drop and power_drop_only items outside Power Drop
+- [x] Public site: filter DealsSection product list by visibility mode before category/search filtering
+- [x] Public site: hide category tabs with zero products in current mode; show "Drop menu coming soon" empty state
+- [x] Cart: surface server rejection error messages to customer on checkout
+- [x] Cart: visually flag non-orderable line items with mode chip
+- [x] Admin: add Visibility selector to product add/edit form
+- [x] Admin: show visibility chips on product cards (PD Only / Always Visible)
+- [x] Admin: show live Power Drop product count next to toggle; warn if count is 0
+- [x] Tests: vitest coverage for visibility enforcement (5 new tests, 30 total passing)

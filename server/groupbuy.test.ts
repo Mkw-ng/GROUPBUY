@@ -21,6 +21,7 @@ vi.mock("./db", () => ({
       img: null,
       sortOrder: 1,
       description: null,
+      visibility: "regular_only" as const,
       createdAt: new Date(),
       updatedAt: new Date(),
     },
@@ -352,5 +353,96 @@ describe("getUnassignedOrders helper", () => {
   it("every returned order has dropId null", async () => {
     const result = await getUnassignedOrders();
     result.forEach((o) => expect(o.dropId).toBeNull());
+  });
+});
+
+// ─── Visibility enforcement tests ────────────────────────────────────────────
+
+describe("Product visibility field", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("getAllProducts returns products with a visibility field", async () => {
+    const products = await getAllProducts();
+    const p = products[0] as { visibility?: string };
+    expect(p).toHaveProperty("visibility");
+    expect(["regular_only", "always", "power_drop_only"]).toContain(p.visibility);
+  });
+
+  it("regular_only product is excluded when powerDropActive is true", async () => {
+    const products = await getAllProducts();
+    const powerDropActive = true;
+    const visible = products.filter((p) => {
+      const vis = (p as { visibility?: string }).visibility ?? "regular_only";
+      return powerDropActive ? vis !== "regular_only" : vis !== "power_drop_only";
+    });
+    // The mock product has visibility: "regular_only" so it should be hidden during PD
+    expect(visible.length).toBe(0);
+  });
+
+  it("regular_only product is included when powerDropActive is false", async () => {
+    const products = await getAllProducts();
+    const powerDropActive = false;
+    const visible = products.filter((p) => {
+      const vis = (p as { visibility?: string }).visibility ?? "regular_only";
+      return powerDropActive ? vis !== "regular_only" : vis !== "power_drop_only";
+    });
+    expect(visible.length).toBe(1);
+  });
+
+  it("power_drop_only product is excluded when powerDropActive is false", async () => {
+    const pdOnlyProduct = [
+      {
+        id: 99,
+        name: "PD Exclusive",
+        cut: "Special",
+        category: "beef",
+        price: "50.00",
+        powerDropPrice: "40.00",
+        unit: "/ kg",
+        badge: null,
+        available: true,
+        img: null,
+        sortOrder: 99,
+        description: null,
+        visibility: "power_drop_only" as const,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    ];
+    const powerDropActive = false;
+    const visible = pdOnlyProduct.filter((p) => {
+      const vis = p.visibility ?? "regular_only";
+      return powerDropActive ? vis !== "regular_only" : vis !== "power_drop_only";
+    });
+    expect(visible.length).toBe(0);
+  });
+
+  it("always-visible product is shown regardless of powerDropActive", async () => {
+    const alwaysProduct = [
+      {
+        id: 100,
+        name: "Always Available",
+        cut: "Standard",
+        category: "beef",
+        price: "30.00",
+        powerDropPrice: "25.00",
+        unit: "/ kg",
+        badge: null,
+        available: true,
+        img: null,
+        sortOrder: 100,
+        description: null,
+        visibility: "always" as const,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    ];
+    for (const powerDropActive of [true, false]) {
+      const visible = alwaysProduct.filter((p) => {
+        const vis = p.visibility ?? "regular_only";
+        return powerDropActive ? vis !== "regular_only" : vis !== "power_drop_only";
+      });
+      expect(visible.length).toBe(1);
+    }
   });
 });

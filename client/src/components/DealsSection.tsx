@@ -129,6 +129,7 @@ interface DealsProps {
     retailPrice?: number | null;
     unit: string;
     category: string;
+    visibility?: "regular_only" | "always" | "power_drop_only";
   }) => void;
   powerDropActive?: boolean;
 }
@@ -233,7 +234,19 @@ export default function DealsSection({ onAddToCart, powerDropActive = false }: D
     ? (dbProducts as Product[])
     : PLACEHOLDER_PRODUCTS;
 
-  const filtered = allProducts.filter((p) => {
+  // ── Visibility pre-filter (applied before category/search) ────────────────
+  // Power Drop active: show only products with visibility !== 'regular_only'
+  // Power Drop off:    show only products with visibility !== 'power_drop_only'
+  const visibleProducts = allProducts.filter((p) => {
+    const vis = (p as Product & { visibility?: string }).visibility ?? "regular_only";
+    if (powerDropActive) return vis !== "regular_only";
+    return vis !== "power_drop_only";
+  });
+
+  // Derive which categories have at least one visible product
+  const categoriesWithProducts = new Set(visibleProducts.map((p) => p.category));
+
+  const filtered = visibleProducts.filter((p) => {
     const matchCat = activeCategory === "all" || p.category === activeCategory;
     const matchSearch = p.name.toLowerCase().includes(search.toLowerCase());
     return matchCat && matchSearch;
@@ -241,7 +254,7 @@ export default function DealsSection({ onAddToCart, powerDropActive = false }: D
 
   // Predictive suggestions: match on name, cut, or category (max 6)
   const suggestions = search.trim().length > 0
-    ? allProducts
+    ? visibleProducts
         .filter(p =>
           p.name.toLowerCase().includes(search.toLowerCase()) ||
           p.cut.toLowerCase().includes(search.toLowerCase()) ||
@@ -315,7 +328,9 @@ export default function DealsSection({ onAddToCart, powerDropActive = false }: D
                 Category
               </p>
               <nav className="flex flex-row flex-wrap lg:flex-col gap-1">
-                {CATEGORIES.map((cat) => (
+                {CATEGORIES.filter((cat) =>
+                  cat.id === "all" || categoriesWithProducts.has(cat.id as Product["category"])
+                ).map((cat) => (
                   <button
                     key={cat.id}
                     onClick={() => setActiveCategory(cat.id)}
@@ -461,6 +476,19 @@ export default function DealsSection({ onAddToCart, powerDropActive = false }: D
             <p className="font-mono-brand text-[11px] text-[#8a857c] mb-6">
               {isLoading ? "Loading…" : `${filtered.length} product${filtered.length !== 1 ? "s" : ""}`}
             </p>
+
+            {/* Power Drop empty state — no products flagged for this drop yet */}
+            {!isLoading && powerDropActive && visibleProducts.length === 0 && (
+              <div className="col-span-full py-16 text-center">
+                <Zap size={32} className="mx-auto mb-4 text-[#c73e3a] opacity-50" />
+                <p className="font-display text-[13px] tracking-widest text-[#0a0a0a] mb-2">
+                  DROP MENU COMING SOON
+                </p>
+                <p className="font-mono-brand text-[11px] text-[#8a857c]">
+                  The Power Drop line-up is being finalised. Check back shortly.
+                </p>
+              </div>
+            )}
 
             {/* Grid */}
             <AnimatePresence mode="wait">
@@ -622,6 +650,7 @@ export default function DealsSection({ onAddToCart, powerDropActive = false }: D
                                   retailPrice: retailPrice,
                                   unit: product.unit,
                                   category: product.category,
+                                  visibility: (product as Product & { visibility?: "regular_only" | "always" | "power_drop_only" }).visibility,
                                 });
                                 toast.success(`${product.name} added to cart`);
                               }}
@@ -638,7 +667,7 @@ export default function DealsSection({ onAddToCart, powerDropActive = false }: D
                   );
                 })}
 
-                {filtered.length === 0 && !isLoading && (
+                {filtered.length === 0 && !isLoading && !(powerDropActive && visibleProducts.length === 0) && (
                   <div className="col-span-full py-16 text-center">
                     <p className="font-mono-brand text-[13px] text-[#8a857c]">
                       No products found.

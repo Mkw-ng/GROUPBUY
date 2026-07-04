@@ -173,6 +173,8 @@ const CATEGORY_EMOJI: Record<string, string> = {
   other:               "🛒",
 };
 
+type VisibilityMode = "regular_only" | "always" | "power_drop_only";
+
 interface ProductForm {
   id?: number;
   name: string;
@@ -188,6 +190,7 @@ interface ProductForm {
   img: string;
   sortOrder: number;
   stockLimit: string;
+  visibility: VisibilityMode;
 }
 
 const EMPTY_FORM: ProductForm = {
@@ -204,6 +207,7 @@ const EMPTY_FORM: ProductForm = {
   img: "",
   sortOrder: 0,
   stockLimit: "",
+  visibility: "regular_only",
 };
 
 // ─── Admin Guard ──────────────────────────────────────────────────────────────
@@ -277,6 +281,7 @@ interface ProductCardProps {
     img?: string | null;
     sortOrder: number;
     description?: string | null;
+    visibility?: "regular_only" | "always" | "power_drop_only" | null;
   };
   onEdit: () => void;
   onDelete: () => void;
@@ -391,6 +396,25 @@ function SortableProductCard({
             </span>
           )}
         </div>
+
+        {/* Visibility chip */}
+        {product.visibility && product.visibility !== "regular_only" && (
+          <div className="flex">
+            <span
+              className={`text-[10px] font-semibold px-2 py-0.5 rounded border ${
+                product.visibility === "power_drop_only"
+                  ? "bg-red-100 text-red-700 border-red-200"
+                  : "bg-green-100 text-green-700 border-green-200"
+              }`}
+            >
+              {product.visibility === "power_drop_only" ? (
+                <span className="flex items-center gap-1"><Zap className="h-2.5 w-2.5 fill-current" /> PD Only</span>
+              ) : (
+                "Always Visible"
+              )}
+            </span>
+          </div>
+        )}
 
         {/* Footer: availability + actions */}
         <div className="flex items-center justify-between pt-1 border-t border-border/50 mt-auto">
@@ -653,6 +677,7 @@ function AdminContent() {
         img: p.img ?? "",
         sortOrder: p.sortOrder,
         stockLimit: (p as { stockLimit?: string | null }).stockLimit ?? "",
+        visibility: ((p as { visibility?: VisibilityMode }).visibility) ?? "regular_only",
       });
       setProductModalOpen(true);
     },
@@ -679,6 +704,7 @@ function AdminContent() {
       img: editingProduct.img || undefined,
       sortOrder: editingProduct.sortOrder,
       stockLimit: editingProduct.stockLimit || undefined,
+      visibility: editingProduct.visibility,
     });
   };
 
@@ -756,6 +782,21 @@ function AdminContent() {
                 When active, all products show their Power Drop price and the site shows a live
                 indicator.
               </p>
+              {/* Live count of products that will appear during a Power Drop */}
+              {(() => {
+                const pdCount = (products ?? []).filter(
+                  (p) => (p as { visibility?: string }).visibility !== "regular_only"
+                ).length;
+                return (
+                  <p className={`text-xs mt-1 font-medium ${
+                    pdCount === 0 ? "text-amber-600" : "text-muted-foreground"
+                  }`}>
+                    {pdCount === 0
+                      ? "⚠ No products are set to appear during a Power Drop"
+                      : `${pdCount} product${pdCount !== 1 ? "s" : ""} will appear during a Power Drop`}
+                  </p>
+                );
+              })()}
               {powerDropActive && (
                 <div className="flex items-center gap-1.5 mt-2">
                   <span className="relative flex h-2 w-2">
@@ -1287,6 +1328,47 @@ function AdminContent() {
                   onCheckedChange={(v) => setEditingProduct((p) => ({ ...p, available: v }))}
                 />
                 <label className="text-sm font-medium">Available for ordering</label>
+              </div>
+
+              {/* Visibility / Power Drop mode */}
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium flex items-center gap-1">
+                  <Zap className="h-3 w-3 text-red-500" />
+                  Power Drop Visibility
+                </label>
+                <Select
+                  value={editingProduct.visibility}
+                  onValueChange={(v) =>
+                    setEditingProduct((p) => ({ ...p, visibility: v as VisibilityMode }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="regular_only">
+                      <span className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-slate-400 inline-block" />
+                        Regular only (hidden during Power Drop)
+                      </span>
+                    </SelectItem>
+                    <SelectItem value="always">
+                      <span className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-green-500 inline-block" />
+                        Always visible
+                      </span>
+                    </SelectItem>
+                    <SelectItem value="power_drop_only">
+                      <span className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-red-500 inline-block" />
+                        Power Drop only (hidden outside Power Drop)
+                      </span>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Controls when this product appears on the public site.
+                </p>
               </div>
             </div>
           </div>
