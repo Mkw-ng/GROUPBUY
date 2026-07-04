@@ -541,3 +541,15 @@
 - [ ] Public site: hide sections whose categories are all hidden (no orphan headings)
 - [ ] Public site: mobile row-groups with section headings
 - [ ] Tests: delete-section unassigns categories, sections.list ordering
+
+## Category Visibility Setting
+- [x] DB: add visibility enum column (regular_only / always / power_drop_only) to categories table
+- [x] DB: run pnpm db:push — existing categories default to always
+- [x] Shared helper: effectiveVisibility(productVis, categoryVis) in shared/visibility.ts
+- [x] Shared helper: isVisibleInMode(vis, isPowerDrop) in shared/visibility.ts
+- [x] Backend: upsertCategory accepts visibility field
+- [x] Backend: orders.create uses effectiveVisibility(product × category) for enforcement
+- [x] Admin UI: CategoryRow shows visibility chip + quick dropdown selector in Manage Categories dialog
+- [x] Public site: DealsSection pre-filter uses effectiveVisibility() with categoryVisibilityMap
+- [x] Tests: effectiveVisibility helper (6 tests), isVisibleInMode (3 tests), category visibility field (4 tests) — 13 new tests
+- [x] Fix failing test: getAllCategories toHaveLength(2) → toHaveLength(3) + seafood assertion

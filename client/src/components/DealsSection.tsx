@@ -6,6 +6,7 @@
  * Power Drop: crossed-out original price + red Power Drop price, button changes to "Secure Power-Drop ⚡"
  */
 import { useState, useRef, useCallback, useEffect } from "react";
+import { effectiveVisibility, isVisibleInMode } from "@shared/visibility";
 import { motion, AnimatePresence } from "framer-motion";
 import { ShoppingCart, Zap } from "lucide-react";
 import { toast } from "sonner";
@@ -236,14 +237,21 @@ export default function DealsSection({ onAddToCart, powerDropActive = false }: D
   });
 
   // Build category list from DB, falling back to hardcoded list if DB is empty
+  // Include visibility so the pre-filter can use effectiveVisibility()
   const liveCategories = dbCategories.length > 0
     ? dbCategories.map((c) => ({
         id: c.slug,
         label: (powerDropActive && c.powerDropName) ? c.powerDropName : c.name,
         emoji: c.emoji,
         sectionId: c.sectionId ?? null,
+        visibility: (c.visibility ?? "always") as "regular_only" | "always" | "power_drop_only",
       }))
-    : CATEGORIES.map((c) => ({ id: c.id, label: c.label, emoji: null, sectionId: null }));
+    : CATEGORIES.map((c) => ({ id: c.id, label: c.label, emoji: null, sectionId: null, visibility: "always" as const }));
+
+  // Build a slug → category-visibility map for the effective-visibility pre-filter
+  const categoryVisibilityMap = new Map<string, "regular_only" | "always" | "power_drop_only">(
+    liveCategories.map((c) => [c.id, c.visibility])
+  );
 
   // Use DB products if available, otherwise show placeholders
   const allProducts: Product[] = (dbProducts && dbProducts.length > 0)
@@ -251,12 +259,13 @@ export default function DealsSection({ onAddToCart, powerDropActive = false }: D
     : PLACEHOLDER_PRODUCTS;
 
   // ── Visibility pre-filter (applied before category/search) ────────────────
-  // Power Drop active: show only products with visibility !== 'regular_only'
-  // Power Drop off:    show only products with visibility !== 'power_drop_only'
+  // Uses effectiveVisibility(productVis, categoryVis) so category-level
+  // overrides are respected (e.g. a whole category can be PD-only).
   const visibleProducts = allProducts.filter((p) => {
-    const vis = (p as Product & { visibility?: string }).visibility ?? "regular_only";
-    if (powerDropActive) return vis !== "regular_only";
-    return vis !== "power_drop_only";
+    const productVis = ((p as Product & { visibility?: string }).visibility ?? "regular_only") as "regular_only" | "always" | "power_drop_only";
+    const catVis = categoryVisibilityMap.get(p.category) ?? "always";
+    const effVis = effectiveVisibility(productVis, catVis);
+    return isVisibleInMode(effVis, powerDropActive);
   });
 
   // Derive which categories have at least one visible product

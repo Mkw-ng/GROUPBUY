@@ -297,7 +297,7 @@ function SectionRow({
 }
 
 interface CategoryRowProps {
-  cat: { id: number; slug: string; name: string; emoji?: string | null; powerDropName?: string | null; sectionId?: number | null };
+  cat: { id: number; slug: string; name: string; emoji?: string | null; powerDropName?: string | null; sectionId?: number | null; visibility: "regular_only" | "always" | "power_drop_only" };
   isEditing: boolean;
   editName: string;
   editEmoji: string;
@@ -311,6 +311,7 @@ interface CategoryRowProps {
   onEditEmojiChange: (v: string) => void;
   onEditPdNameChange: (v: string) => void;
   onSetSection: (sectionId: number | null) => void;
+  onSetVisibility: (v: "regular_only" | "always" | "power_drop_only") => void;
   onDelete: () => void;
   isSaving: boolean;
 }
@@ -330,6 +331,7 @@ function CategoryRow({
   onEditEmojiChange,
   onEditPdNameChange,
   onSetSection,
+  onSetVisibility,
   onDelete,
   isSaving,
 }: CategoryRowProps) {
@@ -360,6 +362,20 @@ function CategoryRow({
             <p className="text-sm font-medium truncate">{cat.name}</p>
             {cat.powerDropName && <p className="text-xs text-muted-foreground truncate">PD: {cat.powerDropName}</p>}
           </div>
+          {/* Category visibility quick selector */}
+          <Select
+            value={cat.visibility}
+            onValueChange={(v) => onSetVisibility(v as "regular_only" | "always" | "power_drop_only")}
+          >
+            <SelectTrigger className={`h-6 text-xs w-24 shrink-0 ${VISIBILITY_COLORS[cat.visibility]}`}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="always"><span className="text-green-600">Always</span></SelectItem>
+              <SelectItem value="regular_only"><span className="text-slate-500">Regular</span></SelectItem>
+              <SelectItem value="power_drop_only"><span className="text-red-600">PD Only</span></SelectItem>
+            </SelectContent>
+          </Select>
           {/* Section assignment dropdown */}
           {sections.length > 0 && (
             <Select
@@ -811,6 +827,11 @@ function AdminContent() {
     onError: (err) => { toast.error(err.message); setDeleteCatId(null); },
   });
   const setCategorySection = trpc.admin.categories.update.useMutation({
+    onSuccess: () => utils.categories.list.invalidate(),
+    onError: (err) => toast.error(err.message),
+  });
+
+  const setCategoryVisibility = trpc.admin.categories.update.useMutation({
     onSuccess: () => utils.categories.list.invalidate(),
     onError: (err) => toast.error(err.message),
   });
@@ -1987,6 +2008,7 @@ function AdminContent() {
                           onEditEmojiChange={setEditCatEmoji}
                           onEditPdNameChange={setEditCatPdName}
                           onSetSection={(sectionId) => setCategorySection.mutate({ id: cat.id, name: cat.name, sectionId })}
+                          onSetVisibility={(visibility) => setCategoryVisibility.mutate({ id: cat.id, name: cat.name, visibility })}
                           onDelete={() => setDeleteCatId(cat.id)}
                           isSaving={updateCategory.isPending}
                         />

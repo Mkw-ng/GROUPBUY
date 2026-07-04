@@ -726,6 +726,7 @@ export async function upsertCategory(data: {
   emoji?: string | null;
   sortOrder?: number;
   sectionId?: number | null;
+  visibility?: "regular_only" | "always" | "power_drop_only";
 }): Promise<Category> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
@@ -739,7 +740,8 @@ export async function upsertCategory(data: {
         powerDropName: data.powerDropName ?? null,
         emoji: data.emoji ?? null,
         ...(data.sortOrder !== undefined ? { sortOrder: data.sortOrder } : {}),
-        ...("sectionId" in data ? { sectionId: data.sectionId ?? null } : {}),
+        ...('sectionId' in data ? { sectionId: data.sectionId ?? null } : {}),
+        ...(data.visibility !== undefined ? { visibility: data.visibility } : {}),
       })
       .where(eq(categories.id, data.id));
     const rows = await db.select().from(categories).where(eq(categories.id, data.id)).limit(1);
@@ -753,6 +755,7 @@ export async function upsertCategory(data: {
       powerDropName: data.powerDropName ?? null,
       emoji: data.emoji ?? null,
       sortOrder: data.sortOrder ?? 0,
+      ...(data.visibility !== undefined ? { visibility: data.visibility } : {}),
     });
     const rows = await db.select().from(categories).where(eq(categories.slug, data.slug)).limit(1);
     return rows[0];

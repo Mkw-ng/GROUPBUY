@@ -1,0 +1,1 @@
+ALTER TABLE `categories` ADD `visibility` enum('regular_only','always','power_drop_only') DEFAULT 'always' NOT NULL;

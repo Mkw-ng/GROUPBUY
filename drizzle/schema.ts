@@ -65,6 +65,16 @@ export const categories = mysqlTable("categories", {
   sortOrder: int("sortOrder").notNull().default(0),
   /** FK to categorySections.id — null means ungrouped */
   sectionId: int("sectionId"),
+  /**
+   * Controls when this category (and its products) is visible on the public site.
+   * regular_only    = shown only when Power Drop is OFF
+   * always          = shown in both modes (default — preserves existing behaviour)
+   * power_drop_only = shown only when Power Drop is ON
+   * The admin panel always shows all categories regardless of this setting.
+   */
+  visibility: mysqlEnum("visibility", ["regular_only", "always", "power_drop_only"])
+    .notNull()
+    .default("always"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

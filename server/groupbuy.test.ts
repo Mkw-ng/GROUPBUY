@@ -10,8 +10,9 @@ vi.mock("./db", () => ({
   bulkUpdateProducts: vi.fn().mockResolvedValue(3),
 
   getAllCategories: vi.fn().mockResolvedValue([
-    { id: 1, slug: "beef", name: "Beef", powerDropName: "PD Beef", emoji: "🥩", sortOrder: 0, createdAt: new Date(), updatedAt: new Date() },
-    { id: 2, slug: "lamb", name: "Lamb", powerDropName: null, emoji: "🐑", sortOrder: 1, createdAt: new Date(), updatedAt: new Date() },
+    { id: 1, slug: "beef", name: "Beef", powerDropName: "PD Beef", emoji: "🥩", sortOrder: 0, visibility: "always" as const, sectionId: null, createdAt: new Date(), updatedAt: new Date() },
+    { id: 2, slug: "lamb", name: "Lamb", powerDropName: null, emoji: "🐑", sortOrder: 1, visibility: "power_drop_only" as const, sectionId: null, createdAt: new Date(), updatedAt: new Date() },
+    { id: 3, slug: "seafood", name: "Seafood", powerDropName: null, emoji: "🦞", sortOrder: 2, visibility: "regular_only" as const, sectionId: null, createdAt: new Date(), updatedAt: new Date() },
   ]),
   getCategoryBySlug: vi.fn().mockResolvedValue(null),
   upsertCategory: vi.fn().mockImplementation(async (data: { id?: number; slug?: string; name: string }) => ({
@@ -538,9 +539,10 @@ describe("Category helpers", () => {
 
   it("getAllCategories returns categories ordered by sortOrder", async () => {
     const result = await getAllCategories();
-    expect(result).toHaveLength(2);
+    expect(result).toHaveLength(3);
     expect(result[0].slug).toBe("beef");
     expect(result[1].slug).toBe("lamb");
+    expect(result[2].slug).toBe("seafood");
   });
 
   it("upsertCategory creates a new category and auto-generates a slug", async () => {
@@ -637,5 +639,82 @@ describe("Section helpers", () => {
   it("deleteSection can be called for a section with no categories", async () => {
     await deleteSection(99);
     expect(deleteSection).toHaveBeenCalledWith(99);
+  });
+});
+
+// ─── Effective Visibility helper tests ────────────────────────────────────────
+import { effectiveVisibility, isVisibleInMode } from "../shared/visibility";
+
+describe("effectiveVisibility helper", () => {
+  it("category always + product always → always", () => {
+    expect(effectiveVisibility("always", "always")).toBe("always");
+  });
+
+  it("category always + product regular_only → regular_only (product wins)", () => {
+    expect(effectiveVisibility("regular_only", "always")).toBe("regular_only");
+  });
+
+  it("category always + product power_drop_only → power_drop_only (product wins)", () => {
+    expect(effectiveVisibility("power_drop_only", "always")).toBe("power_drop_only");
+  });
+
+  it("category power_drop_only overrides product always → power_drop_only", () => {
+    expect(effectiveVisibility("always", "power_drop_only")).toBe("power_drop_only");
+  });
+
+  it("category regular_only overrides product always → regular_only", () => {
+    expect(effectiveVisibility("always", "regular_only")).toBe("regular_only");
+  });
+
+  it("category power_drop_only overrides product regular_only → power_drop_only", () => {
+    expect(effectiveVisibility("regular_only", "power_drop_only")).toBe("power_drop_only");
+  });
+});
+
+describe("isVisibleInMode helper", () => {
+  it("always is visible in both modes", () => {
+    expect(isVisibleInMode("always", true)).toBe(true);
+    expect(isVisibleInMode("always", false)).toBe(true);
+  });
+
+  it("power_drop_only is visible only during Power Drop", () => {
+    expect(isVisibleInMode("power_drop_only", true)).toBe(true);
+    expect(isVisibleInMode("power_drop_only", false)).toBe(false);
+  });
+
+  it("regular_only is visible only outside Power Drop", () => {
+    expect(isVisibleInMode("regular_only", false)).toBe(true);
+    expect(isVisibleInMode("regular_only", true)).toBe(false);
+  });
+});
+
+describe("Category visibility field in DB mock", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("getAllCategories returns categories with visibility field", async () => {
+    const cats = await getAllCategories();
+    expect(cats).toHaveLength(3);
+    for (const c of cats) {
+      expect(c).toHaveProperty("visibility");
+      expect(["regular_only", "always", "power_drop_only"]).toContain(c.visibility);
+    }
+  });
+
+  it("beef category has visibility=always", async () => {
+    const cats = await getAllCategories();
+    const beef = cats.find((c) => c.slug === "beef");
+    expect(beef?.visibility).toBe("always");
+  });
+
+  it("lamb category has visibility=power_drop_only", async () => {
+    const cats = await getAllCategories();
+    const lamb = cats.find((c) => c.slug === "lamb");
+    expect(lamb?.visibility).toBe("power_drop_only");
+  });
+
+  it("seafood category has visibility=regular_only", async () => {
+    const cats = await getAllCategories();
+    const seafood = cats.find((c) => c.slug === "seafood");
+    expect(seafood?.visibility).toBe("regular_only");
   });
 });

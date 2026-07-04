@@ -402,23 +402,34 @@ export const appRouter = router({
 
         // ─── Visibility enforcement ─────────────────────────────────────────
         // Read powerDropActive server-side — do NOT trust input.isPowerDrop.
+        // Effective visibility = more restrictive of product + category visibility.
         {
-          const [allProducts, settings] = await Promise.all([
+          const [allProducts, allCats, settings] = await Promise.all([
             getAllProducts(),
+            getAllCategories(),
             getAllSettings(),
           ]);
           const productMap = new Map(allProducts.map((p) => [p.id, p]));
+          const categoryMap = new Map(allCats.map((c) => [c.slug, c]));
           const powerDropActive = settings.powerDropActive === "true";
           for (const item of parsedItems) {
             const product = productMap.get(item.id);
             if (!product) continue; // already caught above
-            if (powerDropActive && product.visibility === "regular_only") {
+            const category = categoryMap.get(product.category);
+            const catVis = (category?.visibility ?? "always") as "regular_only" | "always" | "power_drop_only";
+            const prodVis = product.visibility as "regular_only" | "always" | "power_drop_only";
+            // Effective visibility: category overrides product when more restrictive
+            const effVis =
+              catVis === "power_drop_only" ? "power_drop_only"
+              : catVis === "regular_only" ? "regular_only"
+              : prodVis;
+            if (powerDropActive && effVis === "regular_only") {
               throw new TRPCError({
                 code: "BAD_REQUEST",
                 message: `"${product.name}" is not part of the current Power Drop.`,
               });
             }
-            if (!powerDropActive && product.visibility === "power_drop_only") {
+            if (!powerDropActive && effVis === "power_drop_only") {
               throw new TRPCError({
                 code: "BAD_REQUEST",
                 message: `"${product.name}" is only available during a Power Drop.`,
@@ -528,6 +539,7 @@ export const appRouter = router({
             name: z.string().min(1).max(64),
             powerDropName: z.string().max(64).optional().nullable(),
             emoji: z.string().max(16).optional().nullable(),
+            visibility: z.enum(["regular_only", "always", "power_drop_only"]).optional().default("always"),
           })
         )
         .mutation(async ({ input }) => {
@@ -553,6 +565,7 @@ export const appRouter = router({
             powerDropName: input.powerDropName ?? null,
             emoji: input.emoji ?? null,
             sortOrder: maxSort + 1,
+            visibility: input.visibility,
           });
           return cat;
         }),
@@ -565,6 +578,7 @@ export const appRouter = router({
             powerDropName: z.string().max(64).optional().nullable(),
             emoji: z.string().max(16).optional().nullable(),
             sectionId: z.number().int().positive().optional().nullable(),
+            visibility: z.enum(["regular_only", "always", "power_drop_only"]).optional(),
           })
         )
         .mutation(async ({ input }) => {
@@ -574,6 +588,7 @@ export const appRouter = router({
             powerDropName: input.powerDropName ?? null,
             emoji: input.emoji ?? null,
             sectionId: input.sectionId ?? null,
+            ...(input.visibility !== undefined ? { visibility: input.visibility } : {}),
           });
           return cat;
         }),
