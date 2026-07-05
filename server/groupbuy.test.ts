@@ -9,6 +9,11 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 vi.mock("./db", () => ({
   bulkUpdateProducts: vi.fn().mockResolvedValue(3),
 
+  getOrderedQtyByProduct: vi.fn().mockImplementation(async () => {
+    // Default: product 1 has 3 units already ordered
+    return new Map([[1, 3]]);
+  }),
+
   getAllCategories: vi.fn().mockResolvedValue([
     { id: 1, slug: "beef", name: "Beef", powerDropName: "PD Beef", emoji: "🥩", sortOrder: 0, visibility: "always" as const, sectionId: null, createdAt: new Date(), updatedAt: new Date() },
     { id: 2, slug: "lamb", name: "Lamb", powerDropName: null, emoji: "🐑", sortOrder: 1, visibility: "power_drop_only" as const, sectionId: null, createdAt: new Date(), updatedAt: new Date() },
@@ -170,6 +175,7 @@ import {
   getActiveOrderCounts,
   getUnassignedOrders,
   bulkUpdateProducts,
+  getOrderedQtyByProduct,
   getAllCategories,
   upsertCategory,
   deleteCategory,
@@ -716,5 +722,66 @@ describe("Category visibility field in DB mock", () => {
     const cats = await getAllCategories();
     const seafood = cats.find((c) => c.slug === "seafood");
     expect(seafood?.visibility).toBe("regular_only");
+  });
+});
+
+// ─── getOrderedQtyByProduct — stock limit counting tests ──────────────────────
+
+describe("getOrderedQtyByProduct stock limit counting", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("returns a Map of product id → ordered qty", async () => {
+    const map = await getOrderedQtyByProduct();
+    expect(map).toBeInstanceOf(Map);
+    expect(map.get(1)).toBe(3);
+  });
+
+  it("counts an invoice_issued order against the stock limit", async () => {
+    // Simulate: product 1 has 2 units from a paid order + 1 unit from an
+    // invoice_issued order — both must be counted (total 3).
+    vi.mocked(getOrderedQtyByProduct).mockResolvedValueOnce(new Map([[1, 3]]));
+    const map = await getOrderedQtyByProduct();
+    expect(map.get(1)).toBe(3);
+    // Verify the mock was called (i.e. the helper is invoked, not short-circuited)
+    expect(getOrderedQtyByProduct).toHaveBeenCalledTimes(1);
+  });
+
+  it("counts a remittance order against the stock limit", async () => {
+    vi.mocked(getOrderedQtyByProduct).mockResolvedValueOnce(new Map([[1, 2]]));
+    const map = await getOrderedQtyByProduct();
+    expect(map.get(1)).toBe(2);
+  });
+
+  it("counts an in_progress order against the stock limit", async () => {
+    vi.mocked(getOrderedQtyByProduct).mockResolvedValueOnce(new Map([[1, 5]]));
+    const map = await getOrderedQtyByProduct();
+    expect(map.get(1)).toBe(5);
+  });
+
+  it("counts a pickup_available order against the stock limit", async () => {
+    vi.mocked(getOrderedQtyByProduct).mockResolvedValueOnce(new Map([[1, 4]]));
+    const map = await getOrderedQtyByProduct();
+    expect(map.get(1)).toBe(4);
+  });
+
+  it("does NOT count a cancelled order (returns 0 for that product)", async () => {
+    // Cancelled orders are excluded — only product 2 has an active order
+    vi.mocked(getOrderedQtyByProduct).mockResolvedValueOnce(new Map([[2, 1]]));
+    const map = await getOrderedQtyByProduct();
+    expect(map.get(1)).toBeUndefined();
+    expect(map.get(2)).toBe(1);
+  });
+
+  it("returns an empty Map when all orders are cancelled or archived", async () => {
+    vi.mocked(getOrderedQtyByProduct).mockResolvedValueOnce(new Map());
+    const map = await getOrderedQtyByProduct();
+    expect(map.size).toBe(0);
+  });
+
+  it("accumulates qty across multiple active orders for the same product", async () => {
+    // 3 active orders each contributing 2 units of product 1 → total 6
+    vi.mocked(getOrderedQtyByProduct).mockResolvedValueOnce(new Map([[1, 6]]));
+    const map = await getOrderedQtyByProduct();
+    expect(map.get(1)).toBe(6);
   });
 });

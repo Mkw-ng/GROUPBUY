@@ -675,7 +675,7 @@ export async function getOrderedQtyByProduct(): Promise<Map<number, number>> {
     .where(
       and(
         eq(orders.archived, false),
-        sql`${orders.status} IN ('pending', 'paid')`
+        sql`${orders.status} != 'cancelled'`
       )
     );
 

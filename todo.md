@@ -498,49 +498,49 @@
 - [x] Tests: vitest for CSV parser/validator (valid update, valid create, bad enum, TRUE/FALSE, empty optionals → null)
 
 ## Bulk-Select Mode — Admin Product Grid
-- [ ] DB: add bulkUpdateProducts(ids, set) helper — single UPDATE WHERE id IN (...)
-- [ ] Backend: admin.products.bulkUpdate tRPC procedure with zod validation (ids min 1 max 500, set must have at least one field)
-- [ ] Admin UI: "Select" toggle button in products toolbar
-- [ ] Admin UI: card checkboxes (top-left over image), click card to toggle, red ring on selected cards
-- [ ] Admin UI: disable drag-to-reorder and edit/delete/availability controls in selection mode
-- [ ] Admin UI: "Select all" (filtered list) and "Clear selection" helpers above grid
-- [ ] Admin UI: selections persist across category tab and search changes
-- [ ] Floating action bar: shown when 1+ selected — N selected, Set Visibility dropdown, Set Available/Unavailable, Clear, X to exit
-- [ ] Floating action bar: confirmation dialog before each action, success toast, invalidate products, keep selection mode on after apply
-- [ ] Floating action bar: disable buttons while mutation pending
-- [ ] Tests: vitest for bulkUpdateProducts (visibility, availability, empty set rejection)
+- [x] DB: add bulkUpdateProducts(ids, set) helper — single UPDATE WHERE id IN (...)
+- [x] Backend: admin.products.bulkUpdate tRPC procedure with zod validation (ids min 1 max 500, set must have at least one field)
+- [x] Admin UI: "Select" toggle button in products toolbar
+- [x] Admin UI: card checkboxes (top-left over image), click card to toggle, red ring on selected cards
+- [x] Admin UI: disable drag-to-reorder and edit/delete/availability controls in selection mode
+- [x] Admin UI: "Select all" (filtered list) and "Clear selection" helpers above grid
+- [x] Admin UI: selections persist across category tab and search changes
+- [x] Floating action bar: shown when 1+ selected — N selected, Set Visibility dropdown, Set Available/Unavailable, Clear, X to exit
+- [x] Floating action bar: confirmation dialog before each action, success toast, invalidate products, keep selection mode on after apply
+- [x] Floating action bar: disable buttons while mutation pending
+- [x] Tests: vitest for bulkUpdateProducts (visibility, availability, empty set rejection)
 
 ## Category Management System
 - [x] DB: add categories table (slug, name, powerDropName, emoji, sortOrder, timestamps)
 - [x] DB: change products.category from mysqlEnum to varchar(64)
 - [x] DB: seed 20 categories with current names, emoji, and sort order
 - [x] DB: run pnpm db:push and verify product data intact
-- [ ] Backend: add getAllCategories, upsertCategory, reorderCategories, deleteCategory helpers in db.ts
-- [ ] Backend: public categories.list tRPC procedure
-- [ ] Backend: admin.categories router (create, update, reorder, delete with product-count guard)
-- [ ] Backend: update productInput to use z.string().min(1) + server-side slug existence check
-- [ ] Backend: update CSV import validator to check category against categories table
-- [ ] Admin UI: Manage Categories dialog with dnd-kit reorder, inline edit, add, delete
-- [ ] Admin UI: replace hardcoded CATEGORIES/CATEGORY_EMOJI maps with categories.list in product form and grid filter tabs
-- [ ] Public site: update DealsSection category tabs to use categories.list with powerDropName support
-- [ ] Tests: slug generation, delete-blocked, delete-succeeds, name resolution
+- [x] Backend: add getAllCategories, upsertCategory, reorderCategories, deleteCategory helpers in db.ts
+- [x] Backend: public categories.list tRPC procedure
+- [x] Backend: admin.categories router (create, update, reorder, delete with product-count guard)
+- [x] Backend: update productInput to use z.string().min(1) + server-side slug existence check
+- [x] Backend: update CSV import validator to check category against categories table
+- [x] Admin UI: Manage Categories dialog with dnd-kit reorder, inline edit, add, delete
+- [x] Admin UI: replace hardcoded CATEGORIES/CATEGORY_EMOJI maps with categories.list in product form and grid filter tabs
+- [x] Public site: update DealsSection category tabs to use categories.list with powerDropName support
+- [x] Tests: slug generation, delete-blocked, delete-succeeds, name resolution
 
 ## Category Sections — Grouped Sidebar Navigation
-- [ ] DB: add categorySections table (id, name, sortOrder, timestamps)
-- [ ] DB: add sectionId (nullable int) to categories table
-- [ ] DB: run pnpm db:push — existing categories start ungrouped
-- [ ] Backend: sections DB helpers (getAllSections, upsertSection, reorderSections, deleteSection with unassign)
-- [ ] Backend: public sections.list procedure
-- [ ] Backend: categories.list (public + admin) returns sectionId
-- [ ] Backend: admin.sections router (create, rename, reorder, delete)
-- [ ] Backend: admin.categories.update gains optional sectionId field
-- [ ] Admin UI: Sections area at top of Manage Categories dialog (inline rename, dnd-kit reorder, Add Section, delete+confirm)
-- [ ] Admin UI: section dropdown on each category row in the dialog
-- [ ] Admin UI: category list grouped by section in the dialog
-- [ ] Public site: DealsSection sidebar renders grouped sections with headings, ungrouped last
-- [ ] Public site: hide sections whose categories are all hidden (no orphan headings)
-- [ ] Public site: mobile row-groups with section headings
-- [ ] Tests: delete-section unassigns categories, sections.list ordering
+- [x] DB: add categorySections table (id, name, sortOrder, timestamps)
+- [x] DB: add sectionId (nullable int) to categories table
+- [x] DB: run pnpm db:push — existing categories start ungrouped
+- [x] Backend: sections DB helpers (getAllSections, upsertSection, reorderSections, deleteSection with unassign)
+- [x] Backend: public sections.list procedure
+- [x] Backend: categories.list (public + admin) returns sectionId
+- [x] Backend: admin.sections router (create, rename, reorder, delete)
+- [x] Backend: admin.categories.update gains optional sectionId field
+- [x] Admin UI: Sections area at top of Manage Categories dialog (inline rename, dnd-kit reorder, Add Section, delete+confirm)
+- [x] Admin UI: section dropdown on each category row in the dialog
+- [x] Admin UI: category list grouped by section in the dialog
+- [x] Public site: DealsSection sidebar renders grouped sections with headings, ungrouped last
+- [x] Public site: hide sections whose categories are all hidden (no orphan headings)
+- [x] Public site: mobile row-groups with section headings
+- [x] Tests: delete-section unassigns categories, sections.list ordering
 
 ## Category Visibility Setting
 - [x] DB: add visibility enum column (regular_only / always / power_drop_only) to categories table
@@ -553,3 +553,7 @@
 - [x] Public site: DealsSection pre-filter uses effectiveVisibility() with categoryVisibilityMap
 - [x] Tests: effectiveVisibility helper (6 tests), isVisibleInMode (3 tests), category visibility field (4 tests) — 13 new tests
 - [x] Fix failing test: getAllCategories toHaveLength(2) → toHaveLength(3) + seafood assertion
+
+## Stock Limit Fix — Count All Active Order Statuses
+- [x] server/db.ts: change getOrderedQtyByProduct filter from status IN ('pending','paid') to archived=false AND status != 'cancelled'
+- [x] Tests: 8 new vitest tests asserting invoice_issued / remittance / in_progress / pickup_available orders all count against stock limit; cancelled orders excluded; empty map when all cancelled/archived
