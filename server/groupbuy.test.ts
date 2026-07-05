@@ -106,7 +106,44 @@ vi.mock("./db", () => ({
     pickup_available: 1,
     completed: 0,
     cancelled: 1,
+    casual: 2,
   }),
+  getCasualOrders: vi.fn().mockResolvedValue([
+    {
+      id: 201,
+      phone: "0400000201",
+      pickupDate: null,
+      location: "cranbourne",
+      deliveryAddress: null,
+      items: JSON.stringify([{ id: 1, name: "Wagyu Ribeye", cut: "MS7+", price: "42.00", unit: "/ steak", qty: 2 }]),
+      specialInstructions: null,
+      status: "pending" as const,
+      isPowerDrop: false,
+      archived: false,
+      dropId: null,
+      deliveryCharge: "0.00",
+      customerName: "Jane Doe",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    },
+    {
+      id: 202,
+      phone: "0400000202",
+      pickupDate: null,
+      location: "clayton",
+      deliveryAddress: null,
+      items: JSON.stringify([{ id: 2, name: "Lamb Shoulder", cut: null, price: "18.00", unit: "/ kg", qty: 1 }]),
+      specialInstructions: "Extra fat trim please",
+      status: "pending" as const,
+      isPowerDrop: false,
+      archived: false,
+      dropId: null,
+      deliveryCharge: "0.00",
+      customerName: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    },
+  ]),
   getUnassignedOrders: vi.fn().mockResolvedValue(
     Array.from({ length: 3 }, (_, i) => ({
       id: i + 1,
@@ -184,6 +221,7 @@ import {
   upsertSection,
   reorderSections,
   deleteSection,
+  getCasualOrders,
 } from "./db";
 
 // ─── Settings tests ───────────────────────────────────────────────────────────
@@ -864,5 +902,69 @@ describe("bulkUpdateProducts stockLimit field", () => {
     vi.mocked(bulkUpdateProducts).mockResolvedValueOnce(0);
     const result = await bulkUpdateProducts([], { stockLimit: "10" });
     expect(result).toBe(0);
+  });
+});
+
+// ─── Casual Orders tests ──────────────────────────────────────────────────────
+
+describe("getCasualOrders — casual order classification", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("returns an array of orders", async () => {
+    const result = await getCasualOrders();
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it("returns only non-Power-Drop orders", async () => {
+    const result = await getCasualOrders();
+    result.forEach((o) => {
+      expect(o.isPowerDrop).toBe(false);
+    });
+  });
+
+  it("returns the expected number of casual orders from mock", async () => {
+    const result = await getCasualOrders();
+    expect(result).toHaveLength(2);
+  });
+
+  it("casual orders have the correct structure", async () => {
+    const result = await getCasualOrders();
+    const o = result[0];
+    expect(o).toHaveProperty("id");
+    expect(o).toHaveProperty("phone");
+    expect(o).toHaveProperty("items");
+    expect(o).toHaveProperty("isPowerDrop", false);
+    expect(o).toHaveProperty("archived", false);
+  });
+
+  it("getActiveOrderCounts includes a casual count", async () => {
+    const counts = await getActiveOrderCounts();
+    expect(counts).toHaveProperty("casual");
+    expect(typeof counts.casual).toBe("number");
+  });
+
+  it("casual count in getActiveOrderCounts matches getCasualOrders length", async () => {
+    const counts = await getActiveOrderCounts();
+    const casual = await getCasualOrders();
+    expect(counts.casual).toBe(casual.length);
+  });
+
+  it("casual orders are excluded from the pipeline 'all' count", async () => {
+    const counts = await getActiveOrderCounts();
+    // The pipeline 'all' count (15) should not include the 2 casual orders
+    expect(counts.all).toBe(15);
+    expect(counts.casual).toBe(2);
+    // Total tracked = pipeline + casual
+    expect(counts.all + counts.casual).toBe(17);
+  });
+
+  it("getOrderedQtyByProduct excludes casual orders from stock count", async () => {
+    // Casual orders (isPowerDrop=false) should not count against stock limits.
+    // The mock returns product 1 with qty 3 — this represents only Power Drop orders.
+    const qtyMap = await getOrderedQtyByProduct();
+    // Casual orders for product 1 should NOT be in this map
+    expect(qtyMap.get(1)).toBe(3);
+    // Casual-only product (id 99) should not appear
+    expect(qtyMap.get(99)).toBeUndefined();
   });
 });

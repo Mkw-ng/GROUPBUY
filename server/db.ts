@@ -231,7 +231,8 @@ export async function createOrder(data: InsertOrder): Promise<number> {
 export async function getAllOrders(limit = 100, offset = 0) {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(orders).where(eq(orders.archived, false)).orderBy(desc(orders.createdAt)).limit(limit).offset(offset);
+  // Pipeline only — exclude casual (isPowerDrop=false) orders
+  return db.select().from(orders).where(and(eq(orders.archived, false), eq(orders.isPowerDrop, true))).orderBy(desc(orders.createdAt)).limit(limit).offset(offset);
 }
 
 /**
@@ -246,10 +247,11 @@ export async function getOrdersPage(limit = 100, offset = 0): Promise<{
 }> {
   const db = await getDb();
   if (!db) return { orders: [], limit, offset, hasMore: false };
+  // Pipeline only — exclude casual (isPowerDrop=false) orders
   const rows = await db
     .select()
     .from(orders)
-    .where(eq(orders.archived, false))
+    .where(and(eq(orders.archived, false), eq(orders.isPowerDrop, true)))
     .orderBy(desc(orders.createdAt), desc(orders.id))
     .limit(limit + 1)
     .offset(offset);
@@ -392,6 +394,8 @@ export async function getAllPickupAvailableActiveOrders(): Promise<(typeof order
 /**
  * Returns accurate counts for active (non-archived) orders by status.
  * Used by the admin UI so filter tab counts are never capped by pagination.
+ * Pipeline tabs (All / Pending / Invoice Issued / Paid / etc.) EXCLUDE casual orders.
+ * A separate `casual` count is returned for the Casual tab label.
  */
 export async function getActiveOrderCounts(): Promise<{
   all: number;
@@ -403,16 +407,27 @@ export async function getActiveOrderCounts(): Promise<{
   pickup_available: number;
   completed: number;
   cancelled: number;
+  casual: number;
 }> {
   const db = await getDb();
-  if (!db) return { all: 0, pending: 0, invoice_issued: 0, remittance: 0, paid: 0, in_progress: 0, pickup_available: 0, completed: 0, cancelled: 0 };
-  const rows = await db
+  if (!db) return { all: 0, pending: 0, invoice_issued: 0, remittance: 0, paid: 0, in_progress: 0, pickup_available: 0, completed: 0, cancelled: 0, casual: 0 };
+
+  // Power Drop pipeline rows (isPowerDrop = true)
+  const pipelineRows = await db
     .select({ status: orders.status, cnt: count() })
     .from(orders)
-    .where(eq(orders.archived, false))
+    .where(and(eq(orders.archived, false), eq(orders.isPowerDrop, true)))
     .groupBy(orders.status);
   const map: Record<string, number> = {};
-  for (const r of rows) map[r.status] = Number(r.cnt);
+  for (const r of pipelineRows) map[r.status] = Number(r.cnt);
+
+  // Casual rows (isPowerDrop = false)
+  const [casualRow] = await db
+    .select({ cnt: count() })
+    .from(orders)
+    .where(and(eq(orders.archived, false), eq(orders.isPowerDrop, false)));
+  const casualCount = Number(casualRow?.cnt ?? 0);
+
   return {
     all: Object.values(map).reduce((a, b) => a + b, 0),
     pending: map["pending"] ?? 0,
@@ -423,7 +438,22 @@ export async function getActiveOrderCounts(): Promise<{
     pickup_available: map["pickup_available"] ?? 0,
     completed: map["completed"] ?? 0,
     cancelled: map["cancelled"] ?? 0,
+    casual: casualCount,
   };
+}
+
+/**
+ * Returns all non-archived casual orders (isPowerDrop = false), newest first.
+ * Used by the Casual tab in AdminOrders.
+ */
+export async function getCasualOrders(): Promise<(typeof orders.$inferSelect)[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(orders)
+    .where(and(eq(orders.archived, false), eq(orders.isPowerDrop, false)))
+    .orderBy(desc(orders.createdAt));
 }
 
 /**
@@ -687,9 +717,12 @@ export async function getOrderedQtyByProduct(
   const result = new Map<number, number>();
   if (!db) return result;
 
+  // Only Power Drop orders count against drop stock limits.
+  // Casual orders (powerDrop = false) are fulfilled off-site and never consume drop stock.
   const baseConditions = [
     eq(orders.archived, false),
     sql`${orders.status} != 'cancelled'`,
+    eq(orders.isPowerDrop, true),
   ] as const;
 
   const whereClause =

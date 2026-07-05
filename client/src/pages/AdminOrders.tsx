@@ -80,7 +80,7 @@ interface Order {
   createdAt: Date;
 }
 
-type StatusFilter = "all" | "pending" | "invoice_issued" | "remittance" | "paid" | "in_progress" | "pickup_available" | "completed" | "archived";
+type StatusFilter = "all" | "pending" | "invoice_issued" | "remittance" | "paid" | "in_progress" | "pickup_available" | "completed" | "archived" | "casual";
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -1066,8 +1066,45 @@ Here's how to lock it in:
 
           {/* Action buttons */}
           <div className="flex flex-wrap gap-2 pt-1">
+            {/* ─── Casual order: simplified action cluster ─────────────────────────────
+                Casual orders are fulfilled in-store. Only the WhatsApp invoice (optional),
+                Acknowledge & Archive, and Delete actions are relevant. */}
+            {!order.isPowerDrop && !order.archived && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="font-display text-[10px] tracking-widest border-amber-500/40 text-amber-400 hover:bg-amber-500/10 gap-1.5"
+                    disabled={archiveOrder.isPending}
+                  >
+                    <Archive size={13} />
+                    {archiveOrder.isPending ? "Archiving…" : "Acknowledge & Archive"}
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent className="section-ink border-white/10">
+                  <AlertDialogHeader>
+                    <AlertDialogTitle className="font-display tracking-widest text-[#f5f2ec]">Acknowledge & archive this casual order?</AlertDialogTitle>
+                    <AlertDialogDescription className="font-mono-brand text-[#8a857c]">
+                      This marks the order as seen and removes it from the Casual tab. It will be kept in the Archived tab for records. Casual orders do not feed loyalty analytics.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel className="font-display text-[10px] tracking-widest">Keep</AlertDialogCancel>
+                    <AlertDialogAction
+                      className="font-display text-[10px] tracking-widest bg-amber-600 hover:bg-amber-700"
+                      onClick={() => archiveOrder.mutate({ id: order.id })}
+                    >
+                      Acknowledge & Archive
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
+
+            {/* ─── Power Drop pipeline actions ─────────────────────────────────────── */}
             {/* Issue WhatsApp Invoice */}
-            <AlertDialog open={confirmInvoice} onOpenChange={setConfirmInvoice}>
+            {order.isPowerDrop && <AlertDialog open={confirmInvoice} onOpenChange={setConfirmInvoice}>
               <AlertDialogTrigger asChild>
                 <Button
                   size="sm"
@@ -1115,7 +1152,7 @@ Here's how to lock it in:
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
-            </AlertDialog>
+            </AlertDialog>}
 
             {/* Final Call reminder */}
             {order.status !== "paid" && (
@@ -1366,7 +1403,7 @@ Here's how to lock it in:
             )}
 
             {/* Mark as In Progress */}
-            {order.status === "paid" && (
+            {order.isPowerDrop && order.status === "paid" && (
               <AlertDialog open={confirmMarkInProgress} onOpenChange={setConfirmMarkInProgress}>
                 <AlertDialogTrigger asChild>
                   <Button
@@ -1402,7 +1439,7 @@ Here's how to lock it in:
             )}
 
             {/* Mark as Pick up Available */}
-            {(order.status === "paid" || order.status === "in_progress") && (
+            {order.isPowerDrop && (order.status === "paid" || order.status === "in_progress") && (
               <AlertDialog open={confirmMarkPickupAvailable} onOpenChange={setConfirmMarkPickupAvailable}>
                 <AlertDialogTrigger asChild>
                   <Button
@@ -1681,6 +1718,7 @@ export default function AdminOrders() {
   const [downloadingItems, setDownloadingItems] = useState(false);
   const [downloadingAllSlips, setDownloadingAllSlips] = useState(false);
   const [downloadingItemsCsv, setDownloadingItemsCsv] = useState(false);
+  const [downloadingCasualCsv, setDownloadingCasualCsv] = useState(false);
 
   async function handleDownloadAllSlips() {
     setDownloadingAllSlips(true);
@@ -1729,6 +1767,47 @@ export default function AdminOrders() {
       toast.error("Download failed");
     } finally {
       setDownloadingItemsCsv(false);
+    }
+  }
+
+  async function handleDownloadCasualCsv() {
+    setDownloadingCasualCsv(true);
+    try {
+      // Build CSV client-side from the already-loaded allCasual list
+      const rows = allCasual.map((o) => {
+        const items = parseItems(o.items);
+        const subtotal = items.reduce((sum, i) => sum + calcItemTotal(i), 0);
+        const delivery = parseFloat(o.deliveryCharge ?? "0") || 0;
+        const total = subtotal + delivery;
+        const itemSummary = items.map((i) => `${i.qty}× ${i.name}${i.cut ? ` (${i.cut})` : ""} @$${parseFloat(i.price).toFixed(2)}${i.unit}`).join(" | ");
+        return [
+          o.id,
+          new Date(o.createdAt).toLocaleString("en-AU"),
+          o.phone,
+          o.customerName ?? "",
+          locationLabel(o.location, o.deliveryAddress),
+          o.pickupDate,
+          itemSummary,
+          total.toFixed(2),
+          o.specialInstructions ?? "",
+          o.status,
+        ].map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",");
+      });
+      const header = '"ID","Created","Phone","Customer Name","Location","Pickup Date","Items","Total","Notes","Status"';
+      const csv = [header, ...rows].join("\n");
+      const blob = new Blob([csv], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const timestamp = new Date().toISOString().slice(0, 10);
+      a.href = url;
+      a.download = `casual-orders-${timestamp}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err);
+      toast.error("Export failed");
+    } finally {
+      setDownloadingCasualCsv(false);
     }
   }
 
@@ -1929,6 +2008,22 @@ export default function AdminOrders() {
     enabled: user?.role === "admin",
   });
 
+  const { data: casualOrdersData, isLoading: isLoadingCasual } = trpc.admin.orders.listCasual.useQuery(undefined, {
+    enabled: user?.role === "admin",
+    refetchInterval: 30_000,
+  });
+  const allCasual = (casualOrdersData as Order[] | undefined) ?? [];
+
+  const [confirmArchiveAllCasual, setConfirmArchiveAllCasual] = useState(false);
+  const archiveAllCasual = trpc.admin.orders.archiveAllCasual.useMutation({
+    onSuccess: (result) => {
+      toast.success(`Archived ${result.archivedCount} casual order${result.archivedCount === 1 ? "" : "s"} ✓`);
+      utils.admin.orders.listCasual.invalidate();
+      utils.admin.orders.counts.invalidate();
+    },
+    onError: () => toast.error("Failed to archive casual orders"),
+  });
+
   if (loading) {
     return (
       <div className="min-h-screen section-ink flex items-center justify-center">
@@ -1969,6 +2064,8 @@ export default function AdminOrders() {
 
   const baseOrders = statusFilter === "archived"
     ? allArchived
+    : statusFilter === "casual"
+    ? allCasual
     : statusFilter === "all"
     ? allOrders
     : allOrders.filter((o) => o.status === statusFilter);
@@ -1976,6 +2073,8 @@ export default function AdminOrders() {
   const filtered = isSearchingPhone
     ? statusFilter === "archived"
       ? searchResults
+      : statusFilter === "casual"
+      ? searchResults.filter((o) => !o.isPowerDrop)
       : statusFilter === "all"
       ? searchResults
       : searchResults.filter((o) => o.status === statusFilter)
@@ -1998,6 +2097,7 @@ export default function AdminOrders() {
     pickup_available: serverCounts?.pickup_available ?? allOrders.filter((o) => o.status === "pickup_available").length,
     completed: serverCounts?.completed ?? allOrders.filter((o) => o.status === "completed").length,
     archived: allArchived.length,
+    casual: serverCounts?.casual ?? 0,
   };
   // No longer needed — counts come from the server
   const countSuffix = "";
@@ -2011,6 +2111,7 @@ export default function AdminOrders() {
     { key: "in_progress", label: "In Progress" },
     { key: "pickup_available", label: "Pick up Available" },
     { key: "completed", label: "Completed" },
+    { key: "casual", label: "Casual" },
     { key: "archived", label: "Archived" },
   ];
   const sortedFiltered = (() => {
@@ -2198,6 +2299,49 @@ export default function AdminOrders() {
               Customers →
             </button>
           </Link>
+          <div className="w-px h-4 bg-white/10" />
+          {/* Export Casual CSV */}
+          <button
+            onClick={handleDownloadCasualCsv}
+            disabled={downloadingCasualCsv || counts.casual === 0}
+            className="flex items-center gap-1.5 font-mono-brand text-[10px] text-[#8a857c] hover:text-[#f5f2ec] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            title={`Export casual orders as CSV${counts.casual > 0 ? ` (${counts.casual})` : ""}`}
+          >
+            <FileDown size={13} />
+            {downloadingCasualCsv ? "Exporting…" : `Casual CSV${counts.casual > 0 ? ` (${counts.casual})` : ""}`}
+          </button>
+          <div className="w-px h-4 bg-white/10" />
+          {/* Archive All Casual */}
+          <AlertDialog open={confirmArchiveAllCasual} onOpenChange={setConfirmArchiveAllCasual}>
+            <AlertDialogTrigger asChild>
+              <button
+                disabled={archiveAllCasual.isPending || counts.casual === 0}
+                className="flex items-center gap-1.5 font-mono-brand text-[10px] text-amber-400/70 hover:text-amber-300 transition-colors disabled:opacity-40 disabled:cursor-not-allowed border border-amber-500/30 hover:border-amber-400/50 rounded px-2 py-1"
+                title="Archive all casual orders"
+              >
+                <Archive size={12} />
+                {archiveAllCasual.isPending ? "Archiving…" : `Archive Casual${counts.casual > 0 ? ` (${counts.casual})` : ""}`}
+              </button>
+            </AlertDialogTrigger>
+            <AlertDialogContent className="section-ink border-white/10">
+              <AlertDialogHeader>
+                <AlertDialogTitle className="font-display tracking-widest text-[#f5f2ec]">Archive all casual orders?</AlertDialogTitle>
+                <AlertDialogDescription className="font-mono-brand text-[#8a857c] space-y-1">
+                  <span className="block">This will archive all {counts.casual} casual order{counts.casual !== 1 ? "s" : ""}. They will be hidden from the Casual tab but kept for records.</span>
+                  <span className="block mt-2 text-amber-400/80">Casual orders do not feed loyalty analytics.</span>
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel className="font-display text-[10px] tracking-widest">Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => { setConfirmArchiveAllCasual(false); archiveAllCasual.mutate(); }}
+                  className="font-display text-[10px] tracking-widest bg-amber-600 hover:bg-amber-700"
+                >
+                  Archive All Casual
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </div>
 
@@ -2278,7 +2422,7 @@ export default function AdminOrders() {
               : `Showing phone search results for “${debouncedPhoneSearch.replace(/\D/g, "")}”`}
           </p>
         )}
-        {((!isSearchingPhone && isLoading) || (!isSearchingPhone && statusFilter === "archived" && isLoadingArchived) || (isSearchingPhone && isPhoneSearchLoading)) ? (
+        {((!isSearchingPhone && isLoading) || (!isSearchingPhone && statusFilter === "archived" && isLoadingArchived) || (!isSearchingPhone && statusFilter === "casual" && isLoadingCasual) || (isSearchingPhone && isPhoneSearchLoading)) ? (
           <div className="space-y-3">
             {[1, 2, 3].map((i) => (
               <div key={i} className="h-16 border border-white/10 animate-pulse bg-white/3" />
@@ -2288,11 +2432,13 @@ export default function AdminOrders() {
           <div className="flex flex-col items-center justify-center py-24 gap-3">
             <Package size={40} className="text-[#8a857c]/30" />
             <p className="font-display text-[11px] tracking-widest text-[#8a857c]">
-              {statusFilter === "all" ? "NO ORDERS YET" : statusFilter === "archived" ? "NO ARCHIVED ORDERS" : statusFilter === "invoice_issued" ? "NO INVOICE ISSUED ORDERS" : statusFilter === "pickup_available" ? "NO PICK UP AVAILABLE ORDERS" : statusFilter === "completed" ? "NO COMPLETED ORDERS" : `NO ${statusFilter.toUpperCase()} ORDERS`}
+              {statusFilter === "all" ? "NO ORDERS YET" : statusFilter === "archived" ? "NO ARCHIVED ORDERS" : statusFilter === "casual" ? "NO CASUAL ORDERS" : statusFilter === "invoice_issued" ? "NO INVOICE ISSUED ORDERS" : statusFilter === "pickup_available" ? "NO PICK UP AVAILABLE ORDERS" : statusFilter === "completed" ? "NO COMPLETED ORDERS" : `NO ${statusFilter.toUpperCase()} ORDERS`}
             </p>
             <p className="font-mono-brand text-[11px] text-[#8a857c]/60">
               {statusFilter === "all"
                 ? "Orders will appear here when customers check out."
+                : statusFilter === "casual"
+                ? "Casual orders placed outside a Power Drop will appear here."
                 : "Try switching to a different filter."}
             </p>
           </div>
@@ -2370,8 +2516,8 @@ export default function AdminOrders() {
           </div>
         )}
 
-        {/* Load More — only shown for non-archived views and when not searching */}
-        {statusFilter !== "archived" && !isSearchingPhone && (
+        {/* Load More — only shown for pipeline views (not archived/casual) and when not searching */}
+        {statusFilter !== "archived" && statusFilter !== "casual" && !isSearchingPhone && (
           <div className="flex flex-col items-center gap-2 py-4">
             {hasMore ? (
               <>

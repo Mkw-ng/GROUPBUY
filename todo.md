@@ -585,3 +585,16 @@
 ### 5. Cart clamping (CartDrawer.tsx + DealsSection.tsx)
 - [x] On add-to-cart or qty increase: clamp against product's remainingQty
 - [x] + button disabled when qty ≥ remainingQty; input clamped on change/blur; cap warning shown
+
+## Casual Orders Tab — Record and Triage Non-Power-Drop Orders
+- [x] server/routers.ts orders.create: classify by server-side powerDropActive — casual orders get powerDrop=false, dropId=NULL
+- [x] server/db.ts getOrderedQtyByProduct: exclude orders with powerDrop=false from stock count
+- [x] server/routers.ts orders.create: skip stock-limit rejection when powerDropActive is false
+- [x] client/src/components/CartDrawer.tsx: always save to DB (server classifies based on active drop)
+- [x] AdminOrders.tsx: Casual tab listing non-archived powerDrop=false orders, newest first
+- [x] AdminOrders.tsx: pipeline tabs exclude casual orders; getActiveOrderCounts adds casual count
+- [x] AdminOrders.tsx: simplified casual order card (no pipeline buttons); Acknowledge & Archive action
+- [x] AdminOrders.tsx: casual archive does NOT call upsertCustomerFromOrder
+- [x] AdminOrders.tsx: Export Casual CSV button (casual-orders-YYYY-MM-DD.csv)
+- [x] AdminOrders.tsx: Archive All Casual (N) bulk button with confirm dialog
+- [x] Tests: getCasualOrders (8 tests), getActiveOrderCounts.casual, stock exclusion — 101/101 passing

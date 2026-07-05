@@ -57,6 +57,7 @@ import {
   upsertSection,
   reorderSections,
   deleteSection,
+  getCasualOrders,
 } from "./db";
 import { OrderItem } from "../drizzle/schema";
 import {
@@ -353,33 +354,42 @@ export const appRouter = router({
           throw new TRPCError({ code: "BAD_REQUEST", message: "items must be valid JSON" });
         }
 
-        // ─── Stock limit validation ─────────────────────────────────────────
-        // Re-fetch products and current ordered quantities server-side.
-        // Do NOT trust frontend stock values — backend is the source of truth.
-        // NOTE: This is a best-effort check. A future order_items table with
-        // row-level locking would make this fully race-condition-proof.
-        {
-          const [activeDrop, allProducts] = await Promise.all([
-            getActiveDrop(),
-            getAllProducts(),
-          ]);
+        // ─── Classify order server-side ─────────────────────────────────────
+        // Fetch all shared data once: active drop, products, categories, settings.
+        const [activeDrop, allProducts, allCats, allSettings] = await Promise.all([
+          getActiveDrop(),
+          getAllProducts(),
+          getAllCategories(),
+          getAllSettings(),
+        ]);
+        // Server-side classification — do NOT trust input.isPowerDrop.
+        const isPowerDropOrder = allSettings.powerDropActive === "true";
+
+        // ─── Product existence + availability check ─────────────────────────
+        const productMap = new Map(allProducts.map((p) => [p.id, p]));
+        for (const item of parsedItems) {
+          const product = productMap.get(item.id);
+          if (!product) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: `Product "${item.name}" no longer exists.`,
+            });
+          }
+          if (!product.available) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: `"${product.name}" is currently unavailable.`,
+            });
+          }
+        }
+
+        // ─── Stock limit validation (Power Drop orders only) ─────────────────
+        // Casual orders are fulfilled off-site and never consume drop stock.
+        if (isPowerDropOrder) {
           const orderedQtyMap = await getOrderedQtyByProduct(activeDrop?.id);
-          // Note: activeDrop is also used below when creating the order record.
-          const productMap = new Map(allProducts.map((p) => [p.id, p]));
           for (const item of parsedItems) {
             const product = productMap.get(item.id);
-            if (!product) {
-              throw new TRPCError({
-                code: "BAD_REQUEST",
-                message: `Product "${item.name}" no longer exists.`,
-              });
-            }
-            if (!product.available) {
-              throw new TRPCError({
-                code: "BAD_REQUEST",
-                message: `"${product.name}" is currently unavailable.`,
-              });
-            }
+            if (!product) continue;
             if (product.stockLimit != null) {
               const stockLimit = parseFloat(product.stockLimit);
               const orderedQty = orderedQtyMap.get(product.id) ?? 0;
@@ -404,17 +414,9 @@ export const appRouter = router({
         }
 
         // ─── Visibility enforcement ─────────────────────────────────────────
-        // Read powerDropActive server-side — do NOT trust input.isPowerDrop.
         // Effective visibility = more restrictive of product + category visibility.
         {
-          const [allProducts, allCats, settings] = await Promise.all([
-            getAllProducts(),
-            getAllCategories(),
-            getAllSettings(),
-          ]);
-          const productMap = new Map(allProducts.map((p) => [p.id, p]));
           const categoryMap = new Map(allCats.map((c) => [c.slug, c]));
-          const powerDropActive = settings.powerDropActive === "true";
           for (const item of parsedItems) {
             const product = productMap.get(item.id);
             if (!product) continue; // already caught above
@@ -426,13 +428,13 @@ export const appRouter = router({
               catVis === "power_drop_only" ? "power_drop_only"
               : catVis === "regular_only" ? "regular_only"
               : prodVis;
-            if (powerDropActive && effVis === "regular_only") {
+            if (isPowerDropOrder && effVis === "regular_only") {
               throw new TRPCError({
                 code: "BAD_REQUEST",
                 message: `"${product.name}" is not part of the current Power Drop.`,
               });
             }
-            if (!powerDropActive && effVis === "power_drop_only") {
+            if (!isPowerDropOrder && effVis === "power_drop_only") {
               throw new TRPCError({
                 code: "BAD_REQUEST",
                 message: `"${product.name}" is only available during a Power Drop.`,
@@ -441,9 +443,9 @@ export const appRouter = router({
           }
         }
 
-        // activeDrop was already fetched in the stock limit validation block above.
-        // Re-read it from the outer scope via the block's variable.
-        const currentActiveDrop = await getActiveDrop();
+        // ─── Persist order ─────────────────────────────────────────────────
+        // Casual orders: powerDrop=false, dropId=NULL (never assigned to a drop).
+        // Power Drop orders: powerDrop=true, dropId=active drop id.
         const id = await createOrder({
           phone: input.phone,
           pickupDate: input.pickupDate,
@@ -451,10 +453,10 @@ export const appRouter = router({
           deliveryAddress: input.deliveryAddress ?? null,
           items: JSON.stringify(parsedItems),
           specialInstructions: input.specialInstructions ?? null,
-          isPowerDrop: input.isPowerDrop,
+          isPowerDrop: isPowerDropOrder,
           status: "pending",
           deliveryCharge: "0.00",
-          dropId: currentActiveDrop?.id ?? null,
+          dropId: isPowerDropOrder ? (activeDrop?.id ?? null) : null,
         });
         return { id };
       }),
@@ -773,8 +775,20 @@ export const appRouter = router({
         .input(z.object({ id: z.number() }))
         .mutation(async ({ input }) => {
           await archiveOrder(input.id);
-          // Update customer analytics whenever an order is archived
-          try { await upsertCustomerFromOrder(input.id); } catch (e) { console.error('[customerDb] upsert failed', e); }
+          // Update customer analytics for Power Drop orders only.
+          // Casual orders are fulfilled off-site and must NOT feed loyalty stats.
+          try {
+            const { getDb } = await import('./db');
+            const db = await getDb();
+            if (db) {
+              const { orders: ordersTable } = await import('../drizzle/schema');
+              const { eq } = await import('drizzle-orm');
+              const [row] = await db.select({ isPowerDrop: ordersTable.isPowerDrop }).from(ordersTable).where(eq(ordersTable.id, input.id));
+              if (row?.isPowerDrop) {
+                await upsertCustomerFromOrder(input.id);
+              }
+            }
+          } catch (e) { console.error('[customerDb] upsert failed', e); }
           return { success: true };
         }),
       updateCustomerName: adminProcedure
@@ -853,6 +867,30 @@ export const appRouter = router({
       transferPaidToPickupAvailable: adminProcedure.mutation(async () => {
         const transferredCount = await transferAllPaidToInProgress();
         return { success: true, transferredCount };
+      }),
+
+      /**
+       * Returns all non-archived casual orders (isPowerDrop = false), newest first.
+       * Used by the Casual tab in AdminOrders.
+       */
+      listCasual: adminProcedure.query(async () => getCasualOrders()),
+
+      /**
+       * Archives all non-archived casual orders in one action.
+       * Does NOT call upsertCustomerFromOrder — casual orders must not feed loyalty stats.
+       */
+      archiveAllCasual: adminProcedure.mutation(async () => {
+        const { getDb } = await import('./db');
+        const { orders: ordersTable } = await import('../drizzle/schema');
+        const { and, eq } = await import('drizzle-orm');
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
+        const result = await db
+          .update(ordersTable)
+          .set({ archived: true })
+          .where(and(eq(ordersTable.archived, false), eq(ordersTable.isPowerDrop, false)));
+        const archivedCount = Number((result[0] as { affectedRows?: number })?.affectedRows ?? 0);
+        return { success: true, archivedCount };
       }),
     }),
 
