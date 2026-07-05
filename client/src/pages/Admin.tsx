@@ -38,6 +38,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 import {
   Zap,
@@ -57,6 +58,9 @@ import {
   Download,
   Upload,
   FileText,
+  BarChart3,
+  Package,
+  X,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -912,9 +916,11 @@ function AdminContent() {
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [bulkConfirm, setBulkConfirm] = useState<{
-    action: "available" | "unavailable" | "visibility";
+    action: "available" | "unavailable" | "visibility" | "stockLimit";
     visibility?: "regular_only" | "always" | "power_drop_only";
+    stockLimit?: string | null; // string value or null to clear
   } | null>(null);
+  const [bulkStockLimitInput, setBulkStockLimitInput] = useState("");
 
   const bulkUpdate = trpc.admin.products.bulkUpdate.useMutation({
     onSuccess: (data) => {
@@ -949,6 +955,9 @@ function AdminContent() {
       bulkUpdate.mutate({ ids, set: { available: false } });
     } else if (bulkConfirm.action === "visibility" && bulkConfirm.visibility) {
       bulkUpdate.mutate({ ids, set: { visibility: bulkConfirm.visibility } });
+    } else if (bulkConfirm.action === "stockLimit") {
+      // null clears the limit; a string sets it
+      bulkUpdate.mutate({ ids, set: { stockLimit: bulkConfirm.stockLimit ?? null } });
     }
   };
 
@@ -1049,6 +1058,48 @@ function AdminContent() {
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // ─── Stock Manager dialog state ────────────────────────────────────────────
+  const [stockManagerOpen, setStockManagerOpen] = useState(false);
+  const [stockSearch, setStockSearch] = useState("");
+  const [addLimitProductId, setAddLimitProductId] = useState<number | null>(null);
+  const [addLimitValue, setAddLimitValue] = useState("");
+  const [editingStockLimits, setEditingStockLimits] = useState<Record<number, string>>({});
+
+  const { data: activeDrop } = trpc.admin.drops.getActive.useQuery(undefined, { staleTime: 30_000 });
+
+  const setStockLimitMutation = trpc.admin.products.upsert.useMutation({
+    onSuccess: () => {
+      utils.products.list.invalidate();
+      toast.success("Stock limit updated");
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const saveStockLimit = (productId: number, limitStr: string) => {
+    const p = (products ?? []).find((x) => x.id === productId);
+    if (!p) return;
+    setStockLimitMutation.mutate({
+      id: p.id,
+      name: p.name,
+      cut: p.cut,
+      category: p.category,
+      description: p.description ?? undefined,
+      price: p.price,
+      powerDropPrice: p.powerDropPrice ?? undefined,
+      retailPrice: (p as { retailPrice?: string | null }).retailPrice ?? undefined,
+      unit: p.unit,
+      badge: (p.badge as BadgeType) ?? null,
+      available: p.available,
+      img: p.img ?? undefined,
+      sortOrder: p.sortOrder,
+      stockLimit: limitStr === "" ? undefined : limitStr,
+      visibility: p.visibility as VisibilityMode,
+    });
+    setEditingStockLimits((prev) => { const next = { ...prev }; delete next[productId]; return next; });
+    setAddLimitProductId(null);
+    setAddLimitValue("");
+  };
 
   // ─── CSV import dialog state ─────────────────────────────────────────────────
   const [importDialogOpen, setImportDialogOpen] = useState(false);
@@ -1478,6 +1529,10 @@ function AdminContent() {
               <Tag className="h-4 w-4 mr-1.5" />
               Categories
             </Button>
+            <Button size="sm" variant="outline" onClick={() => setStockManagerOpen(true)}>
+              <BarChart3 className="h-4 w-4 mr-1.5" />
+              Stock
+            </Button>
             <Button size="sm" onClick={openAddModal}>
               <Plus className="h-4 w-4 mr-1.5" />
               Add Product
@@ -1726,6 +1781,17 @@ function AdminContent() {
             variant="outline"
             className="rounded-full gap-1.5"
             disabled={bulkUpdate.isPending}
+            onClick={() => { setBulkStockLimitInput(""); setBulkConfirm({ action: "stockLimit", stockLimit: undefined }); }}
+          >
+            <BarChart3 className="h-3.5 w-3.5" />
+            Set Stock Limit
+          </Button>
+
+          <Button
+            size="sm"
+            variant="outline"
+            className="rounded-full gap-1.5"
+            disabled={bulkUpdate.isPending}
             onClick={() => setBulkConfirm({ action: "available" })}
           >
             Set Available
@@ -1759,6 +1825,7 @@ function AdminContent() {
               {bulkConfirm?.action === "available" && `Mark ${selectedIds.size} product${selectedIds.size !== 1 ? "s" : ""} as Available?`}
               {bulkConfirm?.action === "unavailable" && `Mark ${selectedIds.size} product${selectedIds.size !== 1 ? "s" : ""} as Unavailable?`}
               {bulkConfirm?.action === "visibility" && `Set visibility for ${selectedIds.size} product${selectedIds.size !== 1 ? "s" : ""}?`}
+              {bulkConfirm?.action === "stockLimit" && `Set stock limit for ${selectedIds.size} product${selectedIds.size !== 1 ? "s" : ""}`}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {bulkConfirm?.action === "available" && `This will make ${selectedIds.size} product${selectedIds.size !== 1 ? "s" : ""} available to customers immediately.`}
@@ -1767,6 +1834,23 @@ function AdminContent() {
                 bulkConfirm.visibility === "regular_only" ? "Regular only" :
                 bulkConfirm.visibility === "always" ? "Always visible" : "Power Drop only"
               }" for ${selectedIds.size} product${selectedIds.size !== 1 ? "s" : ""}.`}
+              {bulkConfirm?.action === "stockLimit" && (
+                <div className="space-y-3 mt-2">
+                  <p>Enter a stock limit to apply to all {selectedIds.size} selected product{selectedIds.size !== 1 ? "s" : ""}, or leave blank to clear their limits.</p>
+                  <Input
+                    type="number"
+                    step="0.001"
+                    min="0"
+                    placeholder="e.g. 50 — leave blank to clear"
+                    value={bulkStockLimitInput}
+                    onChange={(e) => {
+                      setBulkStockLimitInput(e.target.value);
+                      setBulkConfirm((prev) => prev ? { ...prev, stockLimit: e.target.value === "" ? null : e.target.value } : prev);
+                    }}
+                    autoFocus
+                  />
+                </div>
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -2446,6 +2530,204 @@ function AdminContent() {
             <Button onClick={handleProductSubmit} disabled={upsertProduct.isPending}>
               {upsertProduct.isPending ? "Saving…" : "Save Product"}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Stock Manager Dialog ───────────────────────────────────────────────────────────── */}
+      <Dialog open={stockManagerOpen} onOpenChange={setStockManagerOpen}>
+        <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <BarChart3 className="h-5 w-5" />
+              Stock Manager
+            </DialogTitle>
+            <DialogDescription className="flex items-center gap-1.5 text-xs">
+              <Package className="h-3.5 w-3.5" />
+              {activeDrop
+                ? <>Counting orders from: <strong>{activeDrop.name}</strong></>
+                : "No active drop — counting all active orders"}
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* Search row */}
+          <div className="flex gap-2 pt-1">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+              <Input
+                value={stockSearch}
+                onChange={(e) => setStockSearch(e.target.value)}
+                placeholder="Search products…"
+                className="pl-9"
+              />
+            </div>
+          </div>
+
+          {/* Table */}
+          <div className="flex-1 overflow-y-auto mt-2">
+            {(() => {
+              const allProds = products ?? [];
+              const withLimit = allProds
+                .filter((p) => {
+                  const sl = (p as { stockLimit?: string | null }).stockLimit;
+                  return sl != null && sl !== "";
+                })
+                .map((p) => {
+                  const sl = parseFloat((p as { stockLimit?: string | null }).stockLimit ?? "0");
+                  const ordered = (p as { orderedQty?: number }).orderedQty ?? 0;
+                  const remaining = Math.max(sl - ordered, 0);
+                  const pct = sl > 0 ? Math.round((ordered / sl) * 100) : 0;
+                  return { ...p, _sl: sl, _ordered: ordered, _remaining: remaining, _pct: pct };
+                })
+                .sort((a, b) => b._pct - a._pct);
+
+              const withoutLimit = allProds.filter((p) => {
+                const sl = (p as { stockLimit?: string | null }).stockLimit;
+                return (sl == null || sl === "") &&
+                  stockSearch.trim() !== "" &&
+                  (p.name.toLowerCase().includes(stockSearch.toLowerCase()) ||
+                    p.cut.toLowerCase().includes(stockSearch.toLowerCase()));
+              });
+
+              const filteredWithLimit = stockSearch.trim()
+                ? withLimit.filter((p) =>
+                    p.name.toLowerCase().includes(stockSearch.toLowerCase()) ||
+                    p.cut.toLowerCase().includes(stockSearch.toLowerCase())
+                  )
+                : withLimit;
+
+              return (
+                <div className="space-y-1">
+                  {filteredWithLimit.length === 0 && withoutLimit.length === 0 && (
+                    <p className="text-sm text-muted-foreground text-center py-8">
+                      {stockSearch ? "No products match your search." : "No products have a stock limit set."}
+                    </p>
+                  )}
+
+                  {filteredWithLimit.map((p) => {
+                    const isEditing = editingStockLimits[p.id] !== undefined;
+                    const editVal = editingStockLimits[p.id] ?? "";
+                    const isKg = p.unit?.toLowerCase().includes("kg");
+                    const decimals = isKg ? 1 : 0;
+                    const rowClass = p._remaining <= 0
+                      ? "border-red-500/40 bg-red-500/5"
+                      : p._pct >= 80
+                      ? "border-amber-500/40 bg-amber-500/5"
+                      : "border-border";
+                    return (
+                      <div key={p.id} className={`flex items-center gap-3 rounded-lg border px-3 py-2.5 ${rowClass}`}>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{p.name}</p>
+                          <p className="text-xs text-muted-foreground truncate">{p.cut}</p>
+                        </div>
+                        <div className="w-32 shrink-0">
+                          <Progress value={p._pct} className={`h-1.5 ${p._remaining <= 0 ? "[&>div]:bg-red-500" : p._pct >= 80 ? "[&>div]:bg-amber-500" : ""}`} />
+                          <p className="text-xs text-muted-foreground mt-0.5 text-right">{p._pct}% claimed</p>
+                        </div>
+                        <div className="text-right shrink-0 w-20">
+                          <p className="text-xs text-muted-foreground">Ordered</p>
+                          <p className="text-sm font-medium">{p._ordered.toFixed(decimals)}</p>
+                        </div>
+                        <div className="text-right shrink-0 w-20">
+                          <p className="text-xs text-muted-foreground">Remaining</p>
+                          <p className={`text-sm font-medium ${p._remaining <= 0 ? "text-red-500" : p._pct >= 80 ? "text-amber-500" : ""}`}>
+                            {p._remaining.toFixed(decimals)}
+                          </p>
+                        </div>
+                        {isEditing ? (
+                          <div className="flex items-center gap-1 shrink-0">
+                            <Input
+                              type="number"
+                              step="0.001"
+                              min="0"
+                              value={editVal}
+                              onChange={(e) => setEditingStockLimits((prev) => ({ ...prev, [p.id]: e.target.value }))}
+                              className="w-20 h-7 text-sm"
+                              placeholder="Limit"
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") saveStockLimit(p.id, editVal);
+                                if (e.key === "Escape") setEditingStockLimits((prev) => { const next = { ...prev }; delete next[p.id]; return next; });
+                              }}
+                            />
+                            <Button size="sm" className="h-7 px-2" onClick={() => saveStockLimit(p.id, editVal)} disabled={setStockLimitMutation.isPending}>
+                              <Check className="h-3.5 w-3.5" />
+                            </Button>
+                            <button className="text-muted-foreground hover:text-foreground p-1" onClick={() => setEditingStockLimits((prev) => { const next = { ...prev }; delete next[p.id]; return next; })}>
+                              <X className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1 shrink-0">
+                            <span className="text-sm font-medium w-16 text-right">{p._sl.toFixed(decimals)}</span>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 px-2"
+                              onClick={() => setEditingStockLimits((prev) => ({ ...prev, [p.id]: String(p._sl) }))}
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+
+                  {withoutLimit.length > 0 && (
+                    <div className="mt-3">
+                      <p className="text-xs text-muted-foreground font-medium mb-1.5 px-1">Add limit to:</p>
+                      {withoutLimit.slice(0, 5).map((p) => (
+                        <div key={p.id} className="flex items-center gap-3 rounded-lg border border-dashed px-3 py-2.5 mb-1">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">{p.name}</p>
+                            <p className="text-xs text-muted-foreground truncate">{p.cut}</p>
+                          </div>
+                          <span className="text-xs text-muted-foreground">No limit</span>
+                          {addLimitProductId === p.id ? (
+                            <div className="flex items-center gap-1 shrink-0">
+                              <Input
+                                type="number"
+                                step="0.001"
+                                min="0"
+                                value={addLimitValue}
+                                onChange={(e) => setAddLimitValue(e.target.value)}
+                                className="w-20 h-7 text-sm"
+                                placeholder="Limit"
+                                autoFocus
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") saveStockLimit(p.id, addLimitValue);
+                                  if (e.key === "Escape") { setAddLimitProductId(null); setAddLimitValue(""); }
+                                }}
+                              />
+                              <Button size="sm" className="h-7 px-2" onClick={() => saveStockLimit(p.id, addLimitValue)} disabled={setStockLimitMutation.isPending}>
+                                <Check className="h-3.5 w-3.5" />
+                              </Button>
+                              <button className="text-muted-foreground hover:text-foreground p-1" onClick={() => { setAddLimitProductId(null); setAddLimitValue(""); }}>
+                                <X className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 shrink-0"
+                              onClick={() => { setAddLimitProductId(p.id); setAddLimitValue(""); }}
+                            >
+                              <Plus className="h-3.5 w-3.5 mr-1" />
+                              Add limit
+                            </Button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setStockManagerOpen(false)}>Close</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

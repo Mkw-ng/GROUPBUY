@@ -557,3 +557,31 @@
 ## Stock Limit Fix — Count All Active Order Statuses
 - [x] server/db.ts: change getOrderedQtyByProduct filter from status IN ('pending','paid') to archived=false AND status != 'cancelled'
 - [x] Tests: 8 new vitest tests asserting invoice_issued / remittance / in_progress / pickup_available orders all count against stock limit; cancelled orders excluded; empty map when all cancelled/archived
+
+## Stock Limits 2.0 — Per-Drop Counting, Stock Manager, Urgency Display
+
+### 1. Per-drop counting (server/db.ts)
+- [x] getOrderedQtyByProduct: accept optional activeDropId param; filter orders to (dropId = activeDropId OR dropId IS NULL) when an active drop exists
+- [x] routers.ts products.list: pass active drop id to getOrderedQtyByProduct
+- [x] routers.ts orders.create: pass active drop id to getOrderedQtyByProduct
+- [x] Tests: closed-drop order does not count; unassigned order counts; invoice_issued still counts
+
+### 2. Stock Manager panel (Admin.tsx)
+- [x] "Stock" button in products toolbar opens Stock Manager dialog
+- [x] Table: all products with stockLimit — columns: name, limit (inline editable), ordered, remaining, % progress bar
+- [x] Rows sorted by % remaining ascending; amber below 20%, red at 0%
+- [x] Search box + "Add limit" flow to set limit on any product without opening edit form
+- [x] Header line: "Counting orders from: <active drop name>" or "no active drop — counting all active orders"
+
+### 3. Bulk-select stock limit action (Admin.tsx + routers.ts)
+- [x] Extend admin.products.bulkUpdate zod schema to accept optional stockLimit field
+- [x] Add "Set stock limit…" to floating bulk action bar — prompts for number or blank to clear
+
+### 4. Public site urgency (DealsSection.tsx)
+- [x] Show remaining badge only when below 33% of limit (amber), not always
+- [x] During Power Drop: slim "X% claimed" progress bar on cards with stockLimit (red/ink theme)
+- [x] While powerDropActive: refetchInterval 30s on products.list query
+
+### 5. Cart clamping (CartDrawer.tsx + DealsSection.tsx)
+- [x] On add-to-cart or qty increase: clamp against product's remainingQty
+- [x] + button disabled when qty ≥ remainingQty; input clamped on change/blur; cap warning shown

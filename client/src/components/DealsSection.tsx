@@ -131,6 +131,7 @@ interface DealsProps {
     unit: string;
     category: string;
     visibility?: "regular_only" | "always" | "power_drop_only";
+    remainingQty?: number | null;
   }) => void;
   powerDropActive?: boolean;
 }
@@ -228,6 +229,8 @@ export default function DealsSection({ onAddToCart, powerDropActive = false }: D
 
   const { data: dbProducts, isLoading } = trpc.products.list.useQuery(undefined, {
     staleTime: 30_000,
+    // Poll every 30 s during a Power Drop so sold-out states appear without a manual refresh
+    refetchInterval: powerDropActive ? 30_000 : false,
   });
   const { data: dbCategories = [] } = trpc.categories.list.useQuery(undefined, {
     staleTime: 60_000,
@@ -678,8 +681,8 @@ export default function DealsSection({ onAddToCart, powerDropActive = false }: D
                             </span>
                           </div>
                         )}
-                        {/* Stock remaining badge — only when not sold out and close to limit */}
-                        {!soldOut && hasStockLimit && remainingQty != null && remainingQty <= parseFloat(stockLimit!) * 0.25 && (
+                        {/* Stock remaining badge — only when not sold out and ≤33% of limit remains */}
+                        {!soldOut && hasStockLimit && remainingQty != null && remainingQty <= parseFloat(stockLimit!) * 0.33 && (
                           <span className="absolute bottom-2 left-2 font-mono-brand text-[9px] tracking-wider px-2 py-0.5 bg-[#c73e3a] text-[#f5f2ec]">
                             {remainingQty <= 0 ? "SOLD OUT" : `${remainingQty.toFixed(isKgUnit ? 1 : 0)}${isKgUnit ? "kg" : ""} left`}
                           </span>
@@ -694,18 +697,34 @@ export default function DealsSection({ onAddToCart, powerDropActive = false }: D
                         <h3 className="font-body text-[12px] sm:text-[15px] font-bold text-[#0a0a0a] mb-1.5 sm:mb-3 leading-snug flex-1 line-clamp-2">
                           {product.name}
                         </h3>
-                        {/* Stock availability label */}
-                        {hasStockLimit && (
-                          <p className={`font-mono-brand text-[9px] sm:text-[10px] uppercase tracking-wider mb-1 sm:mb-1.5 ${
-                            soldOut ? "text-[#c73e3a]" : remainingQty != null && remainingQty <= 5 ? "text-amber-500" : "text-emerald-600"
-                          }`}>
-                            {soldOut
-                              ? "SOLD OUT"
-                              : remainingQty != null
-                                ? formatRemainingQty(remainingQty, product.unit)
-                                : null}
-                          </p>
-                        )}
+                        {/* Stock availability label + urgency bar */}
+                        {hasStockLimit && (() => {
+                          const sl = parseFloat(stockLimit!);
+                          const pct = sl > 0 && remainingQty != null ? Math.max(0, Math.min(100, Math.round(((sl - remainingQty) / sl) * 100))) : null;
+                          const barColor = soldOut || (pct != null && pct >= 90) ? "bg-[#c73e3a]" : pct != null && pct >= 70 ? "bg-amber-500" : "bg-emerald-600";
+                          return (
+                            <div className="mb-1 sm:mb-1.5">
+                              <p className={`font-mono-brand text-[9px] sm:text-[10px] uppercase tracking-wider ${
+                                soldOut ? "text-[#c73e3a]" : remainingQty != null && remainingQty <= 5 ? "text-amber-500" : "text-emerald-600"
+                              }`}>
+                                {soldOut
+                                  ? "SOLD OUT"
+                                  : remainingQty != null
+                                    ? formatRemainingQty(remainingQty, product.unit)
+                                    : null}
+                              </p>
+                              {/* Urgency bar — show when ≥33% claimed */}
+                              {!soldOut && pct != null && pct >= 33 && (
+                                <div className="mt-0.5 h-1 w-full rounded-full bg-[#e8e4dc] overflow-hidden">
+                                  <div
+                                    className={`h-full rounded-full transition-all ${barColor}`}
+                                    style={{ width: `${pct}%` }}
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
                         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-1.5 sm:gap-2">
                           <div>
                             {showPowerDrop ? (
@@ -760,6 +779,7 @@ export default function DealsSection({ onAddToCart, powerDropActive = false }: D
                                   unit: product.unit,
                                   category: product.category,
                                   visibility: (product as Product & { visibility?: "regular_only" | "always" | "power_drop_only" }).visibility,
+                                  remainingQty: (product as Product & { remainingQty?: number | null }).remainingQty ?? null,
                                 });
                                 toast.success(`${product.name} added to cart`);
                               }}

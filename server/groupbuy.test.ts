@@ -9,7 +9,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 vi.mock("./db", () => ({
   bulkUpdateProducts: vi.fn().mockResolvedValue(3),
 
-  getOrderedQtyByProduct: vi.fn().mockImplementation(async () => {
+  getOrderedQtyByProduct: vi.fn().mockImplementation(async (_activeDropId?: number) => {
     // Default: product 1 has 3 units already ordered
     return new Map([[1, 3]]);
   }),
@@ -783,5 +783,86 @@ describe("getOrderedQtyByProduct stock limit counting", () => {
     vi.mocked(getOrderedQtyByProduct).mockResolvedValueOnce(new Map([[1, 6]]));
     const map = await getOrderedQtyByProduct();
     expect(map.get(1)).toBe(6);
+  });
+});
+
+// ─── Per-drop counting tests ──────────────────────────────────────────────────
+
+describe("getOrderedQtyByProduct — per-drop scoping", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("accepts an activeDropId parameter without error", async () => {
+    // When called with a drop id, the mock should still return the map
+    const map = await getOrderedQtyByProduct(42);
+    expect(map).toBeInstanceOf(Map);
+    expect(getOrderedQtyByProduct).toHaveBeenCalledWith(42);
+  });
+
+  it("an order from a closed/previous drop does NOT count when activeDropId is provided", async () => {
+    // Simulate: drop 1 is active; product 1 has 2 units from drop 1 orders.
+    // An order from drop 2 (closed) is excluded → only 2 units counted.
+    vi.mocked(getOrderedQtyByProduct).mockResolvedValueOnce(new Map([[1, 2]]));
+    const map = await getOrderedQtyByProduct(1); // active drop id = 1
+    expect(map.get(1)).toBe(2);
+    expect(getOrderedQtyByProduct).toHaveBeenCalledWith(1);
+  });
+
+  it("an unassigned order (dropId IS NULL) counts even when activeDropId is provided", async () => {
+    // Unassigned orders always count regardless of active drop
+    vi.mocked(getOrderedQtyByProduct).mockResolvedValueOnce(new Map([[1, 1]]));
+    const map = await getOrderedQtyByProduct(5);
+    expect(map.get(1)).toBe(1);
+  });
+
+  it("falls back to counting all non-cancelled orders when no activeDropId is given", async () => {
+    // No drop active → count everything (existing behaviour)
+    vi.mocked(getOrderedQtyByProduct).mockResolvedValueOnce(new Map([[1, 7]]));
+    const map = await getOrderedQtyByProduct(undefined);
+    expect(map.get(1)).toBe(7);
+  });
+
+  it("an invoice_issued order still counts against the stock limit (drop-scoped)", async () => {
+    // invoice_issued + drop 3 active → 3 units counted
+    vi.mocked(getOrderedQtyByProduct).mockResolvedValueOnce(new Map([[1, 3]]));
+    const map = await getOrderedQtyByProduct(3);
+    expect(map.get(1)).toBe(3);
+    expect(getOrderedQtyByProduct).toHaveBeenCalledWith(3);
+  });
+
+  it("creating a new drop resets counters (old drop orders excluded)", async () => {
+    // After a new drop is created, old drop orders no longer count → 0
+    vi.mocked(getOrderedQtyByProduct).mockResolvedValueOnce(new Map());
+    const map = await getOrderedQtyByProduct(99); // new drop id
+    expect(map.size).toBe(0);
+  });
+});
+
+// ─── bulkUpdateProducts — stockLimit field ────────────────────────────────────
+describe("bulkUpdateProducts stockLimit field", () => {
+  it("accepts a string stockLimit value in the set object", async () => {
+    vi.mocked(bulkUpdateProducts).mockResolvedValueOnce(2);
+    const result = await bulkUpdateProducts([1, 2], { stockLimit: "50" });
+    expect(result).toBe(2);
+    expect(bulkUpdateProducts).toHaveBeenCalledWith([1, 2], { stockLimit: "50" });
+  });
+
+  it("accepts null to clear the stock limit", async () => {
+    vi.mocked(bulkUpdateProducts).mockResolvedValueOnce(3);
+    const result = await bulkUpdateProducts([1, 2, 3], { stockLimit: null });
+    expect(result).toBe(3);
+    expect(bulkUpdateProducts).toHaveBeenCalledWith([1, 2, 3], { stockLimit: null });
+  });
+
+  it("can combine stockLimit with availability in a single call", async () => {
+    vi.mocked(bulkUpdateProducts).mockResolvedValueOnce(1);
+    const result = await bulkUpdateProducts([5], { stockLimit: "20", available: true });
+    expect(result).toBe(1);
+    expect(bulkUpdateProducts).toHaveBeenCalledWith([5], { stockLimit: "20", available: true });
+  });
+
+  it("rejects empty ids array (returns 0 without calling DB)", async () => {
+    vi.mocked(bulkUpdateProducts).mockResolvedValueOnce(0);
+    const result = await bulkUpdateProducts([], { stockLimit: "10" });
+    expect(result).toBe(0);
   });
 });

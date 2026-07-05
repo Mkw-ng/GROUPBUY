@@ -270,9 +270,10 @@ export const appRouter = router({
 
   products: router({
     list: publicProcedure.query(async () => {
+      const activeDrop = await getActiveDrop();
       const [rawProducts, orderedQtyMap] = await Promise.all([
         getAllProducts(),
-        getOrderedQtyByProduct(),
+        getOrderedQtyByProduct(activeDrop?.id),
       ]);
       return rawProducts.map((p) => {
         const orderedQty = orderedQtyMap.get(p.id) ?? 0;
@@ -358,10 +359,12 @@ export const appRouter = router({
         // NOTE: This is a best-effort check. A future order_items table with
         // row-level locking would make this fully race-condition-proof.
         {
-          const [allProducts, orderedQtyMap] = await Promise.all([
+          const [activeDrop, allProducts] = await Promise.all([
+            getActiveDrop(),
             getAllProducts(),
-            getOrderedQtyByProduct(),
           ]);
+          const orderedQtyMap = await getOrderedQtyByProduct(activeDrop?.id);
+          // Note: activeDrop is also used below when creating the order record.
           const productMap = new Map(allProducts.map((p) => [p.id, p]));
           for (const item of parsedItems) {
             const product = productMap.get(item.id);
@@ -438,7 +441,9 @@ export const appRouter = router({
           }
         }
 
-        const activeDrop = await getActiveDrop();
+        // activeDrop was already fetched in the stock limit validation block above.
+        // Re-read it from the outer scope via the block's variable.
+        const currentActiveDrop = await getActiveDrop();
         const id = await createOrder({
           phone: input.phone,
           pickupDate: input.pickupDate,
@@ -449,7 +454,7 @@ export const appRouter = router({
           isPowerDrop: input.isPowerDrop,
           status: "pending",
           deliveryCharge: "0.00",
-          dropId: activeDrop?.id ?? null,
+          dropId: currentActiveDrop?.id ?? null,
         });
         return { id };
       }),
@@ -513,10 +518,12 @@ export const appRouter = router({
               .object({
                 visibility: z.enum(["regular_only", "always", "power_drop_only"]).optional(),
                 available: z.boolean().optional(),
+                // stockLimit: string value to set, or null to clear the limit
+                stockLimit: z.string().optional().nullable(),
               })
               .refine(
-                (s) => s.visibility !== undefined || s.available !== undefined,
-                { message: "At least one field (visibility or available) must be provided in set" }
+                (s) => s.visibility !== undefined || s.available !== undefined || s.stockLimit !== undefined,
+                { message: "At least one field (visibility, available, or stockLimit) must be provided in set" }
               ),
           })
         )

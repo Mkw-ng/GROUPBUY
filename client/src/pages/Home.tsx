@@ -61,11 +61,15 @@ export default function Home() {
     unit: string;
     category?: string;
     visibility?: "regular_only" | "always" | "power_drop_only";
+    remainingQty?: number | null;
   }) => {
     setCartItems((prev) => {
       const existing = prev.find((i) => i.id === product.id);
       if (existing) {
-        return prev.map((i) => (i.id === product.id ? { ...i, qty: i.qty + 1 } : i));
+        // Clamp increment against remainingQty
+        const maxQty = product.remainingQty != null && product.remainingQty > 0 ? product.remainingQty : Infinity;
+        const newQty = Math.min(existing.qty + 1, maxQty);
+        return prev.map((i) => (i.id === product.id ? { ...i, qty: newQty, remainingQty: product.remainingQty ?? null } : i));
       }
       // Use Power Drop price when active and available
       const effectivePrice =
@@ -85,6 +89,7 @@ export default function Home() {
           qty: 1,
           category: product.category,
           visibility: product.visibility,
+          remainingQty: product.remainingQty ?? null,
         },
       ];
     });

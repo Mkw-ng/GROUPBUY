@@ -38,6 +38,7 @@ export interface CartItem {
   note?: string; // per-item customer request
   category?: string; // product category, stored for CSV export
   visibility?: "regular_only" | "always" | "power_drop_only"; // product visibility setting
+  remainingQty?: number | null; // server-computed remaining stock (null = unlimited)
 }
 
 interface CartDrawerProps {
@@ -473,6 +474,12 @@ export default function CartDrawer({
                               POWER DROP ONLY
                             </span>
                           )}
+                          {/* Stock cap warning */}
+                          {item.remainingQty != null && item.remainingQty > 0 && item.qty >= item.remainingQty && (
+                            <p className="text-[9px] font-mono-brand text-amber-400 mt-1">
+                              Max available: {item.remainingQty % 1 === 0 ? item.remainingQty : item.remainingQty.toFixed(1)}
+                            </p>
+                          )}
                           <div className="flex items-center gap-3 mt-2">
                             <div className="flex items-center border border-white/15">
                               <button
@@ -492,7 +499,8 @@ export default function CartDrawer({
                                 onChange={(e) => {
                                   const val = parseFloat(e.target.value);
                                   if (!isNaN(val) && val >= 0.5) {
-                                    onQtyChange(item.id, Math.round(val * 10) / 10);
+                                    const maxQty = item.remainingQty != null && item.remainingQty > 0 ? item.remainingQty : Infinity;
+                                    onQtyChange(item.id, Math.min(Math.round(val * 10) / 10, maxQty));
                                   }
                                 }}
                                 onBlur={(e) => {
@@ -500,7 +508,8 @@ export default function CartDrawer({
                                   if (isNaN(val) || val < 0.5) {
                                     onQtyChange(item.id, 1);
                                   } else {
-                                    onQtyChange(item.id, Math.round(val * 10) / 10);
+                                    const maxQty = item.remainingQty != null && item.remainingQty > 0 ? item.remainingQty : Infinity;
+                                    onQtyChange(item.id, Math.min(Math.round(val * 10) / 10, maxQty));
                                   }
                                 }}
                                 onKeyDown={(e) => {
@@ -511,10 +520,16 @@ export default function CartDrawer({
                               />
                               <button
                                 onClick={() => {
-                                  const next = Math.round((item.qty + 0.5) * 10) / 10;
-                                  onQtyChange(item.id, next);
+                                  const maxQty = item.remainingQty != null && item.remainingQty > 0 ? item.remainingQty : Infinity;
+                                  const next = Math.min(Math.round((item.qty + 0.5) * 10) / 10, maxQty);
+                                  if (next > item.qty) onQtyChange(item.id, next);
                                 }}
-                                className="w-7 h-7 flex items-center justify-center text-[#f5f2ec]/50 hover:text-[#f5f2ec] transition-colors font-mono-brand text-[14px]"
+                                className={`w-7 h-7 flex items-center justify-center transition-colors font-mono-brand text-[14px] ${
+                                  item.remainingQty != null && item.qty >= item.remainingQty
+                                    ? "text-[#f5f2ec]/20 cursor-not-allowed"
+                                    : "text-[#f5f2ec]/50 hover:text-[#f5f2ec]"
+                                }`}
+                                disabled={item.remainingQty != null && item.qty >= item.remainingQty}
                               >
                                 +
                               </button>

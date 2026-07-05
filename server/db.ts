@@ -137,14 +137,24 @@ export async function setProductAvailability(id: number, available: boolean) {
  */
 export async function bulkUpdateProducts(
   ids: number[],
-  set: { visibility?: "regular_only" | "always" | "power_drop_only"; available?: boolean }
+  set: {
+    visibility?: "regular_only" | "always" | "power_drop_only";
+    available?: boolean;
+    /** String decimal value to set stock limit, or null to clear it */
+    stockLimit?: string | null;
+  }
 ): Promise<number> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   if (ids.length === 0) return 0;
+  // Build the update set, mapping stockLimit null → SQL NULL
+  const updateSet: Record<string, unknown> = {};
+  if (set.visibility !== undefined) updateSet.visibility = set.visibility;
+  if (set.available !== undefined) updateSet.available = set.available;
+  if (set.stockLimit !== undefined) updateSet.stockLimit = set.stockLimit ?? null;
   const result = await db
     .update(products)
-    .set(set)
+    .set(updateSet)
     .where(sql`${products.id} IN (${sql.join(ids.map((id) => sql`${id}`), sql`, `)})`);
   return (result[0] as { affectedRows: number }).affectedRows ?? ids.length;
 }
@@ -650,8 +660,14 @@ export async function unarchiveOrder(id: number): Promise<void> {
 }
 
 /**
- * Calculates total ordered quantity per product ID from active (non-archived)
- * pending and paid orders. Cancelled and archived orders are excluded.
+ * Calculates total ordered quantity per product ID from active (non-archived,
+ * non-cancelled) orders.
+ *
+ * When activeDropId is provided, only orders belonging to that drop OR with no
+ * drop assignment (dropId IS NULL) are counted. Orders from previous/closed
+ * drops are excluded — creating a new drop automatically resets every counter.
+ * When activeDropId is undefined, all non-cancelled non-archived orders are
+ * counted (fallback when no drop is active).
  *
  * For kg-based products (unit contains "kg"):
  *   - Uses finalWeightKg if set and > 0, otherwise uses qty.
@@ -664,20 +680,30 @@ export async function unarchiveOrder(id: number): Promise<void> {
  * table with row-level locking would make stock validation stronger under
  * concurrent load.
  */
-export async function getOrderedQtyByProduct(): Promise<Map<number, number>> {
+export async function getOrderedQtyByProduct(
+  activeDropId?: number
+): Promise<Map<number, number>> {
   const db = await getDb();
   const result = new Map<number, number>();
   if (!db) return result;
 
+  const baseConditions = [
+    eq(orders.archived, false),
+    sql`${orders.status} != 'cancelled'`,
+  ] as const;
+
+  const whereClause =
+    activeDropId !== undefined
+      ? and(
+          ...baseConditions,
+          sql`(${orders.dropId} = ${activeDropId} OR ${orders.dropId} IS NULL)`
+        )
+      : and(...baseConditions);
+
   const activeOrders = await db
     .select({ items: orders.items })
     .from(orders)
-    .where(
-      and(
-        eq(orders.archived, false),
-        sql`${orders.status} != 'cancelled'`
-      )
-    );
+    .where(whereClause);
 
   for (const row of activeOrders) {
     let items: OrderItem[] = [];
