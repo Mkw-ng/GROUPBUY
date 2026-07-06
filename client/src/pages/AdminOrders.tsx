@@ -30,6 +30,7 @@ import {
   Search,
   X,
   DollarSign,
+  Copy,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -208,6 +209,48 @@ function buildInvoiceMessage(
   }
 
   return parts.join("\n");
+}
+
+// ─── Casual clipboard summary ────────────────────────────────────────────────
+
+function buildCasualSummary(order: Order, items: OrderItem[], deliveryCharge: string): string {
+  const invoiceRef = order.invoiceNumber ?? formatInvoiceNumber(order.id);
+  const locLabel = order.location === "delivery"
+    ? (order.deliveryAddress ?? "Delivery")
+    : order.location === "cranbourne" ? "Cranbourne"
+    : order.location === "clayton" ? "Clayton"
+    : order.location;
+
+  const itemLines = items.map((item) => {
+    const price = parseFloat(item.price) || 0;
+    const isPerKg = item.unit?.toLowerCase().includes("kg");
+    const hasOverride = item.finalWeightKg !== undefined && item.finalWeightKg !== null && item.finalWeightKg !== "";
+    const qty = hasOverride ? parseFloat(item.finalWeightKg!) || 0 : item.qty;
+    const qtyStr = isPerKg ? `${qty}kg` : `${qty}`;
+    const unitLabel = item.unit?.replace(/^\s*\/\s*/, "") ?? "";
+    const notePart = item.note ? ` - ${item.note}` : "";
+    return `${item.name} - ${qtyStr} - $${price.toFixed(2)} /${unitLabel}${notePart}`;
+  });
+
+  const subtotal = items.reduce((sum, i) => sum + calcItemTotal(i), 0);
+  const delivery = parseFloat(deliveryCharge) || 0;
+  const grandTotal = subtotal + delivery;
+
+  const lines: string[] = [
+    order.phone,
+    invoiceRef,
+    order.pickupDate ?? "",
+    locLabel,
+    ...itemLines,
+  ];
+
+  if (order.specialInstructions) {
+    lines.push(`Special instructions: ${order.specialInstructions}`);
+  }
+
+  lines.push(`Total due: $${grandTotal.toFixed(2)}`);
+
+  return lines.join("\n");
 }
 
 // ─── Order Card ────────────────────────────────────────────────────────────────
@@ -1067,39 +1110,78 @@ Here's how to lock it in:
           {/* Action buttons */}
           <div className="flex flex-wrap gap-2 pt-1">
             {/* ─── Casual order: simplified action cluster ─────────────────────────────
-                Casual orders are fulfilled in-store. Only the WhatsApp invoice (optional),
-                Acknowledge & Archive, and Delete actions are relevant. */}
+                Casual orders are fulfilled in-store. Actions: Copy summary, Acknowledge &
+                Archive (copies then archives), and Delete. No pipeline buttons. */}
             {!order.isPowerDrop && !order.archived && (
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="font-display text-[10px] tracking-widest border-amber-500/40 text-amber-400 hover:bg-amber-500/10 gap-1.5"
-                    disabled={archiveOrder.isPending}
-                  >
-                    <Archive size={13} />
-                    {archiveOrder.isPending ? "Archiving…" : "Acknowledge & Archive"}
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent className="section-ink border-white/10">
-                  <AlertDialogHeader>
-                    <AlertDialogTitle className="font-display tracking-widest text-[#f5f2ec]">Acknowledge & archive this casual order?</AlertDialogTitle>
-                    <AlertDialogDescription className="font-mono-brand text-[#8a857c]">
-                      This marks the order as seen and removes it from the Casual tab. It will be kept in the Archived tab for records. Casual orders do not feed loyalty analytics.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel className="font-display text-[10px] tracking-widest">Keep</AlertDialogCancel>
-                    <AlertDialogAction
-                      className="font-display text-[10px] tracking-widest bg-amber-600 hover:bg-amber-700"
-                      onClick={() => archiveOrder.mutate({ id: order.id })}
+              <>
+                {/* Standalone Copy button */}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="font-display text-[10px] tracking-widest border-[#8a857c]/40 text-[#8a857c] hover:bg-white/5 gap-1.5"
+                  onClick={async () => {
+                    const summary = buildCasualSummary(
+                      { ...order, specialInstructions: specialInstructions.trim() || null },
+                      items,
+                      deliveryCharge
+                    );
+                    try {
+                      await navigator.clipboard.writeText(summary);
+                      toast.success("Order summary copied to clipboard");
+                    } catch {
+                      toast.error("Could not copy — check clipboard permissions");
+                    }
+                  }}
+                >
+                  <Copy size={13} />
+                  Copy
+                </Button>
+
+                {/* Acknowledge & Archive — copies summary first, then archives */}
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="font-display text-[10px] tracking-widest border-amber-500/40 text-amber-400 hover:bg-amber-500/10 gap-1.5"
+                      disabled={archiveOrder.isPending}
                     >
-                      Acknowledge & Archive
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
+                      <Archive size={13} />
+                      {archiveOrder.isPending ? "Archiving…" : "Acknowledge & Archive"}
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent className="section-ink border-white/10">
+                    <AlertDialogHeader>
+                      <AlertDialogTitle className="font-display tracking-widest text-[#f5f2ec]">Acknowledge & archive this casual order?</AlertDialogTitle>
+                      <AlertDialogDescription className="font-mono-brand text-[#8a857c]">
+                        The order summary will be copied to your clipboard, then the order will be removed from the Casual tab. It will be kept in the Archived tab for records. Casual orders do not feed loyalty analytics.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel className="font-display text-[10px] tracking-widest">Keep</AlertDialogCancel>
+                      <AlertDialogAction
+                        className="font-display text-[10px] tracking-widest bg-amber-600 hover:bg-amber-700"
+                        onClick={async () => {
+                          const summary = buildCasualSummary(
+                            { ...order, specialInstructions: specialInstructions.trim() || null },
+                            items,
+                            deliveryCharge
+                          );
+                          try {
+                            await navigator.clipboard.writeText(summary);
+                            toast.success("Summary copied — archiving order");
+                          } catch {
+                            toast("Archiving order (clipboard unavailable)");
+                          }
+                          archiveOrder.mutate({ id: order.id });
+                        }}
+                      >
+                        Acknowledge & Archive
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </>
             )}
 
             {/* ─── Power Drop pipeline actions ─────────────────────────────────────── */}
@@ -1599,8 +1681,9 @@ Here's how to lock it in:
                 Restore
               </Button>
             )}
-            {/* Archive Order — only shown for non-archived orders */}
-            {!order.archived && <AlertDialog>
+            {/* Archive Order — only shown for non-archived Power Drop orders.
+                 Casual orders use the Acknowledge & Archive button above instead. */}
+            {!order.archived && order.isPowerDrop && <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button
                   size="sm"

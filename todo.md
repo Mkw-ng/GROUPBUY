@@ -598,3 +598,7 @@
 - [x] AdminOrders.tsx: Export Casual CSV button (casual-orders-YYYY-MM-DD.csv)
 - [x] AdminOrders.tsx: Archive All Casual (N) bulk button with confirm dialog
 - [x] Tests: getCasualOrders (8 tests), getActiveOrderCounts.casual, stock exclusion — 101/101 passing
+- [x] buildCasualSummary helper: phone, invoice ref, pickup date, location, item lines (name - qty - price/unit - note), special instructions, total due
+- [x] Standalone "Copy" button on casual order cards — copies summary to clipboard with success/error toast
+- [x] Acknowledge & Archive: copies summary to clipboard first, then archives (with fallback toast if clipboard unavailable)
+- [x] Generic "Archive" button guarded to Power Drop orders only (casual orders use Acknowledge & Archive)
