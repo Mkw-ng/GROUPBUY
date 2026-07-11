@@ -281,7 +281,7 @@ function SectionRow({
         </div>
       ) : (
         <>
-          <span className="flex-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{section.name}</span>
+          <span className="flex-1 min-w-0 text-xs font-semibold uppercase tracking-wider text-muted-foreground truncate" title={section.name}>{section.name}</span>
           <Button size="icon" variant="ghost" className="h-6 w-6" onClick={onStartEdit}>
             <Pencil className="h-3 w-3" />
           </Button>
@@ -357,68 +357,69 @@ function CategoryRow({
           </div>
         </div>
       ) : (
-        /* Grid: drag | emoji+name | visibility | section | count | actions */
-        <div className="grid items-center gap-x-2 px-2 py-1.5" style={{ gridTemplateColumns: "16px minmax(0,1fr) 90px 100px 56px 56px" }}>
-          {/* Drag handle */}
-          <button {...attributes} {...listeners} className="cursor-grab text-muted-foreground hover:text-foreground">
-            <GripVertical className="h-4 w-4" />
-          </button>
-          {/* Emoji + name */}
+        /* Two-line layout:
+           Line 1: drag handle | emoji | name (flex-1, truncate) | product count | actions
+           Line 2: visibility dropdown | section dropdown
+           This ensures the name is ALWAYS visible and controls never overflow. */
+        <div className="px-2 py-1.5">
+          {/* Line 1: drag + name + count + actions */}
           <div className="flex items-center gap-1.5 min-w-0">
+            <button {...attributes} {...listeners} className="cursor-grab text-muted-foreground hover:text-foreground shrink-0">
+              <GripVertical className="h-4 w-4" />
+            </button>
             <span className="text-sm shrink-0">{cat.emoji ?? "📦"}</span>
             <span
-              className="text-sm font-medium truncate"
+              className="flex-1 min-w-0 text-sm font-medium truncate"
               title={cat.name + (cat.powerDropName ? ` · PD: ${cat.powerDropName}` : "")}
             >
               {cat.name}
             </span>
+            <span className="text-xs text-muted-foreground tabular-nums whitespace-nowrap shrink-0 ml-1">{productCount}p</span>
+            <div className="flex gap-0.5 shrink-0">
+              <Button size="icon" variant="ghost" className="h-6 w-6" onClick={onStartEdit}>
+                <Pencil className="h-3 w-3" />
+              </Button>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-6 w-6 text-destructive hover:text-destructive"
+                onClick={onDelete}
+                disabled={productCount > 0}
+                title={productCount > 0 ? `${productCount} products assigned` : "Delete category"}
+              >
+                <Trash2 className="h-3 w-3" />
+              </Button>
+            </div>
           </div>
-          {/* Visibility dropdown */}
-          <Select
-            value={cat.visibility}
-            onValueChange={(v) => onSetVisibility(v as "regular_only" | "always" | "power_drop_only")}
-          >
-            <SelectTrigger className={`h-6 text-xs w-full ${VISIBILITY_COLORS[cat.visibility]}`}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="always"><span className="text-green-600">Always</span></SelectItem>
-              <SelectItem value="regular_only"><span className="text-slate-500">Regular</span></SelectItem>
-              <SelectItem value="power_drop_only"><span className="text-red-600">PD Only</span></SelectItem>
-            </SelectContent>
-          </Select>
-          {/* Section dropdown */}
-          <Select
-            value={cat.sectionId ? String(cat.sectionId) : "none"}
-            onValueChange={(v) => onSetSection(v === "none" ? null : Number(v))}
-          >
-            <SelectTrigger className="h-6 text-xs w-full">
-              <SelectValue placeholder="No section" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">No section</SelectItem>
-              {sections.map((s) => (
-                <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {/* Product count */}
-          <span className="text-xs text-muted-foreground text-right tabular-nums whitespace-nowrap">{productCount} prods</span>
-          {/* Edit / delete */}
-          <div className="flex gap-0.5 justify-end">
-            <Button size="icon" variant="ghost" className="h-6 w-6" onClick={onStartEdit}>
-              <Pencil className="h-3 w-3" />
-            </Button>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-6 w-6 text-destructive hover:text-destructive"
-              onClick={onDelete}
-              disabled={productCount > 0}
-              title={productCount > 0 ? `${productCount} products assigned` : "Delete category"}
+          {/* Line 2: visibility + section dropdowns */}
+          <div className="flex gap-1.5 mt-1 pl-[22px]">
+            <Select
+              value={cat.visibility}
+              onValueChange={(v) => onSetVisibility(v as "regular_only" | "always" | "power_drop_only")}
             >
-              <Trash2 className="h-3 w-3" />
-            </Button>
+              <SelectTrigger className={`h-6 text-xs flex-1 min-w-0 ${VISIBILITY_COLORS[cat.visibility]}`}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="always"><span className="text-green-600">Always</span></SelectItem>
+                <SelectItem value="regular_only"><span className="text-slate-500">Regular</span></SelectItem>
+                <SelectItem value="power_drop_only"><span className="text-red-600">PD Only</span></SelectItem>
+              </SelectContent>
+            </Select>
+            <Select
+              value={cat.sectionId ? String(cat.sectionId) : "none"}
+              onValueChange={(v) => onSetSection(v === "none" ? null : Number(v))}
+            >
+              <SelectTrigger className="h-6 text-xs flex-1 min-w-0">
+                <SelectValue placeholder="No section" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">No section</SelectItem>
+                {sections.map((s) => (
+                  <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </div>
       )}
@@ -1986,7 +1987,7 @@ function AdminContent() {
       {/* ─── Manage Categories Dialog ───────────────────────────────────────── */}
       <Dialog open={manageCatsOpen} onOpenChange={(open) => { setManageCatsOpen(open); if (!open) setCatSearch(""); }}>
         {/* Wide dialog: 90vw up to 1100px, 85vh tall, flex-column so header is fixed and body scrolls */}
-        <DialogContent className="w-[90vw] max-w-[1100px] h-[85vh] max-h-[85vh] sm:h-[85vh] flex flex-col gap-0 p-0 overflow-hidden">
+        <DialogContent className="!w-[min(90vw,1100px)] !max-w-[min(90vw,1100px)] !h-[85vh] flex flex-col gap-0 p-0 overflow-hidden">
           {/* Fixed header */}
           <div className="px-6 pt-6 pb-4 border-b shrink-0">
             <DialogHeader>
@@ -1997,11 +1998,11 @@ function AdminContent() {
             </DialogHeader>
           </div>
 
-          {/* Scrollable body — two panels on desktop, stacked on mobile */}
-          <div className="flex-1 min-h-0 flex flex-col sm:flex-row overflow-hidden">
+          {/* Scrollable body — two panels on desktop (>900px), stacked on mobile */}
+          <div className="flex-1 min-h-0 flex flex-col min-[900px]:flex-row overflow-hidden">
 
             {/* ── LEFT PANEL: Sections (~1/3) ── */}
-            <div className="sm:w-[34%] shrink-0 flex flex-col border-b sm:border-b-0 sm:border-r overflow-hidden">
+            <div className="min-[900px]:w-[34%] shrink-0 flex flex-col border-b min-[900px]:border-b-0 min-[900px]:border-r overflow-hidden">
               <div className="px-4 pt-4 pb-2 shrink-0">
                 <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Sections</p>
               </div>
