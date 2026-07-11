@@ -2347,51 +2347,10 @@ export default function AdminOrders() {
           </button>
           <div className="w-px h-4 bg-white/10" />
           <button
-            onClick={() => setPickupSort(s => s === "none" ? "asc" : s === "asc" ? "desc" : "none")}
-            className={`flex items-center gap-1 font-mono-brand text-[10px] transition-colors ${pickupSort !== "none" ? "text-[#c73e3a]" : "text-[#8a857c] hover:text-[#f5f2ec]"}`}
-            title="Sort by pickup date"
-          >
-            {pickupSort === "asc" ? <ArrowUp size={12} /> : pickupSort === "desc" ? <ArrowDown size={12} /> : <ArrowUpDown size={12} />}
-            {pickupSort === "asc" ? "Pickup ↑" : pickupSort === "desc" ? "Pickup ↓" : "Pickup Date"}
-          </button>
-          <div className="w-px h-4 bg-white/10" />
-          <button
-            onClick={() => setPhoneSort(s => s === "none" ? "asc" : s === "asc" ? "desc" : "none")}
-            className={`flex items-center gap-1 font-mono-brand text-[10px] transition-colors ${phoneSort !== "none" ? "text-[#c73e3a]" : "text-[#8a857c] hover:text-[#f5f2ec]"}`}
-            title="Sort by phone number"
-          >
-            {phoneSort === "asc" ? <ArrowUp size={12} /> : phoneSort === "desc" ? <ArrowDown size={12} /> : <ArrowUpDown size={12} />}
-            {phoneSort === "asc" ? "Phone ↑" : phoneSort === "desc" ? "Phone ↓" : "Phone"}
-          </button>
-          <div className="w-px h-4 bg-white/10" />
-          <button
             onClick={() => handleRefresh()}
             className="font-mono-brand text-[10px] text-[#8a857c] hover:text-[#f5f2ec] transition-colors"
           >
             Refresh
-          </button>
-          <div className="w-px h-4 bg-white/10" />
-          <Link href="/admin/drops">
-            <button className="font-mono-brand text-[10px] text-[#8a857c] hover:text-[#f5f2ec] transition-colors">
-              Drops & Analytics →
-            </button>
-          </Link>
-          <div className="w-px h-4 bg-white/10" />
-          <Link href="/admin/customers">
-            <button className="font-mono-brand text-[10px] text-[#8a857c] hover:text-[#f5f2ec] transition-colors">
-              Customers →
-            </button>
-          </Link>
-          <div className="w-px h-4 bg-white/10" />
-          {/* Export Casual CSV */}
-          <button
-            onClick={handleDownloadCasualCsv}
-            disabled={downloadingCasualCsv || counts.casual === 0}
-            className="flex items-center gap-1.5 font-mono-brand text-[10px] text-[#8a857c] hover:text-[#f5f2ec] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-            title={`Export casual orders as CSV${counts.casual > 0 ? ` (${counts.casual})` : ""}`}
-          >
-            <FileDown size={13} />
-            {downloadingCasualCsv ? "Exporting…" : `Casual CSV${counts.casual > 0 ? ` (${counts.casual})` : ""}`}
           </button>
           <div className="w-px h-4 bg-white/10" />
           {/* Archive All Casual */}
