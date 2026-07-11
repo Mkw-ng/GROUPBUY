@@ -343,14 +343,11 @@ function CategoryRow({
   const style: React.CSSProperties = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
 
   return (
-    <div ref={setNodeRef} style={style} className="flex items-start gap-2 rounded-md border bg-card p-2">
-      <button {...attributes} {...listeners} className="mt-1 cursor-grab text-muted-foreground hover:text-foreground shrink-0">
-        <GripVertical className="h-4 w-4" />
-      </button>
+    <div ref={setNodeRef} style={style} className="rounded-md border bg-card">
       {isEditing ? (
-        <div className="flex-1 space-y-2">
+        <div className="p-2 space-y-2">
           <div className="flex gap-2">
-            <Input value={editEmoji} onChange={(e) => onEditEmojiChange(e.target.value)} placeholder="📦" className="w-16 text-center" maxLength={4} />
+            <Input value={editEmoji} onChange={(e) => onEditEmojiChange(e.target.value)} placeholder="📦" className="w-14 text-center shrink-0" maxLength={4} />
             <Input value={editName} onChange={(e) => onEditNameChange(e.target.value)} placeholder="Name" className="flex-1" />
           </div>
           <Input value={editPdName} onChange={(e) => onEditPdNameChange(e.target.value)} placeholder="Power Drop name (optional, e.g. PD Beef)" />
@@ -360,18 +357,28 @@ function CategoryRow({
           </div>
         </div>
       ) : (
-        <div className="flex-1 flex items-center gap-2 min-w-0">
-          <span className="text-base">{cat.emoji ?? "📦"}</span>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium truncate">{cat.name}</p>
-            {cat.powerDropName && <p className="text-xs text-muted-foreground truncate">PD: {cat.powerDropName}</p>}
+        /* Grid: drag | emoji+name | visibility | section | count | actions */
+        <div className="grid items-center gap-x-2 px-2 py-1.5" style={{ gridTemplateColumns: "16px minmax(0,1fr) 90px 100px 56px 56px" }}>
+          {/* Drag handle */}
+          <button {...attributes} {...listeners} className="cursor-grab text-muted-foreground hover:text-foreground">
+            <GripVertical className="h-4 w-4" />
+          </button>
+          {/* Emoji + name */}
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className="text-sm shrink-0">{cat.emoji ?? "📦"}</span>
+            <span
+              className="text-sm font-medium truncate"
+              title={cat.name + (cat.powerDropName ? ` · PD: ${cat.powerDropName}` : "")}
+            >
+              {cat.name}
+            </span>
           </div>
-          {/* Category visibility quick selector */}
+          {/* Visibility dropdown */}
           <Select
             value={cat.visibility}
             onValueChange={(v) => onSetVisibility(v as "regular_only" | "always" | "power_drop_only")}
           >
-            <SelectTrigger className={`h-6 text-xs w-24 shrink-0 ${VISIBILITY_COLORS[cat.visibility]}`}>
+            <SelectTrigger className={`h-6 text-xs w-full ${VISIBILITY_COLORS[cat.visibility]}`}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -380,41 +387,39 @@ function CategoryRow({
               <SelectItem value="power_drop_only"><span className="text-red-600">PD Only</span></SelectItem>
             </SelectContent>
           </Select>
-          {/* Section assignment dropdown */}
-          {sections.length > 0 && (
-            <Select
-              value={cat.sectionId ? String(cat.sectionId) : "none"}
-              onValueChange={(v) => onSetSection(v === "none" ? null : Number(v))}
-            >
-              <SelectTrigger className="h-6 text-xs w-28 shrink-0">
-                <SelectValue placeholder="No section" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">No section</SelectItem>
-                {sections.map((s) => (
-                  <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-          <span className="text-xs text-muted-foreground shrink-0">{productCount} products</span>
-        </div>
-      )}
-      {!isEditing && (
-        <div className="flex gap-1 shrink-0">
-          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={onStartEdit}>
-            <Pencil className="h-3.5 w-3.5" />
-          </Button>
-          <Button
-            size="icon"
-            variant="ghost"
-            className="h-7 w-7 text-destructive hover:text-destructive"
-            onClick={onDelete}
-            disabled={productCount > 0}
-            title={productCount > 0 ? `${productCount} products assigned` : "Delete category"}
+          {/* Section dropdown */}
+          <Select
+            value={cat.sectionId ? String(cat.sectionId) : "none"}
+            onValueChange={(v) => onSetSection(v === "none" ? null : Number(v))}
           >
-            <Trash2 className="h-3.5 w-3.5" />
-          </Button>
+            <SelectTrigger className="h-6 text-xs w-full">
+              <SelectValue placeholder="No section" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">No section</SelectItem>
+              {sections.map((s) => (
+                <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {/* Product count */}
+          <span className="text-xs text-muted-foreground text-right tabular-nums whitespace-nowrap">{productCount} prods</span>
+          {/* Edit / delete */}
+          <div className="flex gap-0.5 justify-end">
+            <Button size="icon" variant="ghost" className="h-6 w-6" onClick={onStartEdit}>
+              <Pencil className="h-3 w-3" />
+            </Button>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-6 w-6 text-destructive hover:text-destructive"
+              onClick={onDelete}
+              disabled={productCount > 0}
+              title={productCount > 0 ? `${productCount} products assigned` : "Delete category"}
+            >
+              <Trash2 className="h-3 w-3" />
+            </Button>
+          </div>
         </div>
       )}
     </div>
@@ -806,6 +811,7 @@ function AdminContent() {
   // ─── Categories ─────────────────────────────────────────────────────────────
   const { data: categories = [], isLoading: categoriesLoading } = trpc.categories.list.useQuery();
   const [manageCatsOpen, setManageCatsOpen] = useState(false);
+  const [catSearch, setCatSearch] = useState("");
   const [newCatName, setNewCatName] = useState("");
   const [newCatEmoji, setNewCatEmoji] = useState("");
   const [editCatId, setEditCatId] = useState<number | null>(null);
@@ -1978,158 +1984,193 @@ function AdminContent() {
       </Dialog>
 
       {/* ─── Manage Categories Dialog ───────────────────────────────────────── */}
-      <Dialog open={manageCatsOpen} onOpenChange={setManageCatsOpen}>
-        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Manage Categories &amp; Sections</DialogTitle>
-            <DialogDescription>
-              Create sections to group categories in the storefront sidebar. Assign each category to a section using the dropdown. Drag to reorder.
-            </DialogDescription>
-          </DialogHeader>
+      <Dialog open={manageCatsOpen} onOpenChange={(open) => { setManageCatsOpen(open); if (!open) setCatSearch(""); }}>
+        {/* Wide dialog: 90vw up to 1100px, 85vh tall, flex-column so header is fixed and body scrolls */}
+        <DialogContent className="w-[90vw] max-w-[1100px] h-[85vh] max-h-[85vh] sm:h-[85vh] flex flex-col gap-0 p-0 overflow-hidden">
+          {/* Fixed header */}
+          <div className="px-6 pt-6 pb-4 border-b shrink-0">
+            <DialogHeader>
+              <DialogTitle>Manage Categories &amp; Sections</DialogTitle>
+              <DialogDescription>
+                Create sections to group categories in the storefront sidebar. Assign each category to a section using the dropdown. Drag to reorder.
+              </DialogDescription>
+            </DialogHeader>
+          </div>
 
-          <div className="space-y-4 py-2">
-            {/* ── Sections area ── */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
+          {/* Scrollable body — two panels on desktop, stacked on mobile */}
+          <div className="flex-1 min-h-0 flex flex-col sm:flex-row overflow-hidden">
+
+            {/* ── LEFT PANEL: Sections (~1/3) ── */}
+            <div className="sm:w-[34%] shrink-0 flex flex-col border-b sm:border-b-0 sm:border-r overflow-hidden">
+              <div className="px-4 pt-4 pb-2 shrink-0">
                 <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Sections</p>
               </div>
-              <DndContext
-                sensors={sensors}
-                collisionDetection={closestCenter}
-                onDragEnd={(event) => {
-                  const { active, over } = event;
-                  if (!over || active.id === over.id) return;
-                  const activeId = Number(String(active.id).replace("section-", ""));
-                  const overId = Number(String(over.id).replace("section-", ""));
-                  const oldIdx = sections.findIndex((s) => s.id === activeId);
-                  const newIdx = sections.findIndex((s) => s.id === overId);
-                  const reordered = arrayMove(sections, oldIdx, newIdx);
-                  reorderSections.mutate({ orderedIds: reordered.map((s) => s.id) });
-                }}
-              >
-                <SortableContext items={sections.map((s) => `section-${s.id}`)} strategy={rectSortingStrategy}>
-                  <div className="space-y-1">
-                    {sections.map((sec) => (
-                      <SectionRow
-                        key={sec.id}
-                        section={sec}
-                        isEditing={editSectionId === sec.id}
-                        editName={editSectionName}
-                        onStartEdit={() => { setEditSectionId(sec.id); setEditSectionName(sec.name); }}
-                        onCancelEdit={() => setEditSectionId(null)}
-                        onSaveEdit={() => renameSection.mutate({ id: sec.id, name: editSectionName.trim() })}
-                        onEditNameChange={setEditSectionName}
-                        onDelete={() => setDeleteSectionId(sec.id)}
-                        isSaving={renameSection.isPending}
-                      />
-                    ))}
-                  </div>
-                </SortableContext>
-              </DndContext>
-              {/* Add new section */}
-              <div className="flex gap-2">
-                <Input
-                  value={newSectionName}
-                  onChange={(e) => setNewSectionName(e.target.value)}
-                  placeholder="New section name (e.g. Beef, Lamb)"
-                  className="flex-1 h-8 text-sm"
-                  onKeyDown={(e) => { if (e.key === "Enter" && newSectionName.trim()) createSection.mutate({ name: newSectionName.trim() }); }}
-                />
-                <Button
-                  size="sm"
-                  className="h-8"
-                  disabled={!newSectionName.trim() || createSection.isPending}
-                  onClick={() => createSection.mutate({ name: newSectionName.trim() })}
-                >
-                  <Plus className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-
-            {/* ── Categories area ── */}
-            <div className="space-y-2 border-t pt-3">
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Categories</p>
-              {categoriesLoading ? (
-                <div className="space-y-2">
-                  {Array.from({ length: 5 }).map((_, i) => (
-                    <Skeleton key={i} className="h-10 w-full" />
-                  ))}
-                </div>
-              ) : (
+              {/* Scrollable section list */}
+              <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-2">
                 <DndContext
                   sensors={sensors}
                   collisionDetection={closestCenter}
                   onDragEnd={(event) => {
                     const { active, over } = event;
                     if (!over || active.id === over.id) return;
-                    const oldIdx = categories.findIndex((c) => c.id === active.id);
-                    const newIdx = categories.findIndex((c) => c.id === over.id);
-                    const reordered = arrayMove(categories, oldIdx, newIdx);
-                    reorderCategories.mutate({ orderedIds: reordered.map((c) => c.id) });
+                    const activeId = Number(String(active.id).replace("section-", ""));
+                    const overId = Number(String(over.id).replace("section-", ""));
+                    const oldIdx = sections.findIndex((s) => s.id === activeId);
+                    const newIdx = sections.findIndex((s) => s.id === overId);
+                    const reordered = arrayMove(sections, oldIdx, newIdx);
+                    reorderSections.mutate({ orderedIds: reordered.map((s) => s.id) });
                   }}
                 >
-                  <SortableContext items={categories.map((c) => c.id)} strategy={rectSortingStrategy}>
+                  <SortableContext items={sections.map((s) => `section-${s.id}`)} strategy={rectSortingStrategy}>
                     <div className="space-y-1">
-                      {categories.map((cat) => (
-                        <CategoryRow
-                          key={cat.id}
-                          cat={cat}
-                          isEditing={editCatId === cat.id}
-                          editName={editCatName}
-                          editEmoji={editCatEmoji}
-                          editPdName={editCatPdName}
-                          productCount={categoryCounts[cat.slug] ?? 0}
-                          sections={sections}
-                          onStartEdit={() => {
-                            setEditCatId(cat.id);
-                            setEditCatName(cat.name);
-                            setEditCatEmoji(cat.emoji ?? "");
-                            setEditCatPdName(cat.powerDropName ?? "");
-                          }}
-                          onCancelEdit={() => setEditCatId(null)}
-                          onSaveEdit={() => updateCategory.mutate({ id: cat.id, name: editCatName, emoji: editCatEmoji || undefined, powerDropName: editCatPdName || undefined })}
-                          onEditNameChange={setEditCatName}
-                          onEditEmojiChange={setEditCatEmoji}
-                          onEditPdNameChange={setEditCatPdName}
-                          onSetSection={(sectionId) => setCategorySection.mutate({ id: cat.id, name: cat.name, sectionId })}
-                          onSetVisibility={(visibility) => setCategoryVisibility.mutate({ id: cat.id, name: cat.name, visibility })}
-                          onDelete={() => setDeleteCatId(cat.id)}
-                          isSaving={updateCategory.isPending}
+                      {sections.map((sec) => (
+                        <SectionRow
+                          key={sec.id}
+                          section={sec}
+                          isEditing={editSectionId === sec.id}
+                          editName={editSectionName}
+                          onStartEdit={() => { setEditSectionId(sec.id); setEditSectionName(sec.name); }}
+                          onCancelEdit={() => setEditSectionId(null)}
+                          onSaveEdit={() => renameSection.mutate({ id: sec.id, name: editSectionName.trim() })}
+                          onEditNameChange={setEditSectionName}
+                          onDelete={() => setDeleteSectionId(sec.id)}
+                          isSaving={renameSection.isPending}
                         />
                       ))}
+                      {sections.length === 0 && (
+                        <p className="text-xs text-muted-foreground py-2">No sections yet. Add one below.</p>
+                      )}
                     </div>
                   </SortableContext>
                 </DndContext>
-              )}
-            </div>
-
-            {/* Add new category */}
-            <div className="border-t pt-3 mt-3 space-y-2">
-              <p className="text-xs font-medium text-muted-foreground">Add new category</p>
-              <div className="flex gap-2">
-                <Input
-                  value={newCatEmoji}
-                  onChange={(e) => setNewCatEmoji(e.target.value)}
-                  placeholder="📦"
-                  className="w-16 text-center"
-                  maxLength={4}
-                />
-                <Input
-                  value={newCatName}
-                  onChange={(e) => setNewCatName(e.target.value)}
-                  placeholder="Category name"
-                  className="flex-1"
-                  onKeyDown={(e) => { if (e.key === "Enter" && newCatName.trim()) createCategory.mutate({ name: newCatName.trim(), emoji: newCatEmoji || undefined }); }}
-                />
-                <Button
-                  size="sm"
-                  disabled={!newCatName.trim() || createCategory.isPending}
-                  onClick={() => createCategory.mutate({ name: newCatName.trim(), emoji: newCatEmoji || undefined })}
-                >
-                  <Plus className="h-4 w-4" />
-                </Button>
+              </div>
+              {/* Add new section — pinned at bottom of left panel */}
+              <div className="px-4 py-3 border-t shrink-0">
+                <div className="flex gap-2">
+                  <Input
+                    value={newSectionName}
+                    onChange={(e) => setNewSectionName(e.target.value)}
+                    placeholder="New section name"
+                    className="flex-1 h-8 text-sm"
+                    onKeyDown={(e) => { if (e.key === "Enter" && newSectionName.trim()) createSection.mutate({ name: newSectionName.trim() }); }}
+                  />
+                  <Button
+                    size="sm"
+                    className="h-8 shrink-0"
+                    disabled={!newSectionName.trim() || createSection.isPending}
+                    onClick={() => createSection.mutate({ name: newSectionName.trim() })}
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             </div>
+
+            {/* ── RIGHT PANEL: Categories (~2/3) ── */}
+            <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
+              <div className="px-4 pt-4 pb-2 shrink-0 space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Categories</p>
+                {/* Category search */}
+                <div className="relative">
+                  <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+                  <Input
+                    value={catSearch}
+                    onChange={(e) => setCatSearch(e.target.value)}
+                    placeholder="Filter categories…"
+                    className="h-8 pl-7 text-sm"
+                  />
+                </div>
+              </div>
+              {/* Scrollable category list */}
+              <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-4">
+                {categoriesLoading ? (
+                  <div className="space-y-1.5">
+                    {Array.from({ length: 5 }).map((_, i) => (
+                      <Skeleton key={i} className="h-9 w-full" />
+                    ))}
+                  </div>
+                ) : (
+                  <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragEnd={(event) => {
+                      const { active, over } = event;
+                      if (!over || active.id === over.id) return;
+                      const oldIdx = categories.findIndex((c) => c.id === active.id);
+                      const newIdx = categories.findIndex((c) => c.id === over.id);
+                      const reordered = arrayMove(categories, oldIdx, newIdx);
+                      reorderCategories.mutate({ orderedIds: reordered.map((c) => c.id) });
+                    }}
+                  >
+                    <SortableContext items={categories.map((c) => c.id)} strategy={rectSortingStrategy}>
+                      <div className="space-y-1">
+                        {categories
+                          .filter((cat) => !catSearch || cat.name.toLowerCase().includes(catSearch.toLowerCase()))
+                          .map((cat) => (
+                            <CategoryRow
+                              key={cat.id}
+                              cat={cat}
+                              isEditing={editCatId === cat.id}
+                              editName={editCatName}
+                              editEmoji={editCatEmoji}
+                              editPdName={editCatPdName}
+                              productCount={categoryCounts[cat.slug] ?? 0}
+                              sections={sections}
+                              onStartEdit={() => {
+                                setEditCatId(cat.id);
+                                setEditCatName(cat.name);
+                                setEditCatEmoji(cat.emoji ?? "");
+                                setEditCatPdName(cat.powerDropName ?? "");
+                              }}
+                              onCancelEdit={() => setEditCatId(null)}
+                              onSaveEdit={() => updateCategory.mutate({ id: cat.id, name: editCatName, emoji: editCatEmoji || undefined, powerDropName: editCatPdName || undefined })}
+                              onEditNameChange={setEditCatName}
+                              onEditEmojiChange={setEditCatEmoji}
+                              onEditPdNameChange={setEditCatPdName}
+                              onSetSection={(sectionId) => setCategorySection.mutate({ id: cat.id, name: cat.name, sectionId })}
+                              onSetVisibility={(visibility) => setCategoryVisibility.mutate({ id: cat.id, name: cat.name, visibility })}
+                              onDelete={() => setDeleteCatId(cat.id)}
+                              isSaving={updateCategory.isPending}
+                            />
+                          ))}
+                        {catSearch && categories.filter((cat) => cat.name.toLowerCase().includes(catSearch.toLowerCase())).length === 0 && (
+                          <p className="text-xs text-muted-foreground py-3 text-center">No categories match "{catSearch}"</p>
+                        )}
+                      </div>
+                    </SortableContext>
+                  </DndContext>
+                )}
+              </div>
+              {/* Add new category — pinned at bottom of right panel */}
+              <div className="px-4 py-3 border-t shrink-0">
+                <p className="text-xs font-medium text-muted-foreground mb-2">Add new category</p>
+                <div className="flex gap-2">
+                  <Input
+                    value={newCatEmoji}
+                    onChange={(e) => setNewCatEmoji(e.target.value)}
+                    placeholder="📦"
+                    className="w-14 text-center shrink-0"
+                    maxLength={4}
+                  />
+                  <Input
+                    value={newCatName}
+                    onChange={(e) => setNewCatName(e.target.value)}
+                    placeholder="Category name"
+                    className="flex-1 min-w-0"
+                    onKeyDown={(e) => { if (e.key === "Enter" && newCatName.trim()) createCategory.mutate({ name: newCatName.trim(), emoji: newCatEmoji || undefined }); }}
+                  />
+                  <Button
+                    size="sm"
+                    className="shrink-0"
+                    disabled={!newCatName.trim() || createCategory.isPending}
+                    onClick={() => createCategory.mutate({ name: newCatName.trim(), emoji: newCatEmoji || undefined })}
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+
           </div>
         </DialogContent>
       </Dialog>

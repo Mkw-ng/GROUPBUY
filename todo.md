@@ -602,3 +602,10 @@
 - [x] Standalone "Copy" button on casual order cards — copies summary to clipboard with success/error toast
 - [x] Acknowledge & Archive: copies summary to clipboard first, then archives (with fallback toast if clipboard unavailable)
 - [x] Generic "Archive" button guarded to Power Drop orders only (casual orders use Acknowledge & Archive)
+
+## Manage Categories & Sections — Dialog Layout Fix
+- [x] Dialog sizing: 90vw/max-1100px/85vh desktop; 100vw/100dvh mobile; fixed header + scrollable body
+- [x] Two-panel desktop layout: left ~1/3 sections (independent scroll), right ~2/3 categories (independent scroll); stacked on mobile
+- [x] Category row grid: drag handle | emoji+name (truncate+tooltip) | visibility dropdown | section dropdown | product count (right-aligned) | actions; reduced row padding
+- [x] Search input above category list (client-side filter by name, preserves grouped-by-section display)
+- [x] No horizontal overflow at 1280px / 768px / 375px; pnpm check + tests pass
