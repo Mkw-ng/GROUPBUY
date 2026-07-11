@@ -892,6 +892,20 @@ export const appRouter = router({
         const archivedCount = Number((result[0] as { affectedRows?: number })?.affectedRows ?? 0);
         return { success: true, archivedCount };
       }),
+
+      archiveAllCompleted: adminProcedure.mutation(async () => {
+        const { getDb } = await import('./db');
+        const { orders: ordersTable } = await import('../drizzle/schema');
+        const { and, eq } = await import('drizzle-orm');
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
+        const result = await db
+          .update(ordersTable)
+          .set({ archived: true })
+          .where(and(eq(ordersTable.archived, false), eq(ordersTable.status, 'completed')));
+        const archivedCount = Number((result[0] as { affectedRows?: number })?.affectedRows ?? 0);
+        return { success: true, archivedCount };
+      }),
     }),
 
     settings: router({

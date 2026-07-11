@@ -2098,6 +2098,7 @@ export default function AdminOrders() {
   const allCasual = (casualOrdersData as Order[] | undefined) ?? [];
 
   const [confirmArchiveAllCasual, setConfirmArchiveAllCasual] = useState(false);
+  const [confirmArchiveAllCompleted, setConfirmArchiveAllCompleted] = useState(false);
   const archiveAllCasual = trpc.admin.orders.archiveAllCasual.useMutation({
     onSuccess: (result) => {
       toast.success(`Archived ${result.archivedCount} casual order${result.archivedCount === 1 ? "" : "s"} ✓`);
@@ -2105,6 +2106,15 @@ export default function AdminOrders() {
       utils.admin.orders.counts.invalidate();
     },
     onError: () => toast.error("Failed to archive casual orders"),
+  });
+
+  const archiveAllCompleted = trpc.admin.orders.archiveAllCompleted.useMutation({
+    onSuccess: (result) => {
+      toast.success(`Archived ${result.archivedCount} completed order${result.archivedCount === 1 ? "" : "s"} ✓`);
+      utils.admin.orders.list.invalidate();
+      utils.admin.orders.counts.invalidate();
+    },
+    onError: () => toast.error("Failed to archive completed orders"),
   });
 
   if (loading) {
@@ -2380,6 +2390,37 @@ export default function AdminOrders() {
                   className="font-display text-[10px] tracking-widest bg-amber-600 hover:bg-amber-700"
                 >
                   Archive All Casual
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+          <div className="w-px h-4 bg-white/10" />
+          {/* Archive All Completed */}
+          <AlertDialog open={confirmArchiveAllCompleted} onOpenChange={setConfirmArchiveAllCompleted}>
+            <AlertDialogTrigger asChild>
+              <button
+                disabled={archiveAllCompleted.isPending || counts.completed === 0}
+                className="flex items-center gap-1.5 font-mono-brand text-[10px] text-green-400/70 hover:text-green-300 transition-colors disabled:opacity-40 disabled:cursor-not-allowed border border-green-500/30 hover:border-green-400/50 rounded px-2 py-1"
+                title="Archive all completed orders"
+              >
+                <Archive size={12} />
+                {archiveAllCompleted.isPending ? "Archiving…" : `Archive Completed${counts.completed > 0 ? ` (${counts.completed})` : ""}`}
+              </button>
+            </AlertDialogTrigger>
+            <AlertDialogContent className="section-ink border-white/10">
+              <AlertDialogHeader>
+                <AlertDialogTitle className="font-display tracking-widest text-[#f5f2ec]">Archive all completed orders?</AlertDialogTitle>
+                <AlertDialogDescription className="font-mono-brand text-[#8a857c] space-y-1">
+                  <span className="block">This will archive all {counts.completed} completed order{counts.completed !== 1 ? "s" : ""}. They will be hidden from the active tabs but kept for records.</span>
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel className="font-display text-[10px] tracking-widest">Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => { setConfirmArchiveAllCompleted(false); archiveAllCompleted.mutate(); }}
+                  className="font-display text-[10px] tracking-widest bg-green-700 hover:bg-green-800"
+                >
+                  Archive All Completed
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
