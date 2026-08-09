@@ -1157,23 +1157,62 @@ Here's how to lock it in:
                         The order summary will be copied to your clipboard, then the order will be removed from the Casual tab. It will be kept in the Archived tab for records. Casual orders do not feed loyalty analytics.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel className="font-display text-[10px] tracking-widest">Keep</AlertDialogCancel>
-                      <AlertDialogAction
-                        className="font-display text-[10px] tracking-widest bg-amber-600 hover:bg-amber-700"
-                        onClick={async () => {
-                          const summary = buildCasualSummary(
+                   <AlertDialogFooter>
+                     <AlertDialogCancel className="font-display text-[10px] tracking-widest">Keep</AlertDialogCancel>
+                     <AlertDialogAction
+                       className="font-display text-[10px] tracking-widest bg-amber-600 hover:bg-amber-700"
+                       onClick={async () => {
+                         // 1. Copy summary to clipboard
+                         const summary = buildCasualSummary(
                             { ...order, specialInstructions: specialInstructions.trim() || null },
                             items,
                             deliveryCharge
                           );
                           try {
                             await navigator.clipboard.writeText(summary);
-                            toast.success("Summary copied — archiving order");
                           } catch {
-                            toast("Archiving order (clipboard unavailable)");
+                            // clipboard unavailable — continue anyway
                           }
+
+                          // 2. Build WhatsApp confirmation message
+                          const waLocLabel = order.location === "delivery"
+                            ? (order.deliveryAddress ?? "Delivery")
+                            : order.location === "cranbourne" ? "Cranbourne"
+                            : order.location === "clayton" ? "Clayton"
+                            : order.location;
+
+                          const waItemLines = items.map((item) => {
+                            const price = parseFloat(item.price) || 0;
+                            const isPerKg = item.unit?.toLowerCase().includes("kg");
+                            const hasOverride = item.finalWeightKg !== undefined && item.finalWeightKg !== null && item.finalWeightKg !== "";
+                            const qty = hasOverride ? parseFloat(item.finalWeightKg!) || 0 : item.qty;
+                            const qtyStr = isPerKg ? `${qty}kg` : `${qty}`;
+                            const unitLabel = item.unit?.replace(/^\s*\/\s*/, "") ?? "";
+                            const notePart = item.note ? ` (${item.note})` : "";
+                            return `  • ${item.name} — ${qtyStr} @ $${price.toFixed(2)}/${unitLabel}${notePart}`;
+                          }).join("\n");
+
+                          const specialNote = (specialInstructions.trim() || order.specialInstructions)
+                            ? `\n\nSpecial instructions: ${specialInstructions.trim() || order.specialInstructions}`
+                            : "";
+
+                          const waMsg = [
+                            `Hey! Just confirming we've received your order — here's a summary:`,
+                            ``,
+                            `📅 Pickup: ${order.pickupDate ?? "TBC"}`,
+                            `📍 Location: ${waLocLabel}`,
+                            ``,
+                            `🥩 Your order:`,
+                            waItemLines,
+                          ].join("\n") + specialNote + `\n\nWe'll have everything ready for you. See you then! 👊`;
+
+                          // 3. Open WhatsApp
+                          const intlPhone = order.phone.replace(/\D/g, "").replace(/^0/, "61");
+                          window.open(`https://wa.me/${intlPhone}?text=${encodeURIComponent(waMsg)}`, "_blank");
+
+                          // 4. Archive the order
                           archiveOrder.mutate({ id: order.id });
+                          toast.success("WhatsApp opened — order archived");
                         }}
                       >
                         Acknowledge & Archive
