@@ -1174,37 +1174,63 @@ Here's how to lock it in:
                             // clipboard unavailable — continue anyway
                           }
 
-                          // 2. Build WhatsApp confirmation message
-                          const waLocLabel = order.location === "delivery"
-                            ? (order.deliveryAddress ?? "Delivery")
-                            : order.location === "cranbourne" ? "Cranbourne"
-                            : order.location === "clayton" ? "Clayton"
-                            : order.location;
+                         // 2. Build WhatsApp confirmation message
+                         const isDelivery = order.location === "delivery";
+                         const waLocLabel = isDelivery
+                           ? (order.deliveryAddress ?? "Delivery")
+                           : order.location === "cranbourne" ? "Cranbourne"
+                           : order.location === "clayton" ? "Clayton"
+                           : order.location;
 
-                          const waItemLines = items.map((item) => {
-                            const price = parseFloat(item.price) || 0;
-                            const isPerKg = item.unit?.toLowerCase().includes("kg");
-                            const hasOverride = item.finalWeightKg !== undefined && item.finalWeightKg !== null && item.finalWeightKg !== "";
-                            const qty = hasOverride ? parseFloat(item.finalWeightKg!) || 0 : item.qty;
-                            const qtyStr = isPerKg ? `${qty}kg` : `${qty}`;
-                            const unitLabel = item.unit?.replace(/^\s*\/\s*/, "") ?? "";
-                            const notePart = item.note ? ` (${item.note})` : "";
-                            return `  • ${item.name} — ${qtyStr} @ $${price.toFixed(2)}/${unitLabel}${notePart}`;
-                          }).join("\n");
+                         const waItemLines = items.map((item) => {
+                           const price = parseFloat(item.price) || 0;
+                           const isPerKg = item.unit?.toLowerCase().includes("kg");
+                           const hasOverride = item.finalWeightKg !== undefined && item.finalWeightKg !== null && item.finalWeightKg !== "";
+                           const qty = hasOverride ? parseFloat(item.finalWeightKg!) || 0 : item.qty;
+                           const qtyStr = isPerKg ? `${qty}kg` : `${qty}`;
+                           const unitLabel = item.unit?.replace(/^\s*\/\s*/, "") ?? "";
+                           const notePart = item.note ? ` (${item.note})` : "";
+                           return `${item.name} - ${qtyStr} @ $${price.toFixed(2)}/${unitLabel}${notePart}`;
+                         }).join("\n");
 
-                          const specialNote = (specialInstructions.trim() || order.specialInstructions)
-                            ? `\n\nSpecial instructions: ${specialInstructions.trim() || order.specialInstructions}`
-                            : "";
+                         const waSubtotal = items.reduce((sum, i) => sum + calcItemTotal(i), 0);
+                         const waDelivery = parseFloat(deliveryCharge) || 0;
+                         const waGrandTotal = waSubtotal + waDelivery;
 
-                          const waMsg = [
-                            `Hey! Just confirming we've received your order — here's a summary:`,
-                            ``,
-                            `📅 Pickup: ${order.pickupDate ?? "TBC"}`,
-                            `📍 Location: ${waLocLabel}`,
-                            ``,
-                            `🥩 Your order:`,
-                            waItemLines,
-                          ].join("\n") + specialNote + `\n\nWe'll have everything ready for you. See you then! 👊`;
+                         const waSpecialNote = (specialInstructions.trim() || order.specialInstructions)
+                           ? `\nSpecial instructions: ${specialInstructions.trim() || order.specialInstructions}`
+                           : "";
+
+                         const waMsgParts: string[] = [
+                           `Hey! Just confirming we've received your order on mitchellsgroupbuy.com - here's a summary:`,
+                           ``,
+                           isDelivery
+                             ? `Delivery date: ${order.pickupDate ?? "TBC"}`
+                             : `Pickup date: ${order.pickupDate ?? "TBC"}`,
+                           isDelivery
+                             ? `Delivery address: ${waLocLabel}`
+                             : `Pickup location: ${waLocLabel}`,
+                           ``,
+                           `Your order:`,
+                           waItemLines,
+                         ];
+
+                         if (waSpecialNote) waMsgParts.push(waSpecialNote);
+
+                         if (isDelivery) {
+                           waMsgParts.push(``);
+                           waMsgParts.push(`Total: $${waGrandTotal.toFixed(2)}`);
+                           if (bankDetails.trim()) {
+                             waMsgParts.push(`Payment details:\n${bankDetails.trim()}`);
+                           }
+                           waMsgParts.push(``);
+                           waMsgParts.push(`Please allow a full day for the delivery to arrive. See you then!`);
+                         } else {
+                           waMsgParts.push(``);
+                           waMsgParts.push(`Please mention groupbuy order + ${order.phone} at the counter while picking up`);
+                         }
+
+                         const waMsg = waMsgParts.join("\n");
 
                           // 3. Open WhatsApp
                           const intlPhone = order.phone.replace(/\D/g, "").replace(/^0/, "61");
