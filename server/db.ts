@@ -215,12 +215,15 @@ async function generateInvoiceNumber(db: Awaited<ReturnType<typeof getDb>>): Pro
   return `GB-${Date.now().toString().slice(-4)}`;
 }
 
-export async function createOrder(data: InsertOrder): Promise<number> {
+export async function createOrder(data: InsertOrder): Promise<{ id: number; invoiceNumber: string }> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   const invoiceNumber = await generateInvoiceNumber(db);
   const result = await db.insert(orders).values({ ...data, invoiceNumber });
-  return (result[0] as { insertId: number }).insertId;
+  return {
+    id: (result[0] as { insertId: number }).insertId,
+    invoiceNumber,
+  };
 }
 
 /**

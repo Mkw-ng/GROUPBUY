@@ -25,6 +25,12 @@ import { DayPicker } from "react-day-picker";
 import "react-day-picker/style.css";
 import { useSavedOrderDetails } from "@/hooks/useSavedOrderDetails";
 import { trpc } from "@/lib/trpc";
+import {
+  DELIVERY_DAYS_LABEL,
+  earliestDeliveryDate,
+  earliestOrderDate,
+  isDateAllowed,
+} from "@shared/deliveryDays";
 
 export interface CartItem {
   id: number;
@@ -81,6 +87,7 @@ export default function CartDrawer({
   const [orderSuccess, setOrderSuccess] = useState(false);
   const [savedWaUrl, setSavedWaUrl] = useState("");
   interface OrderSummary {
+    invoiceNumber: string;
     dateStr: string;
     locationLabel: string;
     items: { qty: number; name: string; cut: string }[];
@@ -158,7 +165,7 @@ export default function CartDrawer({
   useEffect(() => {
     if (saved) {
       setPhone((prev) => prev || saved.phone);
-      setLocation((prev) => prev || saved.location);
+      setLocation(saved.location);
       if (saved.deliveryAddress) {
         setDeliveryAddress((prev) => prev || saved.deliveryAddress!);
       }
@@ -188,19 +195,27 @@ export default function CartDrawer({
 
   // ─── Date picker constraints ────────────────────────────────────────────────
   // Power Drop mode: date picker hidden; auto-select today as the date
-  // Standard mode: earliest = today + 2 days, no upper limit
-  const { disabledDays, dateHint } = (() => {
+  // Standard mode: pickup = today + 2 days; delivery = Wednesday or Saturday after that lead time.
+  const {
+    disabledDays,
+    dateHint,
+    firstSelectable = startOfDay(new Date()),
+  } = (() => {
     const today = startOfDay(new Date());
     if (powerDropActive) {
       const disabled = (date: Date) => startOfDay(date) < today;
       return { disabledDays: disabled, dateHint: "" };
     }
-    // Standard: minimum 2 days from today
-    const earliest = new Date(today);
-    earliest.setDate(earliest.getDate() + 2);
-    const disabled = (date: Date) => startOfDay(date) < earliest;
-    const hint = `Earliest available date: ${format(earliest, "d MMMM yyyy")}`;
-    return { disabledDays: disabled, dateHint: hint };
+    const now = new Date();
+    const earliestPickup = earliestOrderDate(now);
+    const firstSelectable = location === "delivery"
+      ? earliestDeliveryDate(now)
+      : earliestPickup;
+    const disabled = (date: Date) => !isDateAllowed(date, location, now);
+    const hint = location === "delivery"
+      ? `Deliveries run ${DELIVERY_DAYS_LABEL}. Earliest delivery: ${format(earliestDeliveryDate(now), "EEEE, d MMMM")}.`
+      : `Earliest available date: ${format(earliestPickup, "d MMMM yyyy")}`;
+    return { disabledDays: disabled, dateHint: hint, firstSelectable };
   })();
 
   // Auto-select today when Power Drop is active
@@ -209,6 +224,12 @@ export default function CartDrawer({
       setPickupDate(startOfDay(new Date()));
     }
   }, [powerDropActive]);
+
+  useEffect(() => {
+    if (!powerDropActive && pickupDate && !isDateAllowed(pickupDate, location, new Date())) {
+      setPickupDate(undefined);
+    }
+  }, [location]);
 
   // ─── Validation + WhatsApp message ─────────────────────────────────────────
   function normalisePhone(raw: string): string {
@@ -230,13 +251,18 @@ export default function CartDrawer({
     const phoneErr = validatePhone(phone);
     if (phoneErr) errs.phone = phoneErr;
     if (!pickupDate) errs.date = "Please select a pickup / delivery date";
+    else if (!powerDropActive && !isDateAllowed(pickupDate, location, new Date())) {
+      errs.date = location === "delivery"
+        ? `Deliveries run ${DELIVERY_DAYS_LABEL} — please choose another date.`
+        : "That date is no longer available — please choose another date.";
+    }
     if (location === "delivery" && !deliveryAddress.trim())
       errs.address = "Delivery address is required";
     setErrors(errs);
     return Object.keys(errs).length === 0;
   }
 
-  function buildWhatsAppUrl(): string {
+  function buildWhatsAppUrl(invoiceNumber: string): string {
     const dateStr = pickupDate ? format(pickupDate, "EEEE, d MMMM yyyy") : "";
     const locationStr =
       location === "delivery"
@@ -270,6 +296,7 @@ export default function CartDrawer({
         "---",
         "",
         `*Order Number:* ${normalisePhone(phone)}`,
+        `*Invoice:* ${invoiceNumber}`,
         `*Pick up Date:* ${dateStr}`,
         `*Pick up Location:* ${locationStr}`,
         "",
@@ -277,22 +304,24 @@ export default function CartDrawer({
       ];
     } else {
       // — Casual Order message —
+      const orderItemLines = items.flatMap((i) => {
+        const qtyStr = i.qty % 1 === 0 ? String(i.qty) : i.qty.toFixed(1);
+        const cleanUnit = i.unit.replace(/^\/\s*/, "");
+        const line = `${i.name} — ${qtyStr} ${cleanUnit} @ $${i.price.toFixed(2)}/${cleanUnit}`;
+        return i.note?.trim() ? [line, `  ↳ Request: ${i.note.trim()}`] : [line];
+      });
       parts = [
-        "INCOMING GROUPBUY MESSAGE",
+        `*GROUPBUY ORDER ${invoiceNumber}*`,
         "",
-        "We got your casual order!",
+        `*Phone number:* ${normalisePhone(phone)}`,
+        `*Pick up or delivery date:* ${dateStr}`,
+        `*Location:* ${locationStr}`,
         "",
-        `1. Its scheduled in for pick up at *${locationStr}* on *${dateStr}*`,
-        "2. Payments can be sorted in store.",
-        "* If it is a delivery you\'ll receive an invoice. This needs to be sorted before delivery can take place. Send me the remittance",
+        "*Items, quantity and price:*",
+        ...orderItemLines,
         "",
-        "---",
-        "",
-        `*Order Number:* ${normalisePhone(phone)}`,
-        `*Pick up Date:* ${dateStr}`,
-        `*Pick up Location:* ${locationStr}`,
-        "",
-        ...itemLines,
+        "Delivery payments need to be sorted prior to delivery date.",
+        "Pick up payments can be sorted in store.",
       ];
     }
 
@@ -314,8 +343,9 @@ export default function CartDrawer({
       note: i.note?.trim() || undefined,
     }));
 
+    let invoiceNumber = "";
     try {
-      await createOrder.mutateAsync({
+      const result = await createOrder.mutateAsync({
         phone: normalisePhone(phone),
         pickupDate: dateStr,
         location,
@@ -323,6 +353,7 @@ export default function CartDrawer({
         items: JSON.stringify(orderItems),
         isPowerDrop: powerDropActive,
       });
+      invoiceNumber = result.invoiceNumber;
     } catch (err: unknown) {
       // Surface the actual server error (e.g. stock limit exceeded) instead of a generic message
       const msg =
@@ -347,7 +378,7 @@ export default function CartDrawer({
     }
 
     // Capture WhatsApp URL and order summary before clearing the cart
-    const waUrl = buildWhatsAppUrl();
+    const waUrl = buildWhatsAppUrl(invoiceNumber);
     const locationLabel =
       location === "delivery"
         ? `Delivery — ${deliveryAddress.trim()}`
@@ -358,6 +389,7 @@ export default function CartDrawer({
         : LOCATION_LABELS[location];
     setSavedWaUrl(waUrl);
     setSavedSummary({
+      invoiceNumber,
       dateStr,
       locationLabel,
       items: items.map((i) => ({ qty: i.qty, name: i.name, cut: i.cut })),
@@ -620,81 +652,7 @@ export default function CartDrawer({
                     )}
                   </div>
 
-                  {/* 2. Pickup / delivery date — hidden during Power Drop (auto-selected) */}
-                  {!powerDropActive && (
-                  <div ref={calendarRef}>
-                    <label className={labelBase}>Pick-up / Delivery Date *</label>
-                    <button
-                      type="button"
-                      onClick={() => setCalendarOpen((v) => !v)}
-                      className={`${inputBase} flex items-center justify-between text-left ${
-                        pickupDate ? "text-[#f5f2ec]" : "text-[#8a857c]"
-                      }`}
-                    >
-                      <span className="flex items-center gap-2">
-                        <CalendarIcon size={13} className="text-[#8a857c]" />
-                        {pickupDate
-                          ? format(pickupDate, "EEEE, d MMMM yyyy")
-                          : "Select a date"}
-                      </span>
-                      <ChevronDown
-                        size={13}
-                        className={`text-[#8a857c] transition-transform ${calendarOpen ? "rotate-180" : ""}`}
-                      />
-                    </button>
-                    {errors.date && <p className={errorBase}>{errors.date}</p>}
-                    {!errors.date && dateHint && (
-                      <p className="font-mono-brand text-[10px] text-[#8a857c] mt-1">{dateHint}</p>
-                    )}
-
-                    {/* Calendar popover */}
-                    <AnimatePresence>
-                      {calendarOpen && (
-                        <motion.div
-                          initial={{ opacity: 0, y: -4 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -4 }}
-                          transition={{ duration: 0.15 }}
-                          className="mt-1 border border-white/15 bg-[#1a1714] z-10 relative"
-                          style={{ colorScheme: "dark" }}
-                        >
-                          {/* Wrapper forces chevron SVG fill to inherit text colour */}
-                          <div className="[&_.rdp-chevron]:fill-[#f5f2ec] [&_button.rdp-button_previous_.rdp-chevron]:fill-[#f5f2ec] [&_button.rdp-button_next_.rdp-chevron]:fill-[#f5f2ec]">
-                          <DayPicker
-                            mode="single"
-                            selected={pickupDate}
-                            onSelect={(date) => {
-                              setPickupDate(date);
-                              setCalendarOpen(false);
-                              if (errors.date) setErrors((prev) => ({ ...prev, date: "" }));
-                            }}
-                            disabled={disabledDays}
-                            classNames={{
-                              root: "p-3 text-[#f5f2ec] font-mono-brand text-[12px]",
-                              month_caption:
-                                "font-display text-[11px] tracking-widest text-[#f5f2ec] mb-2",
-                              weekday: "text-[#8a857c] text-[10px]",
-                              day_button:
-                                "w-8 h-8 hover:bg-[#c73e3a]/20 rounded transition-colors",
-                              selected: "bg-[#c73e3a] text-[#f5f2ec] rounded",
-                              disabled: "opacity-25 cursor-not-allowed",
-                              today: "font-bold text-[#c73e3a]",
-                              nav: "flex items-center justify-between",
-                              button_previous:
-                                "text-[#f5f2ec] hover:text-[#c73e3a] hover:bg-white/10 p-1 rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed",
-                              button_next:
-                                "text-[#f5f2ec] hover:text-[#c73e3a] hover:bg-white/10 p-1 rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed",
-                              chevron: "fill-[#f5f2ec]",
-                            }}
-                          />
-                          </div>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </div>
-                  )}
-
-                  {/* 3. Pickup location */}
+                  {/* 2. Pickup location */}
                   <div>
                     <label className={labelBase}>Pick-up Location / Delivery *</label>
                     <div className="flex flex-col gap-1.5">
@@ -792,6 +750,82 @@ export default function CartDrawer({
                     </AnimatePresence>
                   </div>
 
+
+                  {/* 3. Pickup / delivery date — hidden during Power Drop (auto-selected) */}
+                  {!powerDropActive && (
+                  <div ref={calendarRef}>
+                    <label className={labelBase}>Pick-up / Delivery Date *</label>
+                    <button
+                      type="button"
+                      onClick={() => setCalendarOpen((v) => !v)}
+                      className={`${inputBase} flex items-center justify-between text-left ${
+                        pickupDate ? "text-[#f5f2ec]" : "text-[#8a857c]"
+                      }`}
+                    >
+                      <span className="flex items-center gap-2">
+                        <CalendarIcon size={13} className="text-[#8a857c]" />
+                        {pickupDate
+                          ? format(pickupDate, "EEEE, d MMMM yyyy")
+                          : "Select a date"}
+                      </span>
+                      <ChevronDown
+                        size={13}
+                        className={`text-[#8a857c] transition-transform ${calendarOpen ? "rotate-180" : ""}`}
+                      />
+                    </button>
+                    {errors.date && <p className={errorBase}>{errors.date}</p>}
+                    {!errors.date && dateHint && (
+                      <p className="font-mono-brand text-[10px] text-[#8a857c] mt-1">{dateHint}</p>
+                    )}
+
+                    {/* Calendar popover */}
+                    <AnimatePresence>
+                      {calendarOpen && (
+                        <motion.div
+                          initial={{ opacity: 0, y: -4 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -4 }}
+                          transition={{ duration: 0.15 }}
+                          className="mt-1 border border-white/15 bg-[#1a1714] z-10 relative"
+                          style={{ colorScheme: "dark" }}
+                        >
+                          {/* Wrapper forces chevron SVG fill to inherit text colour */}
+                          <div className="[&_.rdp-chevron]:fill-[#f5f2ec] [&_button.rdp-button_previous_.rdp-chevron]:fill-[#f5f2ec] [&_button.rdp-button_next_.rdp-chevron]:fill-[#f5f2ec]">
+                          <DayPicker
+                            mode="single"
+                            selected={pickupDate}
+                            defaultMonth={pickupDate ?? firstSelectable}
+                            onSelect={(date) => {
+                              setPickupDate(date);
+                              setCalendarOpen(false);
+                              if (errors.date) setErrors((prev) => ({ ...prev, date: "" }));
+                            }}
+                            disabled={disabledDays}
+                            classNames={{
+                              root: "p-3 text-[#f5f2ec] font-mono-brand text-[12px]",
+                              month_caption:
+                                "font-display text-[11px] tracking-widest text-[#f5f2ec] mb-2",
+                              weekday: "text-[#8a857c] text-[10px]",
+                              day_button:
+                                "w-8 h-8 hover:bg-[#c73e3a]/20 rounded transition-colors",
+                              selected: "bg-[#c73e3a] text-[#f5f2ec] rounded",
+                              disabled: "opacity-25 cursor-not-allowed",
+                              today: "font-bold text-[#c73e3a]",
+                              nav: "flex items-center justify-between",
+                              button_previous:
+                                "text-[#f5f2ec] hover:text-[#c73e3a] hover:bg-white/10 p-1 rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed",
+                              button_next:
+                                "text-[#f5f2ec] hover:text-[#c73e3a] hover:bg-white/10 p-1 rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed",
+                              chevron: "fill-[#f5f2ec]",
+                            }}
+                          />
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                  )}
+
                   {/* 4. Save / clear details */}
                   <div className="border border-white/10 px-3 py-3 space-y-2">
                     <label className="flex items-center gap-2.5 cursor-pointer select-none">
@@ -853,7 +887,7 @@ export default function CartDrawer({
                   Your order has been successfully saved
                 </p>
                 <p className="font-mono-brand text-[12px] text-[#8a857c] text-center max-w-xs mx-auto">
-                  An invoice will be sent to your WhatsApp shortly.
+                  Last step: tap the button below to send your order to us on WhatsApp.
                 </p>
                 {powerDropActive && (
                   <p className="font-mono-brand text-[11px] text-[#8a857c] text-center max-w-xs mx-auto">
@@ -862,6 +896,9 @@ export default function CartDrawer({
                 )}
                 {/* Scrollable order summary */}
                 <div className="border border-white/10 p-4 w-full max-h-[35dvh] overflow-y-auto">
+                  <p className="font-mono-brand text-[12px] text-[#f5f2ec] mb-1">
+                    Order {savedSummary.invoiceNumber}
+                  </p>
                   <p className="font-mono-brand text-[11px] text-[#8a857c] mb-3">
                     {savedSummary.locationLabel}
                   </p>
@@ -877,6 +914,15 @@ export default function CartDrawer({
             {/* Success screen footer buttons — fixed at bottom */}
             {orderSuccess && savedSummary && (
               <div className="shrink-0 border-t border-white/10 px-6 py-4 pb-[calc(1rem+env(safe-area-inset-bottom))] flex flex-col gap-2">
+                <a
+                  href={savedWaUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full flex items-center justify-center gap-2 font-display text-[11px] tracking-widest bg-[#c73e3a] text-[#f5f2ec] py-4 hover:bg-[#a83330] transition-colors"
+                >
+                  <MessageCircle size={14} strokeWidth={1.5} />
+                  Send Order on WhatsApp
+                </a>
                 <button
                   type="button"
                   onClick={() => {

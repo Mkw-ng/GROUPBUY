@@ -1,6 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { COOKIE_NAME } from "@shared/const";
+import { DELIVERY_DAYS_LABEL, isDeliveryDateLabel } from "@shared/deliveryDays";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
@@ -69,6 +70,8 @@ import {
 } from "./customerDb";
 import { ALL_BADGES, RARITY_ORDER } from "../shared/badges";
 import { calcOrderTotal as calcOrderTotalUtil, calcLineItemTotal } from "../shared/orderUtils";
+import { notifyOwner } from "./_core/notification";
+import { buildNewOrderNotification } from "./orderNotification";
 
 // ─── In-memory cache for Power Drop expiry check ────────────────────────────
 let lastExpireCheckAt = 0;
@@ -444,10 +447,21 @@ export const appRouter = router({
           }
         }
 
+        if (
+          !isPowerDropOrder &&
+          input.location === "delivery" &&
+          !isDeliveryDateLabel(input.pickupDate)
+        ) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: `Deliveries run on ${DELIVERY_DAYS_LABEL}. Please choose another delivery date.`,
+          });
+        }
+
         // ─── Persist order ─────────────────────────────────────────────────
         // Casual orders: powerDrop=false, dropId=NULL (never assigned to a drop).
         // Power Drop orders: powerDrop=true, dropId=active drop id.
-        const id = await createOrder({
+        const { id, invoiceNumber } = await createOrder({
           phone: input.phone,
           pickupDate: input.pickupDate,
           location: input.location,
@@ -459,7 +473,34 @@ export const appRouter = router({
           deliveryCharge: "0.00",
           dropId: isPowerDropOrder ? (activeDrop?.id ?? null) : null,
         });
-        return { id };
+
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        try {
+          const payload = buildNewOrderNotification({
+            invoiceNumber,
+            phone: input.phone,
+            pickupDate: input.pickupDate,
+            location: input.location,
+            deliveryAddress: input.deliveryAddress ?? null,
+            isPowerDrop: isPowerDropOrder,
+            items: parsedItems,
+          });
+          const delivered = await Promise.race([
+            notifyOwner(payload),
+            new Promise<boolean>((resolve) => {
+              timer = setTimeout(() => resolve(false), 4_000);
+            }),
+          ]);
+          if (!delivered) {
+            console.warn("[orders.create] owner notification not delivered", invoiceNumber);
+          }
+        } catch (err) {
+          console.warn("[orders.create] owner notification failed", invoiceNumber, err);
+        } finally {
+          if (timer) clearTimeout(timer);
+        }
+
+        return { id, invoiceNumber };
       }),
   }),
 

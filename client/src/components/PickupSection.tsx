@@ -161,7 +161,7 @@ export default function PickupSection() {
                   Delivery
                 </p>
                 <p className="font-body text-[13px] text-[#8a857c] leading-relaxed">
-                  We deliver within a 5 km radius of each zone listed. Not sure if we cover your area? Message us on WhatsApp.
+                  Deliveries run Wednesdays &amp; Saturdays, within a 5 km radius of each zone listed. Not sure if we cover your area? Message us on WhatsApp.
                 </p>
               </div>
             </motion.div>
