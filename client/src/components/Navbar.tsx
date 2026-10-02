@@ -7,13 +7,14 @@
 import { useState, useEffect, useCallback } from "react";
 import { ShoppingCart, Menu, X, Zap } from "lucide-react";
 import { useFlyToCart } from "@/contexts/FlyToCartContext";
+import { SHOW_MY_STATS } from "@/const";
 
 const NAV_LINKS = [
   { label: "How It Works", href: "#how-it-works" },
   { label: "Current Deals", href: "#deals" },
   { label: "Pickup Info", href: "#pickup" },
   { label: "Join Group", href: "#join" },
-  { label: "My Stats", href: "/my-stats" },
+  ...(SHOW_MY_STATS ? [{ label: "My Stats", href: "/my-stats" }] : []),
 ];
 
 interface NavbarProps {

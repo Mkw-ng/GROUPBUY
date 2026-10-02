@@ -8,6 +8,7 @@
 import { motion } from "framer-motion";
 import { ArrowRight, MessageCircle, Zap, Dices, BarChart2 } from "lucide-react";
 import PowerDropCountdown from "@/components/PowerDropCountdown";
+import { SHOW_MY_STATS, SHOW_STAKEHOUSE } from "@/const";
 
 const STATS = [
   { value: "12,600+", label: "Members" },
@@ -171,22 +172,26 @@ export default function HeroSection({ powerDropActive = false, powerDropActivate
             Join WhatsApp
           </a>
 
-          <a
-            href="https://groupbuy-deal-of-fortune-432233841783.us-west1.run.app"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="stakehouse-btn inline-flex items-center gap-2 font-display text-[11px] tracking-widest px-6 py-3.5 transition-all"
-          >
-            <Dices size={14} strokeWidth={1.5} />
-            The Stakehouse
-          </a>
-          <a
-            href="/my-stats"
-            className="inline-flex items-center gap-2 font-display text-[11px] tracking-widest border border-[#f5f2ec]/20 text-[#f5f2ec]/80 px-6 py-3.5 hover:border-[#c73e3a]/60 hover:text-[#c73e3a] transition-colors"
-          >
-            <BarChart2 size={14} strokeWidth={1.5} />
-            Check My Stats
-          </a>
+          {SHOW_STAKEHOUSE && (
+            <a
+              href="https://groupbuy-deal-of-fortune-432233841783.us-west1.run.app"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="stakehouse-btn inline-flex items-center gap-2 font-display text-[11px] tracking-widest px-6 py-3.5 transition-all"
+            >
+              <Dices size={14} strokeWidth={1.5} />
+              The Stakehouse
+            </a>
+          )}
+          {SHOW_MY_STATS && (
+            <a
+              href="/my-stats"
+              className="inline-flex items-center gap-2 font-display text-[11px] tracking-widest border border-[#f5f2ec]/20 text-[#f5f2ec]/80 px-6 py-3.5 hover:border-[#c73e3a]/60 hover:text-[#c73e3a] transition-colors"
+            >
+              <BarChart2 size={14} strokeWidth={1.5} />
+              Check My Stats
+            </a>
+          )}
         </motion.div>
 
         {/* Stats row */}

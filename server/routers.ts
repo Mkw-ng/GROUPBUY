@@ -196,7 +196,8 @@ const customersRouter = router({
       await db.update(customersTable).set({ adminNotes: input.notes }).where(eq(customersTable.phone, input.phone));
       return { success: true };
     }),
-  lookup: publicProcedure
+  // Admin-only while My Stats is hidden; see SHOW_MY_STATS in client/src/const.ts.
+  lookup: adminProcedure
     .input(z.object({ phone: z.string().min(8) }))
     .query(async ({ input }) => {
       const c = await getCustomerByPhone(input.phone);

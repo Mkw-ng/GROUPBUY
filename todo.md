@@ -609,3 +609,9 @@
 - [x] Category row grid: drag handle | emoji+name (truncate+tooltip) | visibility dropdown | section dropdown | product count (right-aligned) | actions; reduced row padding
 - [x] Search input above category list (client-side filter by name, preserves grouped-by-section display)
 - [x] No horizontal overflow at 1280px / 768px / 375px; pnpm check + tests pass
+
+## Hide My Stats + Stakehouse Buttons
+- [x] `client/src/const.ts`: add `SHOW_MY_STATS` and `SHOW_STAKEHOUSE` flags, both defaulting to `false`.
+- [x] `Navbar`, `Footer`, `HeroSection`, and `JoinSection`: show My Stats and Stakehouse controls only when their corresponding flag is enabled.
+- [x] `server/routers.ts`: make `customers.lookup` admin-only while My Stats is hidden.
+- [x] Tests: verify `customers.lookup` rejects unauthenticated and non-admin callers.

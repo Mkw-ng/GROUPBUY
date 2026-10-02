@@ -4,13 +4,14 @@
  * Three columns: brand + tagline, quick links, contact
  * Bottom bar: mono copyright + disclaimer
  */
+import { SHOW_MY_STATS } from "@/const";
 
 const QUICK_LINKS = [
   { label: "How It Works", href: "#how-it-works" },
   { label: "Current Deals", href: "#deals" },
   { label: "Pickup Info", href: "#pickup" },
   { label: "Join Group", href: "#join" },
-  { label: "My Stats", href: "/my-stats" },
+  ...(SHOW_MY_STATS ? [{ label: "My Stats", href: "/my-stats" }] : []),
 ];
 
 const CONTACT = [
