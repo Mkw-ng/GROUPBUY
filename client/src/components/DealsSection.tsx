@@ -15,7 +15,7 @@ import { useFlyToCart } from "@/contexts/FlyToCartContext";
 import ShareDealButton from "@/components/ShareDealButton";
 
 const CATEGORIES = [
-  { id: "all",               label: "All Drops" },
+  { id: "all",               label: "Shop All" },
   { id: "limited-offer",     label: "Limited Offer" },
   { id: "featured-deals",    label: "Featured Deals" },
   { id: "m3atfr3ak",         label: "M3ATFR3AK" },
@@ -365,7 +365,7 @@ export default function DealsSection({ onAddToCart, powerDropActive = false }: D
                       : "text-[#8a857c] hover:text-[#0a0a0a]"
                   }`}
                 >
-                  All Drops
+                  Shop All
                 </button>
 
                 {/* Grouped sections */}
