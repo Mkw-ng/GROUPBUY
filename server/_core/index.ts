@@ -8,6 +8,7 @@ import { registerStorageProxy } from "./storageProxy";
 import { registerUploadRoutes } from "../uploadRoutes";
 import { registerInvoiceRoutes } from "../invoiceRoutes";
 import { registerAdminProductRoutes } from "../adminProductRoutes";
+import registerOrderFeedRoutes from "../orderFeedRoutes";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
@@ -42,6 +43,7 @@ async function startServer() {
   registerUploadRoutes(app);
   registerInvoiceRoutes(app);
   registerAdminProductRoutes(app);
+  registerOrderFeedRoutes(app);
   // tRPC API
   app.use(
     "/api/trpc",

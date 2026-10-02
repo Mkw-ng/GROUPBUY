@@ -615,3 +615,8 @@
 - [x] `Navbar`, `Footer`, `HeroSection`, and `JoinSection`: show My Stats and Stakehouse controls only when their corresponding flag is enabled.
 - [x] `server/routers.ts`: make `customers.lookup` admin-only while My Stats is hidden.
 - [x] Tests: verify `customers.lookup` rejects unauthenticated and non-admin callers.
+
+## Casual order feed for Claude task
+- [x] `GET /api/orders/feed?key=<ORDER_FEED_KEY>&days=<1-60>` is a private, read-only feed for recent casual orders. It requires the `ORDER_FEED_KEY` project secret and sends `Cache-Control: no-store` on every response.
+- [x] The feed includes generated time, effective day window, count, truncation status, and each order's id, display invoice number, timestamps, status/archive state, scheduling and location details, delivery data, item details, and approximate pre-delivery total. Malformed item data is contained to the affected order.
+- [x] `id` is the unique, never-reused deduplication key for the Claude task. `invoiceNumber` is display-only and can repeat after an order has been deleted.

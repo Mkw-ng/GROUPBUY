@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, isNull, like, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, isNull, like, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { InsertUser, InsertProduct, InsertOrder, orders, products, settings, users, OrderItem, drops, Drop, categories, Category, InsertCategory, categorySections, CategorySection } from "../drizzle/schema";
 import { ENV } from './_core/env';
@@ -457,6 +457,21 @@ export async function getCasualOrders(): Promise<(typeof orders.$inferSelect)[]>
     .from(orders)
     .where(and(eq(orders.archived, false), eq(orders.isPowerDrop, false)))
     .orderBy(desc(orders.createdAt));
+}
+
+/**
+ * Returns recent casual orders, including archived rows, newest first.
+ * Used only by the private order-feed route for the external order organiser.
+ */
+export async function getCasualOrdersSince(since: Date): Promise<(typeof orders.$inferSelect)[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(orders)
+    .where(and(eq(orders.isPowerDrop, false), gte(orders.createdAt, since)))
+    .orderBy(desc(orders.createdAt), desc(orders.id))
+    .limit(500);
 }
 
 /**
