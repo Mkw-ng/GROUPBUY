@@ -11,6 +11,7 @@ import type { Application } from "express";
 import PDFDocument from "pdfkit";
 import { sdk } from "./_core/sdk";
 import { getAllPaidActiveOrders, getAllPickupAvailableActiveOrders, getAllNonArchivedOrders, getAllProducts } from "./db";
+import { DELIVERY_ZONE_FEE_LABEL } from "../shared/deliveryPricing";
 
 interface OrderItem {
   id: number;
@@ -36,16 +37,16 @@ function locationLabel(location: string, address: string | null): string {
   if (location === "delivery") return `Delivery${address ? ` — ${address}` : ""}`;
   if (location === "cranbourne") return "Cranbourne Park (Mitchells Quality Meat)";
   if (location === "clayton") return "Clayton South (BQ Direct)";
-  if (location === "williamstown") return "Williamstown — $20 Delivery";
-  if (location === "footscray") return "Footscray — $20 Delivery";
-  if (location === "sunshine") return "Sunshine — $20 Delivery";
-  if (location === "essendon") return "Essendon — $20 Delivery";
-  if (location === "preston") return "Preston — $20 Delivery";
-  if (location === "point-cook") return "Point Cook — $20 Delivery";
+  if (location === "williamstown") return `Williamstown — ${DELIVERY_ZONE_FEE_LABEL} Delivery`;
+  if (location === "footscray") return `Footscray — ${DELIVERY_ZONE_FEE_LABEL} Delivery`;
+  if (location === "sunshine") return `Sunshine — ${DELIVERY_ZONE_FEE_LABEL} Delivery`;
+  if (location === "essendon") return `Essendon — ${DELIVERY_ZONE_FEE_LABEL} Delivery`;
+  if (location === "preston") return `Preston — ${DELIVERY_ZONE_FEE_LABEL} Delivery`;
+  if (location === "point-cook") return `Point Cook — ${DELIVERY_ZONE_FEE_LABEL} Delivery`;
   return location;
 }
 
-// Location group order: Cranbourne first, then Clayton, then Delivery, then $20 suburbs, then others
+// Location group order: Cranbourne first, then Clayton, then Delivery, then delivery zones, then others
 const LOCATION_ORDER: Record<string, number> = {
   cranbourne: 0,
   clayton: 1,

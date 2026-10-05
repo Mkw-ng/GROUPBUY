@@ -6,6 +6,7 @@
 import { motion } from "framer-motion";
 import { MapPin, Clock, Calendar, Truck } from "lucide-react";
 import PickupMap from "@/components/PickupMap";
+import { DELIVERY_ZONE_FEE } from "@shared/deliveryPricing";
 
 const PICKUP_LOCATIONS = [
   {
@@ -19,30 +20,10 @@ const PICKUP_LOCATIONS = [
 ];
 
 const DELIVERY_ZONES = [
-  { suburb: "Clayton",       price: 5  },
-  { suburb: "Cranbourne",    price: 5  },
-  { suburb: "Berwick",       price: 10 },
-  { suburb: "Frankstone",    price: 10 },
-  { suburb: "Dandenong",     price: 10 },
-  { suburb: "Glen Waverley", price: 10 },
-  { suburb: "Cheltenham",    price: 10 },
-  { suburb: "Brighton",      price: 10 },
-  { suburb: "Pakenham",      price: 15 },
-  { suburb: "Tooradin",      price: 15 },
-  { suburb: "Mornington",    price: 15 },
-  { suburb: "Ringwood",      price: 15 },
-  { suburb: "Mooroolbark",   price: 15 },
-  { suburb: "Doncaster",     price: 15 },
-  { suburb: "Melbourne CBD", price: 15 },
-  { suburb: "Upwey",         price: 15 },
-  { suburb: "Dromana",       price: 20 },
-  { suburb: "Williamstown",  price: 20 },
-  { suburb: "Footscray",     price: 20 },
-  { suburb: "Sunshine",      price: 20 },
-  { suburb: "Essendon",      price: 20 },
-  { suburb: "Preston",       price: 20 },
-  { suburb: "Point Cook",    price: 20 },
-];
+  "Clayton", "Cranbourne", "Berwick", "Frankstone", "Dandenong", "Glen Waverley", "Cheltenham", "Brighton",
+  "Pakenham", "Tooradin", "Mornington", "Ringwood", "Mooroolbark", "Doncaster", "Melbourne CBD", "Upwey",
+  "Dromana", "Williamstown", "Footscray", "Sunshine", "Essendon", "Preston", "Point Cook",
+].map((suburb) => ({ suburb, price: DELIVERY_ZONE_FEE }));
 
 export default function PickupSection() {
   return (

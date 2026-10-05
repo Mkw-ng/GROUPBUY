@@ -8,6 +8,7 @@
  */
 import { useRef, useCallback } from "react";
 import { MapView } from "@/components/Map";
+import { DELIVERY_ZONE_FEE, DELIVERY_ZONE_FEE_LABEL } from "@shared/deliveryPricing";
 
 // ── Data ─────────────────────────────────────────────────────────────────────
 
@@ -28,38 +29,32 @@ const PICKUP_LOCATIONS = [
 ];
 
 const DELIVERY_ZONES: { suburb: string; price: number; lat: number; lng: number }[] = [
-  { suburb: "Clayton",       price: 5,  lat: -37.9200, lng: 145.1200 },
-  { suburb: "Cranbourne",    price: 5,  lat: -38.1027, lng: 145.2833 },
-  { suburb: "Berwick",       price: 10, lat: -38.0333, lng: 145.3500 },
-  { suburb: "Frankston",     price: 10, lat: -38.1455, lng: 145.1262 },
-  { suburb: "Dandenong",     price: 10, lat: -37.9870, lng: 145.2150 },
-  { suburb: "Glen Waverley", price: 10, lat: -37.8800, lng: 145.1630 },
-  { suburb: "Cheltenham",    price: 10, lat: -37.9530, lng: 145.0530 },
-  { suburb: "Brighton",      price: 10, lat: -37.9050, lng: 144.9940 },
-  { suburb: "Pakenham",      price: 15, lat: -38.0710, lng: 145.4870 },
-  { suburb: "Tooradin",      price: 15, lat: -38.2220, lng: 145.3820 },
-  { suburb: "Mornington",    price: 15, lat: -38.2180, lng: 145.0370 },
-  { suburb: "Ringwood",      price: 15, lat: -37.8160, lng: 145.2290 },
-  { suburb: "Mooroolbark",   price: 15, lat: -37.7820, lng: 145.3040 },
-  { suburb: "Doncaster",     price: 15, lat: -37.7880, lng: 145.1260 },
-  { suburb: "Melbourne CBD", price: 15, lat: -37.8136, lng: 144.9631 },
-  { suburb: "Upwey",         price: 15, lat: -37.9000, lng: 145.3190 },
-  { suburb: "Dromana",       price: 20, lat: -38.3370, lng: 145.1380 },
-  { suburb: "Williamstown",  price: 20, lat: -37.8607, lng: 144.8997 },
-  { suburb: "Footscray",     price: 20, lat: -37.8001, lng: 144.8997 },
-  { suburb: "Sunshine",      price: 20, lat: -37.7888, lng: 144.8310 },
-  { suburb: "Essendon",      price: 20, lat: -37.7490, lng: 144.9170 },
-  { suburb: "Preston",       price: 20, lat: -37.7440, lng: 145.0710 },
-  { suburb: "Point Cook",    price: 20, lat: -37.9000, lng: 144.7540 },
+  { suburb: "Clayton",       price: DELIVERY_ZONE_FEE, lat: -37.9200, lng: 145.1200 },
+  { suburb: "Cranbourne",    price: DELIVERY_ZONE_FEE, lat: -38.1027, lng: 145.2833 },
+  { suburb: "Berwick",       price: DELIVERY_ZONE_FEE, lat: -38.0333, lng: 145.3500 },
+  { suburb: "Frankston",     price: DELIVERY_ZONE_FEE, lat: -38.1455, lng: 145.1262 },
+  { suburb: "Dandenong",     price: DELIVERY_ZONE_FEE, lat: -37.9870, lng: 145.2150 },
+  { suburb: "Glen Waverley", price: DELIVERY_ZONE_FEE, lat: -37.8800, lng: 145.1630 },
+  { suburb: "Cheltenham",    price: DELIVERY_ZONE_FEE, lat: -37.9530, lng: 145.0530 },
+  { suburb: "Brighton",      price: DELIVERY_ZONE_FEE, lat: -37.9050, lng: 144.9940 },
+  { suburb: "Pakenham",      price: DELIVERY_ZONE_FEE, lat: -38.0710, lng: 145.4870 },
+  { suburb: "Tooradin",      price: DELIVERY_ZONE_FEE, lat: -38.2220, lng: 145.3820 },
+  { suburb: "Mornington",    price: DELIVERY_ZONE_FEE, lat: -38.2180, lng: 145.0370 },
+  { suburb: "Ringwood",      price: DELIVERY_ZONE_FEE, lat: -37.8160, lng: 145.2290 },
+  { suburb: "Mooroolbark",   price: DELIVERY_ZONE_FEE, lat: -37.7820, lng: 145.3040 },
+  { suburb: "Doncaster",     price: DELIVERY_ZONE_FEE, lat: -37.7880, lng: 145.1260 },
+  { suburb: "Melbourne CBD", price: DELIVERY_ZONE_FEE, lat: -37.8136, lng: 144.9631 },
+  { suburb: "Upwey",         price: DELIVERY_ZONE_FEE, lat: -37.9000, lng: 145.3190 },
+  { suburb: "Dromana",       price: DELIVERY_ZONE_FEE, lat: -38.3370, lng: 145.1380 },
+  { suburb: "Williamstown",  price: DELIVERY_ZONE_FEE, lat: -37.8607, lng: 144.8997 },
+  { suburb: "Footscray",     price: DELIVERY_ZONE_FEE, lat: -37.8001, lng: 144.8997 },
+  { suburb: "Sunshine",      price: DELIVERY_ZONE_FEE, lat: -37.7888, lng: 144.8310 },
+  { suburb: "Essendon",      price: DELIVERY_ZONE_FEE, lat: -37.7490, lng: 144.9170 },
+  { suburb: "Preston",       price: DELIVERY_ZONE_FEE, lat: -37.7440, lng: 145.0710 },
+  { suburb: "Point Cook",    price: DELIVERY_ZONE_FEE, lat: -37.9000, lng: 144.7540 },
 ];
 
-// Colour per price tier
-const ZONE_COLOURS: Record<number, string> = {
-  5:  "#c73e3a",
-  10: "#e07b39",
-  15: "#d4a017",
-  20: "#7b5ea7",
-};
+const ZONE_COLOUR = "#c73e3a";
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
@@ -72,7 +67,7 @@ export default function PickupMap() {
 
     // ── Delivery zone circles ────────────────────────────────────────────────
     DELIVERY_ZONES.forEach((zone) => {
-      const colour = ZONE_COLOURS[zone.price] ?? "#c73e3a";
+      const colour = ZONE_COLOUR;
       new google.maps.Circle({
         map,
         center: { lat: zone.lat, lng: zone.lng },
@@ -98,13 +93,13 @@ export default function PickupMap() {
         white-space: nowrap;
         pointer-events: none;
       `;
-      labelEl.textContent = `${zone.suburb} $${zone.price}`;
+      labelEl.textContent = `${zone.suburb} ${DELIVERY_ZONE_FEE_LABEL}`;
 
       new google.maps.marker.AdvancedMarkerElement({
         map,
         position: { lat: zone.lat, lng: zone.lng },
         content: labelEl,
-        title: `${zone.suburb} — $${zone.price} delivery`,
+        title: `${zone.suburb} — ${DELIVERY_ZONE_FEE_LABEL} delivery`,
       });
     });
 
@@ -171,17 +166,10 @@ export default function PickupMap() {
       />
       {/* Legend */}
       <div className="flex flex-wrap gap-x-5 gap-y-2 px-1">
-        {Object.entries(ZONE_COLOURS).map(([price, colour]) => (
-          <div key={price} className="flex items-center gap-1.5">
-            <span
-              className="inline-block w-3 h-3 rounded-full border border-white/20"
-              style={{ background: colour }}
-            />
-            <span className="font-mono-brand text-[11px] text-[#8a857c]">
-              ${price} delivery
-            </span>
-          </div>
-        ))}
+        <div className="flex items-center gap-1.5">
+          <span className="inline-block w-3 h-3 rounded-full border border-white/20" style={{ background: ZONE_COLOUR }} />
+          <span className="font-mono-brand text-[11px] text-[#8a857c]">{DELIVERY_ZONE_FEE_LABEL} delivery zone</span>
+        </div>
         <div className="flex items-center gap-1.5">
           <span className="inline-block w-3 h-3 rounded-full bg-[#c73e3a] border border-[#f5f2ec]/60" />
           <span className="font-mono-brand text-[11px] text-[#8a857c]">Pickup store</span>

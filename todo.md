@@ -640,3 +640,8 @@
 - [x] Planner safeguards reject INT-overflow sort orders, oversized UTF-8 product text/image content, and deletion of a product that is still available or appears in orders.
 - [x] Catalog CSV now requires downloading a ZIP backup for the current plan before Apply is enabled, provides delete/restore-aware confirmation, locks controls during requests, handles all documented server outcomes cautiously, and refreshes catalog queries after every apply attempt reaching the network.
 - [x] Run 3 unit and route tests use only fakes/mocks; live verification stopped at the unavailable admin login and never applied, previewed edited data, or changed catalog records.
+
+## Flat delivery zone fee
+- [x] Every listed delivery zone now uses the shared flat fee of $12.50 in pickup information and map labels.
+- [x] Delivery-zone labels in packing documents no longer show the legacy $20 rate.
+- [x] Shared delivery pricing test and the complete type/test suite pass.
