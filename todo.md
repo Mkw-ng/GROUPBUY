@@ -620,3 +620,9 @@
 - [x] `GET /api/orders/feed?key=<ORDER_FEED_KEY>&days=<1-60>` is a private, read-only feed for recent casual orders. It requires the `ORDER_FEED_KEY` project secret and sends `Cache-Control: no-store` on every response.
 - [x] The feed includes generated time, effective day window, count, truncation status, and each order's id, display invoice number, timestamps, status/archive state, scheduling and location details, delivery data, item details, and approximate pre-delivery total. Malformed item data is contained to the affected order.
 - [x] `id` is the unique, never-reused deduplication key for the Claude task. `invoiceNumber` is display-only and can repeat after an order has been deleted.
+
+## Catalog CSV (run 1: export + preview)
+- [x] New protected, read-only catalog export routes provide a BOM/CRLF ZIP (`sections.csv`, `categories.csv`, `products.csv`) and individual CSV downloads. Every file includes `updatedAt` and `action` columns.
+- [x] New protected multipart preview route accepts one to three CSV files, reads a snapshot only, validates all cross-file dependencies/conflicts/safety rules, and returns a deterministic change plan with SHA-256 plan hash. There is deliberately no apply route or catalog database write path in Run 1.
+- [x] `Catalog CSV` button in the `/admin` Products toolbar opens a dialog for ZIP/individual downloads and a no-write preview of counts, safety figures, blockers, warnings, row-level changes, errors, and conflicts. It explicitly states that applying arrives in the next update.
+- [x] Pure in-memory `catalogCsv` tests cover parsing, round trips, partial updates, dependency/deletion/duplicate guards, legacy-data tolerance, conflicts, safety blockers, lone CR handling, and stable plan hashing.

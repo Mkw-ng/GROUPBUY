@@ -73,6 +73,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useLocation, Link } from "wouter";
 import { getLoginUrl } from "@/const";
+import CatalogCsvDialog from "@/components/admin/CatalogCsvDialog";
 
 // dnd-kit
 import {
@@ -1119,6 +1120,7 @@ function AdminContent() {
   const [importLoading, setImportLoading] = useState(false);
   const [importApplying, setImportApplying] = useState(false);
   const csvImportInputRef = useRef<HTMLInputElement>(null);
+  const [catalogCsvOpen, setCatalogCsvOpen] = useState(false);
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -1531,6 +1533,10 @@ function AdminContent() {
             >
               <Upload className="h-4 w-4 mr-1.5" />
               Import CSV
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => setCatalogCsvOpen(true)}>
+              <FileText className="h-4 w-4 mr-1.5" />
+              Catalog CSV
             </Button>
             <Button size="sm" variant="outline" onClick={() => setManageCatsOpen(true)}>
               <Tag className="h-4 w-4 mr-1.5" />
@@ -2804,6 +2810,7 @@ function AdminContent() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <CatalogCsvDialog open={catalogCsvOpen} onOpenChange={setCatalogCsvOpen} />
     </div>
   );
 }
