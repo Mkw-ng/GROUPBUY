@@ -648,3 +648,7 @@
 
 ## How It Works delivery schedule
 - [x] Step 02 now says `Delivery Wednesday and Saturday` and explains that customers can schedule delivery for either day.
+
+## Storefront opening category fallback
+- [x] Limited Offer remains the opening category when it has a sellable item; otherwise the initial storefront selection falls back to Featured Deals when it has one.
+- [x] The decision accounts for products marked unavailable and stock-sold-out products, is made only after the first catalog load, and does not override a shopper's subsequent category choice.

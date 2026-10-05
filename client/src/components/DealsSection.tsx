@@ -7,6 +7,7 @@
  */
 import { useState, useRef, useCallback, useEffect } from "react";
 import { effectiveVisibility, isVisibleInMode } from "@shared/visibility";
+import { getStorefrontDefaultCategory } from "@shared/storefrontCategory";
 import { motion, AnimatePresence } from "framer-motion";
 import { ShoppingCart, Zap } from "lucide-react";
 import { toast } from "sonner";
@@ -220,6 +221,7 @@ function PowerDropButton({ showPowerDrop, available, soldOut, onAdd, onFlyTrigge
 
 export default function DealsSection({ onAddToCart, powerDropActive = false }: DealsProps) {
   const [activeCategory, setActiveCategory] = useState("limited-offer");
+  const initialCategoryResolved = useRef(false);
   const [search, setSearch] = useState("");
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -273,6 +275,19 @@ export default function DealsSection({ onAddToCart, powerDropActive = false }: D
 
   // Derive which categories have at least one visible product
   const categoriesWithProducts = new Set<string>(visibleProducts.map((p) => p.category));
+  const categoriesWithAvailableProducts = new Set<string>(
+    visibleProducts
+      .filter((product) => product.available && !product.isSoldOutByStock)
+      .map((product) => product.category)
+  );
+
+  // Keep Limited Offer as the normal opening category. If it has no sellable
+  // items once the initial catalog load is complete, lead with Featured Deals.
+  useEffect(() => {
+    if (isLoading || initialCategoryResolved.current) return;
+    setActiveCategory(getStorefrontDefaultCategory(categoriesWithAvailableProducts));
+    initialCategoryResolved.current = true;
+  }, [isLoading, categoriesWithAvailableProducts]);
 
   const filtered = visibleProducts.filter((p) => {
     const matchCat = activeCategory === "all" || p.category === activeCategory;
