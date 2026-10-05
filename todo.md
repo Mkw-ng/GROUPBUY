@@ -645,3 +645,6 @@
 - [x] Every listed delivery zone now uses the shared flat fee of $12.50 in pickup information and map labels.
 - [x] Delivery-zone labels in packing documents no longer show the legacy $20 rate.
 - [x] Shared delivery pricing test and the complete type/test suite pass.
+
+## How It Works delivery schedule
+- [x] Step 02 now says `Delivery Wednesday and Saturday` and explains that customers can schedule delivery for either day.

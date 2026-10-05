@@ -14,8 +14,8 @@ const STEPS = [
   },
   {
     num: "02",
-    title: "Power-Drop",
-    desc: "Goes live once a month. Unreal deals. 3 days to order. Sort payment and enjoy it next week.",
+    title: "Delivery Wednesday and Saturday",
+    desc: "Schedule an order for delivery on either Wednesday or Saturday.",
   },
   {
     num: "03",
