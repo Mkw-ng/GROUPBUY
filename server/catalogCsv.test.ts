@@ -5,7 +5,9 @@ import {
   SECTION_HEADERS,
   exportCatalogCsv,
   exportCatalogRows,
+  parseCatalogCsv,
   parseCatalogFiles,
+  parseOrderedProductIds,
   validateAndPlan,
   type CatalogSnapshot,
 } from "./catalogCsv";
@@ -130,13 +132,13 @@ describe("catalog CSV parser and planner", () => {
     expect(deletedCategory.errors.some((error) => /non-deleted category/.test(error.message))).toBe(true);
   });
 
-  it("rejects a section name that is both deleted and created", () => {
+  it("allows a section name that is both deleted and created", () => {
     const data = snapshot();
     const result = plan([{ filename: "sections.csv", text: csv(SECTION_HEADERS, [
       ["", "Protein", "3", "", ""],
       ["1", "", "", "", "delete"],
     ]) }], data);
-    expect(result.errors.some((error) => /deleted.*created|created.*deleted/i.test(error.message))).toBe(true);
+    expect(result).toMatchObject({ creates: 1, deletes: 1, updates: 1, errors: [] });
   });
 
   it("detects ambiguous section names but accepts an unchanged current-section cell", () => {
@@ -255,5 +257,218 @@ describe("catalog CSV parser and planner", () => {
     const c = plan([{ filename: "products.csv", text: csv(["id", "price", "updatedAt"], [["1", "14.00", UPDATED_AT.toISOString()]]) }], data);
     expect(a.planHash).toBe(b.planHash);
     expect(a.planHash).not.toBe(c.planHash);
+  });
+});
+
+
+describe("catalog CSV run 2 operations and preview fixes", () => {
+  function planWithOptions(files: Array<{ filename: string; text: string }>, data = snapshot(), options?: { restoreMode?: boolean }) {
+    return validateAndPlan(parseCatalogFiles(files), data, options);
+  }
+
+  function productCreateRow(patch: Record<string, unknown> = {}): unknown[] {
+    const values: Record<string, unknown> = {
+      id: "", name: "New Cut", cut: "", category: "beef", description: "", price: "9.00", powerDropPrice: "",
+      retailPrice: "", unit: "/ kg", badge: "", available: "FALSE", visibility: "regular_only", stockLimit: "", sortOrder: "0", img: "", updatedAt: "", action: "",
+      ...patch,
+    };
+    return PRODUCT_HEADERS.map((header) => values[header] ?? "");
+  }
+
+  it("round-trips an unedited export with no operations, changes, warnings, or errors", () => {
+    const data = snapshot({ products: [snapshot().products[0], snapshot().products[1]] });
+    const exported = exportCatalogCsv(data);
+    const result = planWithOptions([
+      { filename: "sections.csv", text: exported["sections.csv"] },
+      { filename: "categories.csv", text: exported["categories.csv"] },
+      { filename: "products.csv", text: exported["products.csv"] },
+    ], data);
+    expect(result.operations).toEqual([]);
+    expect(result.changes).toEqual([]);
+    expect(result.warnings).toEqual([]);
+    expect(result.errors).toEqual([]);
+  });
+
+  it("shows accepted deletes as red-display-ready change rows with matching operations", () => {
+    const result = planWithOptions([{ filename: "products.csv", text: csv(["id", "action"], [["1", "delete"]]) }]);
+    expect(result.operations).toContainEqual({ kind: "deleteProduct", target: "product:1", id: 1 });
+    expect(result.changes).toContainEqual(expect.objectContaining({ action: "delete", item: "product:1", field: "name", oldValue: "Ribeye", newValue: "DELETE" }));
+  });
+
+  it("maps every operation and change row in both directions by target and action", () => {
+    const result = planWithOptions([
+      { filename: "sections.csv", text: csv(SECTION_HEADERS, [["1", "", "", "", "delete"]]) },
+      { filename: "products.csv", text: csv(["id", "price", "updatedAt"], [["1", "13.00", UPDATED_AT.toISOString()]]) },
+    ]);
+    result.operations.forEach((operation) => {
+      const action = operation.kind.startsWith("create") ? "create" : operation.kind.startsWith("update") ? "update" : "delete";
+      expect(result.changes.some((change) => change.item === operation.target && change.action === action)).toBe(true);
+    });
+    result.changes.forEach((change) => {
+      expect(result.operations.some((operation) => operation.target === change.item && operation.kind.startsWith(change.action))).toBe(true);
+    });
+  });
+
+  it("merges a category edit and section-delete unassignment into one update operation", () => {
+    const result = planWithOptions([
+      { filename: "sections.csv", text: csv(SECTION_HEADERS, [["1", "", "", "", "delete"]]) },
+      { filename: "categories.csv", text: csv(["slug", "name", "updatedAt"], [["beef", "Beef Prime", UPDATED_AT.toISOString()]]) },
+    ]);
+    const updates = result.operations.filter((operation) => operation.target === "category:beef");
+    expect(updates).toHaveLength(1);
+    expect(updates[0]).toMatchObject({ kind: "updateCategory", set: { name: "Beef Prime" }, section: null });
+  });
+
+  it("creates a category with no section column as No section", () => {
+    const result = planWithOptions([{ filename: "categories.csv", text: csv(["slug", "name", "visibility"], [["fresh", "Fresh", "always"]]) }]);
+    expect(result.errors).toEqual([]);
+    expect(result.operations).toContainEqual(expect.objectContaining({ kind: "createCategory", slug: "fresh", section: null }));
+  });
+
+  it("keeps false, blank cut, and other explicit create values in operation and changes", () => {
+    const result = planWithOptions([{ filename: "products.csv", text: csv(PRODUCT_HEADERS, [productCreateRow()]) }]);
+    const operation = result.operations.find((candidate) => candidate.kind === "createProduct");
+    expect(operation).toMatchObject({ kind: "createProduct", available: false, cut: "" });
+    expect(result.changes).toContainEqual(expect.objectContaining({ action: "create", field: "available", newValue: false }));
+    expect(result.changes).toContainEqual(expect.objectContaining({ action: "create", field: "cut", newValue: "" }));
+    const serialised = JSON.stringify(operation);
+    expect(serialised).not.toContain("createdAt");
+    expect(serialised).not.toContain("updatedAt");
+    expect(serialised).not.toContain("undefined");
+  });
+
+  it("allows section swaps, reusing deleted names, and untouched legacy duplicates", () => {
+    const swapped = planWithOptions([{ filename: "sections.csv", text: csv(SECTION_HEADERS, [
+      ["1", "Specials", "0", UPDATED_AT.toISOString(), ""],
+      ["2", "Protein", "1", UPDATED_AT.toISOString(), ""],
+    ]) }]);
+    expect(swapped.errors).toEqual([]);
+
+    const reused = planWithOptions([{ filename: "sections.csv", text: csv(SECTION_HEADERS, [
+      ["1", "", "", "", "delete"],
+      ["", "Protein", "4", "", ""],
+    ]) }]);
+    expect(reused.errors).toEqual([]);
+
+    const legacy = planWithOptions([{ filename: "products.csv", text: csv(["id"], [["1"]]) }], snapshot({
+      sections: [{ id: 1, name: "Same", sortOrder: 0, updatedAt: UPDATED_AT }, { id: 2, name: " same ", sortOrder: 1, updatedAt: UPDATED_AT }],
+    }));
+    expect(legacy.errors).toEqual([]);
+  });
+
+  it("keeps categories in renamed and swapped section ids", () => {
+    const renamed = planWithOptions([
+      { filename: "sections.csv", text: csv(SECTION_HEADERS, [["1", "Protein Prime", "0", UPDATED_AT.toISOString(), ""]]) },
+      { filename: "categories.csv", text: csv(CATEGORY_HEADERS, [["beef", "Beef", "", "", "Protein", "always", "0", UPDATED_AT.toISOString(), ""]]) },
+    ]);
+    expect(renamed.errors).toEqual([]);
+    expect(renamed.warnings).toContain("category beef stays in renamed section Protein Prime");
+    const categoryUpdate = renamed.operations.find((operation) => operation.target === "category:beef");
+    expect(categoryUpdate).toBeUndefined();
+
+    const swapped = planWithOptions([
+      { filename: "sections.csv", text: csv(SECTION_HEADERS, [["1", "Specials", "0", UPDATED_AT.toISOString(), ""], ["2", "Protein", "1", UPDATED_AT.toISOString(), ""]]) },
+      { filename: "categories.csv", text: csv(CATEGORY_HEADERS, [
+        ["beef", "Beef", "", "", "Protein", "always", "0", UPDATED_AT.toISOString(), ""],
+        ["pork", "Pork", "", "", "Specials", "always", "1", UPDATED_AT.toISOString(), ""],
+      ]) },
+    ]);
+    expect(swapped.errors).toEqual([]);
+    expect(swapped.operations.filter((operation) => operation.kind === "updateCategory")).toHaveLength(0);
+  });
+
+  it("still blocks a category reference to a section deleted with no live name winner", () => {
+    const result = planWithOptions([
+      { filename: "sections.csv", text: csv(SECTION_HEADERS, [["1", "", "", "", "delete"]]) },
+      { filename: "categories.csv", text: csv(CATEGORY_HEADERS, [["beef", "Beef", "", "", "Protein", "always", "0", UPDATED_AT.toISOString(), ""]]) },
+    ]);
+    expect(result.errors.some((error) => error.message === "section is being deleted")).toBe(true);
+  });
+
+  it("allows category name swaps and ignores untouched category duplicates", () => {
+    const swapped = planWithOptions([{ filename: "categories.csv", text: csv(CATEGORY_HEADERS, [
+      ["beef", "Pork", "", "", "Protein", "always", "0", UPDATED_AT.toISOString(), ""],
+      ["pork", "Beef", "", "", "Specials", "always", "1", UPDATED_AT.toISOString(), ""],
+    ]) }]);
+    expect(swapped.errors).toEqual([]);
+    const legacy = planWithOptions([{ filename: "products.csv", text: csv(["id"], [["1"]]) }], snapshot({
+      categories: [
+        { ...snapshot().categories[0], name: "Same" },
+        { ...snapshot().categories[1], name: " same " },
+      ],
+    }));
+    expect(legacy.errors).toEqual([]);
+  });
+
+  it("treats numeric-equivalent product ids as duplicate keys", () => {
+    const result = planWithOptions([{ filename: "products.csv", text: csv(["id"], [["10"], ["10.0"]]) }]);
+    expect(result.errors.filter((error) => /duplicate id: 10/.test(error.message))).toHaveLength(2);
+  });
+
+  it("accepts updatedAt .000Z UTC timestamps and rejects malformed CSV quoting", () => {
+    const good = planWithOptions([{ filename: "products.csv", text: csv(["id", "price", "updatedAt"], [["1", "13.00", "2026-10-05T03:04:05.000Z"]]) }]);
+    expect(good.errors).toEqual([]);
+    const strayQuote = parseCatalogCsv("products.csv", "id,name\r\n1,ri\"beye");
+    const trailingText = parseCatalogCsv("products.csv", "id,name\r\n1,\"Ribeye\"junk");
+    const unterminated = parseCatalogCsv("products.csv", "id,name\r\n1,\"Ribeye");
+    expect(strayQuote.errors.some((error) => /quote inside unquoted cell/.test(error.message))).toBe(true);
+    expect(trailingText.errors.some((error) => /text after closing quote/.test(error.message))).toBe(true);
+    expect(unterminated.errors.some((error) => /unterminated quote/.test(error.message))).toBe(true);
+  });
+
+  it("removes rejected category deletes from operations, changes, counts, and hash", () => {
+    const rejected = planWithOptions([{ filename: "categories.csv", text: csv(CATEGORY_HEADERS, [["beef", "", "", "", "", "", "", "", "delete"]]) }]);
+    const baseline = planWithOptions([{ filename: "products.csv", text: csv(["id"], [["1"]]) }]);
+    expect(rejected.errors.some((error) => /category cannot be deleted/.test(error.message))).toBe(true);
+    expect(rejected.operations.some((operation) => operation.target === "category:beef")).toBe(false);
+    expect(rejected.changes.some((change) => change.item === "category:beef")).toBe(false);
+    expect(rejected.deletes).toBe(0);
+    expect(rejected.planHash).toBe(baseline.planHash);
+  });
+
+  it("counts category visibility warning products after moves", () => {
+    const result = planWithOptions([
+      { filename: "categories.csv", text: csv(["slug", "visibility", "updatedAt"], [["beef", "regular_only", UPDATED_AT.toISOString()]]) },
+      { filename: "products.csv", text: csv(["id", "category", "updatedAt"], [["2", "beef", UPDATED_AT.toISOString()]]) },
+    ]);
+    expect(result.warnings).toContain("category visibility change: beef affects all 2 products in this category");
+  });
+
+  it("references existing sections by id and new sections by key", () => {
+    const existing = planWithOptions([{ filename: "categories.csv", text: csv(CATEGORY_HEADERS, [["fresh", "Fresh", "", "", "Protein", "always", "2", "", ""]]) }]);
+    expect(existing.operations.find((operation) => operation.kind === "createCategory")).toMatchObject({ section: { existingId: 1 } });
+    const added = planWithOptions([
+      { filename: "sections.csv", text: csv(SECTION_HEADERS, [["", "New Area", "2", "", ""]]) },
+      { filename: "categories.csv", text: csv(CATEGORY_HEADERS, [["fresh", "Fresh", "", "", "New Area", "always", "2", "", ""]]) },
+    ]);
+    expect(added.operations.find((operation) => operation.kind === "createCategory")).toMatchObject({ section: { newSectionKey: "new area" } });
+  });
+
+  it("keeps plan hashes stable, changes them for values and restore mode, and honours restore mode", () => {
+    const data = snapshot({ products: [{ ...snapshot().products[0], updatedAt: UPDATED_AT }] });
+    const files = [{ filename: "products.csv", text: csv(["id", "price", "updatedAt"], [["1", "13.00", OLDER.toISOString()]]) }];
+    const normal = planWithOptions(files, data);
+    const restored = planWithOptions(files, data, { restoreMode: true });
+    const restoredAgain = planWithOptions(files, data, { restoreMode: true });
+    expect(normal.conflicts).toHaveLength(1);
+    expect(restored.conflicts).toEqual([]);
+    expect(restored.operations).toContainEqual(expect.objectContaining({ kind: "updateProduct", id: 1, set: { price: "13.00" } }));
+    expect(restored.warnings).toContain("products.csv: row 2: changed in admin since export (restore mode: overwriting)");
+    expect(normal.planHash).not.toBe(restored.planHash);
+    expect(restored.planHash).toBe(restoredAgain.planHash);
+  });
+
+  it("parses ordered product ids under every strict order-item rule", () => {
+    const parsed = parseOrderedProductIds([
+      JSON.stringify([{ id: 42 }, { id: "42" }, { id: 42 }]),
+      "not json",
+      JSON.stringify({ id: 2 }),
+      JSON.stringify([null]),
+      JSON.stringify([{ id: "4.2" }]),
+      JSON.stringify([{ id: 1.5 }]),
+      JSON.stringify([{ id: Number.MAX_SAFE_INTEGER + 1 }]),
+    ]);
+    expect(parsed.orderedProductIds).toEqual(new Set([42]));
+    expect(parsed.unreadableOrderCount).toBe(6);
   });
 });

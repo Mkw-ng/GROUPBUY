@@ -626,3 +626,10 @@
 - [x] New protected multipart preview route accepts one to three CSV files, reads a snapshot only, validates all cross-file dependencies/conflicts/safety rules, and returns a deterministic change plan with SHA-256 plan hash. There is deliberately no apply route or catalog database write path in Run 1.
 - [x] `Catalog CSV` button in the `/admin` Products toolbar opens a dialog for ZIP/individual downloads and a no-write preview of counts, safety figures, blockers, warnings, row-level changes, errors, and conflicts. It explicitly states that applying arrives in the next update.
 - [x] Pure in-memory `catalogCsv` tests cover parsing, round trips, partial updates, dependency/deletion/duplicate guards, legacy-data tolerance, conflicts, safety blockers, lone CR handling, and stable plan hashing.
+
+## Catalog CSV (run 2: preview fixes + operations)
+- [x] Catalog preview remains read-only: no schema change, database mutation, apply route, or auth bypass. Catalog export reads catalog rows only; preview separately reads `orders.items` and uses a pure strict order-item parser.
+- [x] Planner now generates displayable create/update/delete change rows plus one merged apply-ready operation per target, with DB-form values, section references by ID/new key, deterministic plan hashing, and restore-mode hashing. Operations are preview data only and cannot be applied in this run.
+- [x] Preview fixes include strict CSV quote errors, UTC timestamp parsing, numeric duplicate IDs, final-state section/category naming and swaps, renamed-section category retention warnings, safe rejected-delete removal, final-state visibility counts, and scalable row/tuple indexes.
+- [x] Catalog dialog shows actions (deletes first/red), validates preview responses, reports Nothing to apply, and offers the preview-only restore-mode conflict override with explanatory copy.
+- [x] Tests include pure planner operations, order parsing, restore mode, final-state dependencies, and Melbourne-timezone UTC parsing. The only revised original Run 1 test is the approved section delete/create-name reuse expectation.

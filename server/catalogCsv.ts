@@ -10,6 +10,12 @@ export const PRODUCT_HEADERS = [
 
 export type CatalogFileType = "sections" | "categories" | "products";
 export type CatalogAction = "create" | "update" | "delete";
+export type SectionReference = { existingId: number } | { newSectionKey: string };
+
+type NullableProductField = "description" | "powerDropPrice" | "retailPrice" | "badge" | "stockLimit" | "img";
+type NullableCategoryField = "powerDropName" | "emoji";
+type ChangeValue = string | number | boolean | null;
+type ChangeFields = Record<string, { oldValue: ChangeValue; newValue: ChangeValue }>;
 
 export interface CatalogSectionSnapshot {
   id: number;
@@ -67,13 +73,83 @@ export interface CatalogIssue {
 }
 
 export interface CatalogChange {
+  action: CatalogAction;
   item: string;
   file: string;
   row: number;
   field: string;
-  oldValue: string | number | boolean | null;
-  newValue: string | number | boolean | null;
+  oldValue: ChangeValue;
+  newValue: ChangeValue;
 }
+
+export type CreateSectionOperation = {
+  kind: "createSection";
+  target: string;
+  key: string;
+  name: string;
+  sortOrder: number;
+};
+export type UpdateSectionOperation = {
+  kind: "updateSection";
+  target: string;
+  id: number;
+  set: Partial<Pick<CatalogSectionSnapshot, "name" | "sortOrder">>;
+};
+export type DeleteSectionOperation = { kind: "deleteSection"; target: string; id: number };
+export type CreateCategoryOperation = {
+  kind: "createCategory";
+  target: string;
+  slug: string;
+  name: string;
+  powerDropName: string | null;
+  emoji: string | null;
+  visibility: VisibilityMode;
+  sortOrder: number;
+  section: SectionReference | null;
+};
+export type UpdateCategoryOperation = {
+  kind: "updateCategory";
+  target: string;
+  slug: string;
+  set: Partial<Pick<CatalogCategorySnapshot, "name" | "powerDropName" | "emoji" | "visibility" | "sortOrder">>;
+  section?: SectionReference | null;
+};
+export type DeleteCategoryOperation = { kind: "deleteCategory"; target: string; slug: string };
+export type CreateProductOperation = {
+  kind: "createProduct";
+  target: string;
+  name: string;
+  cut: string;
+  category: string;
+  description: string | null;
+  price: string;
+  powerDropPrice: string | null;
+  retailPrice: string | null;
+  unit: string;
+  badge: CatalogProductSnapshot["badge"];
+  available: boolean;
+  visibility: VisibilityMode;
+  stockLimit: string | null;
+  sortOrder: number;
+  img: string | null;
+};
+export type UpdateProductOperation = {
+  kind: "updateProduct";
+  target: string;
+  id: number;
+  set: Partial<Pick<CatalogProductSnapshot, "name" | "cut" | "category" | "description" | "price" | "powerDropPrice" | "retailPrice" | "unit" | "badge" | "available" | "visibility" | "stockLimit" | "sortOrder" | "img">>;
+};
+export type DeleteProductOperation = { kind: "deleteProduct"; target: string; id: number };
+export type ApplyOperation =
+  | CreateSectionOperation
+  | UpdateSectionOperation
+  | DeleteSectionOperation
+  | CreateCategoryOperation
+  | UpdateCategoryOperation
+  | DeleteCategoryOperation
+  | CreateProductOperation
+  | UpdateProductOperation
+  | DeleteProductOperation;
 
 export interface CatalogPlan {
   creates: number;
@@ -85,6 +161,7 @@ export interface CatalogPlan {
   warnings: string[];
   blockers: string[];
   changes: CatalogChange[];
+  operations: ApplyOperation[];
   safety: {
     visibleAvailableBefore: number;
     visibleAvailableAfter: number;
@@ -105,19 +182,57 @@ export interface ParsedCatalogFile {
   errors: CatalogIssue[];
 }
 
-interface PlannedOperation {
+interface PlanOptions {
+  restoreMode?: boolean;
+}
+
+interface OperationDraft {
   action: CatalogAction;
-  entity: CatalogFileType;
   target: string;
   file: string;
   row: number;
-  fields: Record<string, { oldValue: string | number | boolean | null; newValue: string | number | boolean | null }>;
+  fields: ChangeFields;
+  operation: ApplyOperation;
+}
+
+interface SectionEntry {
+  ref: SectionReference;
+  id?: number;
+  key?: string;
+  name: string;
+  sortOrder: number;
+  initial?: CatalogSectionSnapshot;
+  row?: CsvRow;
+  action?: CatalogAction;
+  changedName: boolean;
+}
+
+interface InternalCategory {
+  id?: number;
+  slug: string;
+  name: string;
+  powerDropName: string | null;
+  emoji: string | null;
+  section: SectionReference | null;
+  visibility: VisibilityMode;
+  sortOrder: number;
+  initial?: CatalogCategorySnapshot;
+  row?: CsvRow;
+  action?: CatalogAction;
+  changedName: boolean;
+}
+
+interface ProductEntry {
+  product: CatalogProductSnapshot;
+  row?: CsvRow;
+  action?: CatalogAction;
 }
 
 const VISIBILITY_VALUES = new Set<VisibilityMode>(["regular_only", "always", "power_drop_only"]);
 const BADGE_VALUES = new Set(["LIMITED", "POPULAR", "NEW", "SOLD OUT"]);
-const PRODUCT_NUMERIC_FIELDS = new Set(["price", "powerDropPrice", "retailPrice", "stockLimit"]);
-const PRODUCT_TEXT_FIELDS = new Set(["name", "cut", "category", "description", "unit", "badge", "img"]);
+const PRODUCT_FIELDS = ["name", "cut", "category", "description", "price", "powerDropPrice", "retailPrice", "unit", "badge", "available", "visibility", "stockLimit", "sortOrder", "img"] as const;
+const PRODUCT_NULLABLE = new Set<NullableProductField>(["description", "powerDropPrice", "retailPrice", "badge", "stockLimit", "img"]);
+const PRODUCT_DECIMALS = new Set(["price", "powerDropPrice", "retailPrice", "stockLimit"]);
 
 function headersFor(type: CatalogFileType): readonly string[] {
   if (type === "sections") return SECTION_HEADERS;
@@ -134,35 +249,46 @@ function lower(value: unknown): string {
 }
 
 function nullableText(value: unknown): string | null {
-  const normalized = normaliseText(value);
-  return normalized === "" ? null : normalized;
+  const text = normaliseText(value);
+  return text === "" ? null : text;
 }
 
-function displayValue(value: unknown): string | number | boolean | null {
-  if (value === undefined || value === null || value === "") return null;
-  return typeof value === "string" ? normaliseText(value) : value as number | boolean;
+function displayValue(value: unknown): ChangeValue {
+  if (value === undefined || value === null) return null;
+  if (typeof value === "string") return normaliseText(value);
+  return value as string | number | boolean;
 }
 
-function asDate(value: Date | string | undefined): Date | null {
+function copySection(section: CatalogSectionSnapshot): CatalogSectionSnapshot {
+  return { ...section };
+}
+function copyCategory(category: CatalogCategorySnapshot): CatalogCategorySnapshot {
+  return { ...category };
+}
+function copyProduct(product: CatalogProductSnapshot): CatalogProductSnapshot {
+  return { ...product };
+}
+
+function csvEscape(value: unknown): string {
+  const text = value == null ? "" : String(value).replace(/\r\n|\r|\n/g, "\r\n");
+  return `"${text.replace(/"/g, '""')}"`;
+}
+
+function dateFromDb(value: Date | string | undefined): Date | null {
   if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
   if (typeof value !== "string") return null;
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
-function wholeSecond(value: Date | string | undefined): number | null {
-  const date = asDate(value);
+function wholeSecondFromDb(value: Date | string | undefined): number | null {
+  const date = dateFromDb(value);
   return date ? Math.floor(date.getTime() / 1000) : null;
 }
 
 function utcIso(value: Date | string | undefined): string {
-  const date = asDate(value);
+  const date = dateFromDb(value);
   return date ? date.toISOString().replace(/\.\d{3}Z$/, "Z") : "";
-}
-
-function csvEscape(value: unknown): string {
-  const text = value == null ? "" : String(value).replace(/\r\n|\r|\n/g, "\r\n");
-  return `"${text.replace(/"/g, '""')}"`;
 }
 
 /** Detects the catalog file family from its filename. */
@@ -172,97 +298,126 @@ export function detectCatalogFileType(filename: string): CatalogFileType | null 
   return matches.length === 1 ? matches[0] : null;
 }
 
-/** CSV reader that supports BOM, CRLF, LF, lone CR, quotes and quoted line breaks. */
+/** Strict CSV reader supporting BOM, CRLF/LF/lone-CR and quoted line breaks. */
 export function parseCatalogCsv(filename: string, raw: string): ParsedCatalogFile {
   const type = detectCatalogFileType(filename);
   const source = raw.startsWith("\uFEFF") ? raw.slice(1) : raw;
-  const rows: string[][] = [];
-  let row: string[] = [];
+  const errors: CatalogIssue[] = [];
+  const records: string[][] = [];
+  let record: string[] = [];
   let cell = "";
-  let quoted = false;
+  let state: "unquoted" | "quoted" | "afterQuote" = "unquoted";
+  let rowNumber = 1;
+
+  const pushRecord = () => {
+    record.push(cell);
+    records.push(record);
+    record = [];
+    cell = "";
+    state = "unquoted";
+    rowNumber += 1;
+  };
 
   for (let index = 0; index < source.length; index += 1) {
     const char = source[index];
-    if (char === '"') {
-      if (quoted && source[index + 1] === '"') {
-        cell += '"';
-        index += 1;
+    if (state === "quoted") {
+      if (char === '"') {
+        if (source[index + 1] === '"') {
+          cell += '"';
+          index += 1;
+        } else {
+          state = "afterQuote";
+        }
       } else {
-        quoted = !quoted;
+        cell += char;
       }
       continue;
     }
-    if (!quoted && char === ",") {
-      row.push(cell);
-      cell = "";
+    if (state === "afterQuote") {
+      if (char === ",") {
+        record.push(cell);
+        cell = "";
+        state = "unquoted";
+      } else if (char === "\n" || char === "\r") {
+        pushRecord();
+        if (char === "\r" && source[index + 1] === "\n") index += 1;
+      } else {
+        errors.push({ file: filename, row: rowNumber, message: "text after closing quote" });
+        cell += char;
+      }
       continue;
     }
-    if (!quoted && (char === "\n" || char === "\r")) {
-      row.push(cell);
-      rows.push(row);
-      row = [];
+    if (char === '"') {
+      if (cell !== "") {
+        errors.push({ file: filename, row: rowNumber, message: "quote inside unquoted cell" });
+        cell += char;
+      } else {
+        state = "quoted";
+      }
+    } else if (char === ",") {
+      record.push(cell);
       cell = "";
+    } else if (char === "\n" || char === "\r") {
+      pushRecord();
       if (char === "\r" && source[index + 1] === "\n") index += 1;
-      continue;
+    } else {
+      cell += char;
     }
-    cell += char;
   }
-  if (cell !== "" || row.length > 0) {
-    row.push(cell);
-    rows.push(row);
+  if (state === "quoted") errors.push({ file: filename, row: rowNumber, message: "unterminated quote" });
+  if (cell !== "" || record.length > 0 || state === "afterQuote") {
+    record.push(cell);
+    records.push(record);
   }
 
-  const errors: CatalogIssue[] = [];
   if (!type) {
     errors.push({ file: filename, row: 1, message: `unrecognised catalog file: ${filename}` });
     return { filename, type: null, headers: [], rows: [], errors };
   }
-  if (rows.length === 0) {
+  if (records.length === 0) {
     errors.push({ file: filename, row: 1, message: "CSV file is empty" });
     return { filename, type, headers: [], rows: [], errors };
   }
 
-  const headers = rows[0].map((header) => normaliseText(header));
+  const headers = records[0].map((header) => normaliseText(header));
   const allowed = new Set(headersFor(type));
-  const seenHeaders = new Set<string>();
+  const seen = new Set<string>();
   for (const header of headers) {
     if (!allowed.has(header)) errors.push({ file: filename, row: 1, message: `unknown header: ${header || "(blank)"}` });
-    if (seenHeaders.has(header)) errors.push({ file: filename, row: 1, message: `duplicate header: ${header || "(blank)"}` });
-    seenHeaders.add(header);
+    if (seen.has(header)) errors.push({ file: filename, row: 1, message: `duplicate header: ${header || "(blank)"}` });
+    seen.add(header);
   }
-
   const key = type === "categories" ? "slug" : "id";
-  if (!seenHeaders.has(key)) errors.push({ file: filename, row: 1, message: `missing key column: ${key}` });
+  if (!seen.has(key)) errors.push({ file: filename, row: 1, message: `missing key column: ${key}` });
 
-  const parsedRows: CsvRow[] = [];
-  for (let index = 1; index < rows.length; index += 1) {
-    const cells = rows[index];
+  const rows: CsvRow[] = [];
+  for (let index = 1; index < records.length; index += 1) {
+    const cells = records[index];
     if (cells.every((value) => normaliseText(value) === "")) continue;
     const values: Record<string, string> = {};
     headers.forEach((header, cellIndex) => {
       if (header) values[header] = cells[cellIndex] ?? "";
     });
-    parsedRows.push({ row: index + 1, values });
+    rows.push({ row: index + 1, values });
   }
-
-  return { filename, type, headers, rows: parsedRows, errors };
+  return { filename, type, headers, rows, errors };
 }
 
 /** Parses every uploaded file and catches duplicate/misnamed file families before planning. */
 export function parseCatalogFiles(files: Array<{ filename: string; text: string }>): ParsedCatalogFile[] {
   const parsed = files.map((file) => parseCatalogCsv(file.filename, file.text));
-  const byType = new Map<CatalogFileType, ParsedCatalogFile[]>();
-  for (const file of parsed) {
-    if (!file.type) continue;
-    const group = byType.get(file.type) ?? [];
+  const groups = new Map<CatalogFileType, ParsedCatalogFile[]>();
+  parsed.forEach((file) => {
+    if (!file.type) return;
+    const group = groups.get(file.type) ?? [];
     group.push(file);
-    byType.set(file.type, group);
-  }
-  for (const group of Array.from(byType.values())) {
-    if (group.length < 2) continue;
+    groups.set(file.type, group);
+  });
+  Array.from(groups.values()).forEach((group) => {
+    if (group.length < 2) return;
     const names = group.map((file) => file.filename).join(", ");
-    for (const file of group) file.errors.push({ file: file.filename, row: 1, message: `two files of the same type: ${names}` });
-  }
+    group.forEach((file) => file.errors.push({ file: file.filename, row: 1, message: `two files of the same type: ${names}` }));
+  });
   return parsed;
 }
 
@@ -277,662 +432,869 @@ export function exportCatalogCsv(snapshot: CatalogSnapshot): Record<`${CatalogFi
   const sections = [...snapshot.sections].sort((a, b) => a.sortOrder - b.sortOrder || a.id - b.id);
   const categories = [...snapshot.categories].sort((a, b) => a.sortOrder - b.sortOrder || a.id - b.id);
   const products = [...snapshot.products].sort((a, b) => a.sortOrder - b.sortOrder || a.id - b.id);
-
   return {
-    "sections.csv": exportCatalogRows(SECTION_HEADERS, sections.map((section) => [
-      section.id, section.name, section.sortOrder, utcIso(section.updatedAt), "",
-    ])),
+    "sections.csv": exportCatalogRows(SECTION_HEADERS, sections.map((section) => [section.id, section.name, section.sortOrder, utcIso(section.updatedAt), ""])),
     "categories.csv": exportCatalogRows(CATEGORY_HEADERS, categories.map((category) => [
-      category.slug,
-      category.name,
-      category.powerDropName,
-      category.emoji,
+      category.slug, category.name, category.powerDropName, category.emoji,
       category.sectionId == null ? "" : sectionById.get(category.sectionId)?.name ?? "",
-      category.visibility,
-      category.sortOrder,
-      utcIso(category.updatedAt),
-      "",
+      category.visibility, category.sortOrder, utcIso(category.updatedAt), "",
     ])),
     "products.csv": exportCatalogRows(PRODUCT_HEADERS, products.map((product) => [
-      product.id,
-      product.name,
-      product.cut,
-      product.category,
-      product.description,
-      product.price,
-      product.powerDropPrice,
-      product.retailPrice,
-      product.unit,
-      product.badge,
-      product.available ? "TRUE" : "FALSE",
-      product.visibility,
-      product.stockLimit,
-      product.sortOrder,
-      product.img,
-      utcIso(product.updatedAt),
-      "",
+      product.id, product.name, product.cut, product.category, product.description, product.price,
+      product.powerDropPrice, product.retailPrice, product.unit, product.badge,
+      product.available ? "TRUE" : "FALSE", product.visibility, product.stockLimit, product.sortOrder,
+      product.img, utcIso(product.updatedAt), "",
     ])),
   };
 }
 
-function issue(file: ParsedCatalogFile, row: number, message: string): CatalogIssue {
-  return { file: file.filename, row, message };
+/** Strictly extracts every ordered product id without touching a database. */
+export function parseOrderedProductIds(itemsTexts: string[]): { orderedProductIds: Set<number>; unreadableOrderCount: number } {
+  const orderedProductIds = new Set<number>();
+  let unreadableOrderCount = 0;
+  itemsTexts.forEach((itemsText) => {
+    try {
+      const parsed: unknown = JSON.parse(itemsText);
+      if (!Array.isArray(parsed)) throw new Error("items is not an array");
+      const ids = new Set<number>();
+      parsed.forEach((item) => {
+        if (!item || typeof item !== "object" || Array.isArray(item)) throw new Error("item is not an object");
+        const rawId = (item as { id?: unknown }).id;
+        const id = typeof rawId === "number"
+          ? (Number.isSafeInteger(rawId) ? rawId : null)
+          : (typeof rawId === "string" && /^[0-9]+$/.test(rawId) && Number.isSafeInteger(Number(rawId)) ? Number(rawId) : null);
+        if (id === null) throw new Error("item id is invalid");
+        ids.add(id);
+      });
+      ids.forEach((id) => orderedProductIds.add(id));
+    } catch {
+      unreadableOrderCount += 1;
+    }
+  });
+  return { orderedProductIds, unreadableOrderCount };
 }
 
-function parseAction(file: ParsedCatalogFile, row: CsvRow, errors: CatalogIssue[]): "" | "delete" {
-  if (!file.headers.includes("action")) return "";
-  const action = lower(row.values.action);
-  if (action === "" || action === "delete") return action;
-  errors.push(issue(file, row.row, "action must be blank or delete"));
-  return "";
-}
+class Issues {
+  readonly errors: CatalogIssue[];
+  private readonly rows = new Set<string>();
 
-function parsePositiveInteger(value: string): number | null {
-  const text = normaliseText(value);
-  if (!/^\d+(?:\.0+)?$/.test(text)) return null;
-  const result = Number(text);
-  return Number.isSafeInteger(result) && result > 0 ? result : null;
-}
-
-function parseNonNegativeInteger(value: string): number | null {
-  const text = normaliseText(value);
-  if (!/^\d+(?:\.0+)?$/.test(text)) return null;
-  const result = Number(text);
-  return Number.isSafeInteger(result) && result >= 0 ? result : null;
-}
-
-function parseBoolean(value: string): boolean | null {
-  const normalized = lower(value);
-  if (normalized === "true") return true;
-  if (normalized === "false") return false;
-  return null;
-}
-
-function parseDecimal(value: string, max: number, decimals: number): string | null {
-  const text = normaliseText(value);
-  if (!new RegExp(`^\\d+(?:\\.\\d{1,${decimals}})?$`).test(text)) return null;
-  const number = Number(text);
-  return Number.isFinite(number) && number <= max ? text : null;
-}
-
-function equalDecimal(left: unknown, right: unknown): boolean {
-  const a = nullableText(left);
-  const b = nullableText(right);
-  if (a === null || b === null) return a === b;
-  return Number(a) === Number(b);
-}
-
-function equalValue(field: string, left: unknown, right: unknown): boolean {
-  if (PRODUCT_NUMERIC_FIELDS.has(field)) return equalDecimal(left, right);
-  if (field === "available") return Boolean(left) === Boolean(right);
-  if (field === "sortOrder" || field === "sectionId") return Number(left ?? 0) === Number(right ?? 0);
-  return normaliseText(left) === normaliseText(right);
-}
-
-function validateUpdatedAt(file: ParsedCatalogFile, row: CsvRow, current: { updatedAt: Date | string }, errors: CatalogIssue[]): number | null | undefined {
-  if (!file.headers.includes("updatedAt")) return undefined;
-  const value = normaliseText(row.values.updatedAt);
-  const parsed = /^\d{4}-\d{2}-\d{2}T/.test(value) ? asDate(value) : null;
-  if (!parsed) {
-    errors.push(issue(file, row.row, "updatedAt must be an ISO date"));
-    return null;
+  constructor(initial: CatalogIssue[]) {
+    this.errors = [...initial];
+    initial.forEach((entry) => this.rows.add(this.key(entry.file, entry.row)));
   }
-  return wholeSecond(parsed);
-}
 
-function hasConflict(
-  file: ParsedCatalogFile,
-  row: CsvRow,
-  current: { updatedAt: Date | string },
-  changed: boolean,
-  errors: CatalogIssue[],
-  conflicts: CatalogIssue[],
-): boolean {
-  const fileTime = validateUpdatedAt(file, row, current, errors);
-  if (fileTime === null) return true;
-  if (!changed || fileTime === undefined) return false;
-  const dbTime = wholeSecond(current.updatedAt);
-  if (dbTime !== null && dbTime > fileTime) {
-    conflicts.push(issue(file, row.row, "changed in admin since export: re-export and redo this edit"));
-    return true;
+  add(file: ParsedCatalogFile, row: number, message: string): void {
+    this.errors.push({ file: file.filename, row, message });
+    this.rows.add(this.key(file.filename, row));
   }
-  return false;
-}
 
-function cloneSection(section: CatalogSectionSnapshot): CatalogSectionSnapshot {
-  return { ...section };
-}
-function cloneCategory(category: CatalogCategorySnapshot): CatalogCategorySnapshot {
-  return { ...category };
-}
-function cloneProduct(product: CatalogProductSnapshot): CatalogProductSnapshot {
-  return { ...product };
-}
-
-function pushDuplicateKeyErrors(file: ParsedCatalogFile, key: string, errors: CatalogIssue[]): void {
-  const groups = new Map<string, CsvRow[]>();
-  for (const row of file.rows) {
-    const value = normaliseText(row.values[key]);
-    if (!value) continue;
-    const normalized = key === "slug" ? lower(value) : value;
-    const group = groups.get(normalized) ?? [];
-    group.push(row);
-    groups.set(normalized, group);
+  has(file: ParsedCatalogFile, row: number): boolean {
+    return this.rows.has(this.key(file.filename, row));
   }
-  for (const [value, rows] of Array.from(groups.entries())) {
-    if (rows.length > 1) rows.forEach((row) => errors.push(issue(file, row.row, `duplicate ${key}: ${value}`)));
-  }
-}
 
-function rowHasError(errors: CatalogIssue[], file: ParsedCatalogFile, row: number): boolean {
-  return errors.some((error) => error.file === file.filename && error.row === row);
+  private key(file: string, row: number): string {
+    return `${file}\u0000${row}`;
+  }
 }
 
 function present(file: ParsedCatalogFile, field: string): boolean {
   return file.headers.includes(field);
 }
 
-function sectionTarget(section: CatalogSectionSnapshot): string {
-  return `section:${section.id}`;
-}
-function categoryTarget(category: CatalogCategorySnapshot): string {
-  return `category:${category.slug}`;
-}
-function productTarget(product: CatalogProductSnapshot): string {
-  return `product:${product.id}`;
+function parseAction(file: ParsedCatalogFile, row: CsvRow, issues: Issues): "" | "delete" {
+  if (!present(file, "action")) return "";
+  const action = lower(row.values.action);
+  if (action === "" || action === "delete") return action;
+  issues.add(file, row.row, "action must be blank or delete");
+  return "";
 }
 
-function operation(
-  operations: PlannedOperation[],
-  action: CatalogAction,
-  entity: CatalogFileType,
-  target: string,
-  file: string,
-  row: number,
-  fields: PlannedOperation["fields"],
-): void {
-  if (action === "update" && Object.keys(fields).length === 0) return;
-  operations.push({ action, entity, target, file, row, fields });
+function parsePositiveInteger(value: string): number | null {
+  const text = normaliseText(value);
+  if (!/^\d+(?:\.0+)?$/.test(text)) return null;
+  const number = Number(text);
+  return Number.isSafeInteger(number) && number > 0 ? number : null;
 }
 
-function sectionNameById(sections: Map<number, CatalogSectionSnapshot>, id: number | null): string {
-  if (id == null) return "";
-  return sections.get(id)?.name ?? "";
+function parseNonNegativeInteger(value: string): number | null {
+  const text = normaliseText(value);
+  if (!/^\d+(?:\.0+)?$/.test(text)) return null;
+  const number = Number(text);
+  return Number.isSafeInteger(number) && number >= 0 ? number : null;
 }
 
-function resolveSection(
+function parseBoolean(value: string): boolean | null {
+  const text = lower(value);
+  if (text === "true") return true;
+  if (text === "false") return false;
+  return null;
+}
+
+function parseDecimal(value: string, max: number, decimalPlaces: number): string | null {
+  const text = normaliseText(value);
+  if (!new RegExp(`^\\d+(?:\\.\\d{1,${decimalPlaces}})?$`).test(text)) return null;
+  const number = Number(text);
+  return Number.isFinite(number) && number <= max ? text : null;
+}
+
+function equalValue(field: string, previous: unknown, next: unknown): boolean {
+  if (PRODUCT_DECIMALS.has(field)) {
+    const a = nullableText(previous);
+    const b = nullableText(next);
+    return a === null || b === null ? a === b : Number(a) === Number(b);
+  }
+  if (field === "available") return Boolean(previous) === Boolean(next);
+  if (field === "sortOrder") return Number(previous ?? 0) === Number(next ?? 0);
+  return normaliseText(previous) === normaliseText(next);
+}
+
+function changedFields(before: Record<string, unknown>, after: Record<string, unknown>, fields: readonly string[]): ChangeFields {
+  const result: ChangeFields = {};
+  fields.forEach((field) => {
+    if (!equalValue(field, before[field], after[field])) {
+      result[field] = { oldValue: displayValue(before[field]), newValue: displayValue(after[field]) };
+    }
+  });
+  return result;
+}
+
+function allCreateFields(after: Record<string, unknown>, fields: readonly string[]): ChangeFields {
+  const result: ChangeFields = {};
+  fields.forEach((field) => {
+    result[field] = { oldValue: null, newValue: after[field] === undefined ? null : displayValue(after[field]) };
+  });
+  return result;
+}
+
+/** Parses accepted CSV updatedAt text as a UTC whole-second timestamp. */
+export function parseUpdatedAtUtc(value: string): number | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?(?:Z|\+00:00)?$/.exec(normaliseText(value));
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const hour = Number(match[4]);
+  const minute = Number(match[5]);
+  const second = Number(match[6]);
+  if (month < 1 || month > 12 || day < 1 || day > 31 || hour > 23 || minute > 59 || second > 59) return null;
+  const millis = Date.UTC(year, month - 1, day, hour, minute, second);
+  const date = new Date(millis);
+  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return null;
+  return Math.floor(millis / 1000);
+}
+
+function checkConflict(
   file: ParsedCatalogFile,
   row: CsvRow,
-  currentSectionId: number | null,
-  sections: Map<number, CatalogSectionSnapshot>,
-  deletedSectionIds: Set<number>,
-  initialSections: Map<number, CatalogSectionSnapshot>,
-  errors: CatalogIssue[],
-): number | null | undefined {
-  if (!present(file, "section")) return undefined;
-  const supplied = normaliseText(row.values.section);
-  const initial = currentSectionId == null ? undefined : initialSections.get(currentSectionId);
-  const currentAfter = currentSectionId == null ? undefined : sections.get(currentSectionId);
-  const currentName = currentAfter?.name ?? initial?.name ?? "";
+  current: { updatedAt: Date | string },
+  changed: boolean,
+  issues: Issues,
+  conflicts: CatalogIssue[],
+  warnings: string[],
+  restoreMode: boolean,
+): boolean {
+  if (!present(file, "updatedAt")) return false;
+  const exportSecond = parseUpdatedAtUtc(row.values.updatedAt);
+  if (exportSecond === null) {
+    issues.add(file, row.row, "updatedAt must be an ISO date");
+    return true;
+  }
+  if (!changed) return false;
+  const databaseSecond = wholeSecondFromDb(current.updatedAt);
+  if (databaseSecond !== null && databaseSecond > exportSecond) {
+    if (restoreMode) {
+      warnings.push(`${file.filename}: row ${row.row}: changed in admin since export (restore mode: overwriting)`);
+      return false;
+    }
+    conflicts.push({ file: file.filename, row: row.row, message: "changed in admin since export: re-export and redo this edit" });
+    return true;
+  }
+  return false;
+}
 
-  if (supplied === "") {
-    if (currentSectionId == null || !sections.has(currentSectionId)) return currentSectionId;
-    return null;
-  }
-  if (currentName && lower(supplied) === lower(currentName) && !deletedSectionIds.has(currentSectionId ?? -1)) {
-    return currentSectionId;
-  }
+function sectionTarget(id: number): string { return `section:${id}`; }
+function newSectionTarget(key: string): string { return `section:new:${key}`; }
+function categoryTarget(slug: string): string { return `category:${slug}`; }
+function productTarget(id: number): string { return `product:${id}`; }
+function newProductTarget(row: number): string { return `product:new:${row}`; }
 
-  const deletedMatches = Array.from(deletedSectionIds)
-    .map((id) => initialSections.get(id))
-    .filter((section): section is CatalogSectionSnapshot => Boolean(section))
-    .filter((section) => lower(section.name) === lower(supplied));
-  if (deletedMatches.length > 0) {
-    errors.push(issue(file, row.row, `section is being deleted: ${deletedMatches.map((section) => section.id).join(", ")}`));
-    return undefined;
-  }
+function sectionKey(name: string): string {
+  return lower(name);
+}
 
-  const matches = Array.from(sections.values()).filter((section) => lower(section.name) === lower(supplied));
-  if (matches.length === 0) {
-    errors.push(issue(file, row.row, "unknown section name: renamed? Update this column or leave categories.csv out"));
-    return undefined;
-  }
-  if (matches.length > 1) {
-    errors.push(issue(file, row.row, `ambiguous section name: ${matches.map((section) => section.id).join(", ")}`));
-    return undefined;
-  }
-  return matches[0].id;
+function sectionRefForId(id: number | null): SectionReference | null {
+  return id === null ? null : { existingId: id };
+}
+
+function sameSectionRef(left: SectionReference | null, right: SectionReference | null): boolean {
+  if (left === null || right === null) return left === right;
+  if ("existingId" in left && "existingId" in right) return left.existingId === right.existingId;
+  if ("newSectionKey" in left && "newSectionKey" in right) return left.newSectionKey === right.newSectionKey;
+  return false;
 }
 
 function productTuple(product: Pick<CatalogProductSnapshot, "name" | "cut" | "category">): string {
   return [product.name, product.cut, product.category].map(lower).join("\u0000");
 }
 
-function countVisibleAvailable(products: Iterable<CatalogProductSnapshot>, categories: Iterable<CatalogCategorySnapshot>): number {
-  const visibilityByCategory = new Map(Array.from(categories).map((category) => [category.slug, category.visibility]));
+function countVisibleAvailable(products: Iterable<CatalogProductSnapshot>, categories: Iterable<InternalCategory | CatalogCategorySnapshot>): number {
+  const categoryVisibility = new Map<string, VisibilityMode>();
+  Array.from(categories).forEach((category) => categoryVisibility.set(category.slug, category.visibility));
   return Array.from(products).filter((product) => {
-    const categoryVisibility = visibilityByCategory.get(product.category) ?? "always";
-    return product.available && isVisibleInMode(effectiveVisibility(product.visibility, categoryVisibility), false);
+    const visibility = categoryVisibility.get(product.category) ?? "always";
+    return product.available && isVisibleInMode(effectiveVisibility(product.visibility, visibility), false);
   }).length;
 }
 
-function fieldsFromObject(
-  before: Record<string, unknown>,
-  after: Record<string, unknown>,
-  fields: string[],
-): PlannedOperation["fields"] {
-  const result: PlannedOperation["fields"] = {};
-  for (const field of fields) {
-    if (!equalValue(field, before[field], after[field])) {
-      result[field] = { oldValue: displayValue(before[field]), newValue: displayValue(after[field]) };
-    }
-  }
-  return result;
+function stableJson(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(stableJson);
+  if (!value || typeof value !== "object") return value;
+  return Object.fromEntries(Object.entries(value as Record<string, unknown>)
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([key, nested]) => [key, stableJson(nested)]));
 }
 
-function validationError(file: ParsedCatalogFile, row: CsvRow, errors: CatalogIssue[], message: string): void {
-  errors.push(issue(file, row.row, message));
+function isStructuralFileError(file: ParsedCatalogFile): boolean {
+  return file.errors.some((error) => error.row === 1);
+}
+
+function addDraft(drafts: Map<string, OperationDraft>, draft: OperationDraft): void {
+  drafts.set(draft.target, draft);
+}
+
+function mergeCategoryUpdateDraft(
+  drafts: Map<string, OperationDraft>,
+  category: InternalCategory,
+  file: string,
+  row: number,
+  fields: ChangeFields,
+  set: UpdateCategoryOperation["set"],
+  section: SectionReference | null | undefined,
+): void {
+  const target = categoryTarget(category.slug);
+  const existing = drafts.get(target);
+  if (existing && existing.operation.kind === "updateCategory") {
+    existing.fields = { ...existing.fields, ...fields };
+    existing.operation.set = { ...existing.operation.set, ...set };
+    if (section !== undefined) existing.operation.section = section;
+    return;
+  }
+  addDraft(drafts, {
+    action: "update",
+    target,
+    file,
+    row,
+    fields,
+    operation: { kind: "updateCategory", target, slug: category.slug, set, ...(section !== undefined ? { section } : {}) },
+  });
+}
+
+function referenceDisplay(ref: SectionReference | null, sections: Map<number, SectionEntry>, newSections: Map<string, SectionEntry>): ChangeValue {
+  if (ref === null) return null;
+  if ("existingId" in ref) return sections.get(ref.existingId)?.name ?? ref.existingId;
+  return newSections.get(ref.newSectionKey)?.name ?? ref.newSectionKey;
+}
+
+function allSections(sections: Map<number, SectionEntry>, newSections: Map<string, SectionEntry>): SectionEntry[] {
+  return [...Array.from(sections.values()), ...Array.from(newSections.values())];
+}
+
+function resolveSectionReference(
+  file: ParsedCatalogFile,
+  row: CsvRow,
+  current: SectionReference | null,
+  initial: SectionReference | null,
+  sections: Map<number, SectionEntry>,
+  newSections: Map<string, SectionEntry>,
+  deletedSectionIds: Set<number>,
+  initialSections: Map<number, CatalogSectionSnapshot>,
+  issues: Issues,
+  warnings: string[],
+  warningKeys: Set<string>,
+  categorySlug: string,
+  isNewCategory: boolean,
+): SectionReference | null | undefined {
+  if (!present(file, "section")) return isNewCategory ? null : current;
+  const supplied = normaliseText(row.values.section);
+  if (supplied === "") {
+    if (current && "existingId" in current && !sections.has(current.existingId)) return current;
+    return null;
+  }
+
+  if (!isNewCategory && current && "existingId" in current && !deletedSectionIds.has(current.existingId)) {
+    const before = initial && "existingId" in initial ? initialSections.get(initial.existingId)?.name : undefined;
+    const after = sections.get(current.existingId)?.name;
+    const matchesBefore = Boolean(before && lower(supplied) === lower(before));
+    const matchesAfter = Boolean(after && lower(supplied) === lower(after));
+    if (matchesBefore || matchesAfter) {
+      if (before && after && lower(before) !== lower(after) && matchesBefore && !matchesAfter) {
+        const warning = `category ${categorySlug} stays in renamed section ${after}`;
+        if (!warningKeys.has(warning)) {
+          warningKeys.add(warning);
+          warnings.push(warning);
+        }
+      }
+      return current;
+    }
+  }
+
+  const liveMatches = allSections(sections, newSections).filter((section) => lower(section.name) === lower(supplied));
+  if (liveMatches.length === 1) return liveMatches[0].ref;
+  if (liveMatches.length > 1) {
+    issues.add(file, row.row, `ambiguous section name: ${liveMatches.map((section) => section.id ?? `row ${section.row?.row ?? "?"}`).join(", ")}`);
+    return undefined;
+  }
+  const deletedMatches = Array.from(deletedSectionIds)
+    .map((id) => initialSections.get(id))
+    .filter((section): section is CatalogSectionSnapshot => Boolean(section))
+    .filter((section) => lower(section.name) === lower(supplied));
+  if (deletedMatches.length > 0) {
+    issues.add(file, row.row, "section is being deleted");
+    return undefined;
+  }
+  issues.add(file, row.row, "unknown section name: renamed? Update this column or leave categories.csv out");
+  return undefined;
+}
+
+function productSetForTuple(index: Map<string, Set<string>>, tuple: string): Set<string> {
+  const found = index.get(tuple);
+  if (found) return found;
+  const created = new Set<string>();
+  index.set(tuple, created);
+  return created;
+}
+
+function tupleRemove(index: Map<string, Set<string>>, tuple: string, reference: string): void {
+  const group = index.get(tuple);
+  if (!group) return;
+  group.delete(reference);
+  if (group.size === 0) index.delete(tuple);
+}
+
+function tupleAdd(index: Map<string, Set<string>>, tuple: string, reference: string): void {
+  productSetForTuple(index, tuple).add(reference);
 }
 
 /**
- * Validates uploaded catalog files and returns a deterministic, read-only plan.
- * This function is intentionally pure: its only inputs are parsed CSV text and a snapshot.
+ * Validates uploaded catalog files and returns a deterministic, pure plan.
+ * No database helper or mutation is called from this module.
  */
-export function validateAndPlan(parsedFiles: ParsedCatalogFile[], snapshot: CatalogSnapshot): CatalogPlan {
-  const errors: CatalogIssue[] = parsedFiles.flatMap((file) => file.errors);
+export function validateAndPlan(parsedFiles: ParsedCatalogFile[], snapshot: CatalogSnapshot, options: PlanOptions = {}): CatalogPlan {
+  const restoreMode = options.restoreMode === true;
+  const issues = new Issues(parsedFiles.flatMap((file) => file.errors));
   const conflicts: CatalogIssue[] = [];
   const warnings: string[] = [];
   const blockers: string[] = [];
-  const operations: PlannedOperation[] = [];
+  const warningKeys = new Set<string>();
+  const drafts = new Map<string, OperationDraft>();
   const rowStatus = new Map<string, "changed" | "unchanged" | "error" | "conflict">();
-  const initialSections = new Map(snapshot.sections.map((section) => [section.id, cloneSection(section)]));
-  const sections = new Map(snapshot.sections.map((section) => [section.id, cloneSection(section)]));
-  const categories = new Map(snapshot.categories.map((category) => [category.slug, cloneCategory(category)]));
-  const products = new Map(snapshot.products.map((product) => [product.id, cloneProduct(product)]));
-  const deletedSections = new Set<number>();
-  const deletedCategories = new Set<string>();
-  const deletedProducts = new Set<number>();
-  let nextSectionId = Math.max(0, ...snapshot.sections.map((section) => section.id)) + 1;
-  let nextCategoryId = Math.max(0, ...snapshot.categories.map((category) => category.id)) + 1;
-  let nextProductId = Math.max(0, ...snapshot.products.map((product) => product.id)) + 1;
+  const statusKey = (file: ParsedCatalogFile, row: CsvRow) => `${file.filename}\u0000${row.row}`;
+  const validFile = (type: CatalogFileType): ParsedCatalogFile | undefined => {
+    const matches = parsedFiles.filter((file) => file.type === type);
+    return matches.length === 1 && !isStructuralFileError(matches[0]) ? matches[0] : undefined;
+  };
+
+  parsedFiles.forEach((file) => {
+    if (!file.type) return;
+    const key = file.type === "categories" ? "slug" : "id";
+    const groups = new Map<string, CsvRow[]>();
+    file.rows.forEach((row) => {
+      const raw = normaliseText(row.values[key]);
+      if (!raw) return;
+      const normalized = key === "id" ? String(parsePositiveInteger(raw) ?? raw) : lower(raw);
+      const group = groups.get(normalized) ?? [];
+      group.push(row);
+      groups.set(normalized, group);
+    });
+    Array.from(groups.entries()).forEach(([value, rows]) => {
+      if (rows.length > 1) rows.forEach((row) => issues.add(file, row.row, `duplicate ${key}: ${value}`));
+    });
+  });
+
+  // Sections are planned first, then final-state section names are checked collectively.
+  const initialSections = new Map(snapshot.sections.map((section) => [section.id, copySection(section)]));
+  const sections = new Map<number, SectionEntry>(snapshot.sections.map((section) => [section.id, {
+    ref: { existingId: section.id }, id: section.id, name: section.name, sortOrder: section.sortOrder,
+    initial: copySection(section), changedName: false,
+  }]));
+  const newSections = new Map<string, SectionEntry>();
+  const deletedSectionIds = new Set<number>();
+  const sectionRows = new Map<number | string, { row: CsvRow; action: CatalogAction; previous?: CatalogSectionSnapshot; candidate?: SectionEntry; fields: ChangeFields }>();
   let nextSectionSort = Math.max(-1, ...snapshot.sections.map((section) => section.sortOrder)) + 1;
-  let nextCategorySort = Math.max(-1, ...snapshot.categories.map((category) => category.sortOrder)) + 1;
-  let nextProductSort = Math.max(-1, ...snapshot.products.map((product) => product.sortOrder)) + 1;
+  const sectionsFile = validFile("sections");
 
-  const fileByType = new Map<CatalogFileType, ParsedCatalogFile>();
-  for (const file of parsedFiles) {
-    if (file.type && !file.errors.some((error) => /two files of the same type/.test(error.message))) fileByType.set(file.type, file);
-  }
-  for (const file of parsedFiles) {
-    if (!file.type) continue;
-    pushDuplicateKeyErrors(file, file.type === "categories" ? "slug" : "id", errors);
-  }
-
-  const sectionsFile = fileByType.get("sections");
-  const requestedDeletedSectionNames = new Set(
-    (sectionsFile?.rows ?? [])
-      .filter((row) => lower(row.values.action) === "delete")
-      .map((row) => parsePositiveInteger(normaliseText(row.values.id)))
-      .filter((id): id is number => id !== null)
-      .map((id) => initialSections.get(id))
-      .filter((section): section is CatalogSectionSnapshot => Boolean(section))
-      .map((section) => lower(section.name)),
-  );
-  if (sectionsFile && sectionsFile.errors.length === 0) {
-    for (const row of sectionsFile.rows) {
-      const statusKey = `${sectionsFile.filename}:${row.row}`;
-      const action = parseAction(sectionsFile, row, errors);
+  if (sectionsFile) {
+    sectionsFile.rows.forEach((row) => {
+      const key = statusKey(sectionsFile, row);
+      const deleteAction = parseAction(sectionsFile, row, issues);
       const rawId = normaliseText(row.values.id);
       const id = rawId === "" ? null : parsePositiveInteger(rawId);
-      if (rawId !== "" && id === null) validationError(sectionsFile, row, errors, "id must be a positive integer");
-      if (rowHasError(errors, sectionsFile, row.row)) { rowStatus.set(statusKey, "error"); continue; }
-      if (action === "delete") {
-        if (id === null || !sections.has(id)) {
-          validationError(sectionsFile, row, errors, "section id does not exist");
-          rowStatus.set(statusKey, "error");
-          continue;
-        }
-        const existing = sections.get(id)!;
+      if (rawId !== "" && id === null) issues.add(sectionsFile, row.row, "id must be a positive integer");
+      if (issues.has(sectionsFile, row.row)) { rowStatus.set(key, "error"); return; }
+      if (deleteAction === "delete") {
+        const existing = id === null ? undefined : sections.get(id);
+        if (!existing || id === null) { issues.add(sectionsFile, row.row, "section id does not exist"); rowStatus.set(key, "error"); return; }
         sections.delete(id);
-        deletedSections.add(id);
-        operation(operations, "delete", "sections", sectionTarget(existing), sectionsFile.filename, row.row, {});
-        rowStatus.set(statusKey, "changed");
-        continue;
+        deletedSectionIds.add(id);
+        sectionRows.set(id, { row, action: "delete", previous: existing.initial, fields: { name: { oldValue: existing.name, newValue: "DELETE" } } });
+        rowStatus.set(key, "changed");
+        return;
       }
       if (id === null) {
-        if (!present(sectionsFile, "name") || normaliseText(row.values.name) === "") validationError(sectionsFile, row, errors, "name is required for a new section");
         const name = normaliseText(row.values.name);
-        if (name.length > 64) validationError(sectionsFile, row, errors, "name must be at most 64 characters");
-        const sortOrder = !present(sectionsFile, "sortOrder") || normaliseText(row.values.sortOrder) === ""
-          ? nextSectionSort++
-          : parseNonNegativeInteger(row.values.sortOrder);
-        if (sortOrder === null) validationError(sectionsFile, row, errors, "sortOrder must be an integer of 0 or more");
-        if (rowHasError(errors, sectionsFile, row.row)) { rowStatus.set(statusKey, "error"); continue; }
-        const section: CatalogSectionSnapshot = { id: nextSectionId++, name, sortOrder: sortOrder!, updatedAt: new Date(0) };
-        if (requestedDeletedSectionNames.has(lower(name))) {
-          validationError(sectionsFile, row, errors, `section name is both deleted and created: ${name}`);
-          rowStatus.set(statusKey, "error");
-          continue;
+        if (!present(sectionsFile, "name") || !name) issues.add(sectionsFile, row.row, "name is required for a new section");
+        if (name.length > 64) issues.add(sectionsFile, row.row, "name must be at most 64 characters");
+        const sortOrder = !present(sectionsFile, "sortOrder") || normaliseText(row.values.sortOrder) === "" ? nextSectionSort++ : parseNonNegativeInteger(row.values.sortOrder);
+        if (sortOrder === null) issues.add(sectionsFile, row.row, "sortOrder must be an integer of 0 or more");
+        if (issues.has(sectionsFile, row.row)) { rowStatus.set(key, "error"); return; }
+        const section: SectionEntry = { ref: { newSectionKey: sectionKey(name) }, key: sectionKey(name), name, sortOrder: sortOrder!, row, action: "create", changedName: true };
+        const sameNewSection = newSections.get(section.key!);
+        if (sameNewSection) {
+          issues.add(sectionsFile, row.row, `section name already exists: row ${sameNewSection.row?.row ?? "?"}`);
+          rowStatus.set(key, "error");
+          return;
         }
-        const duplicate = Array.from(sections.values()).find((candidate) => lower(candidate.name) === lower(name));
-        if (duplicate) {
-          validationError(sectionsFile, row, errors, `section name already exists: ${duplicate.id}`);
-          rowStatus.set(statusKey, "error");
-          continue;
-        }
-        sections.set(section.id, section);
-        operation(operations, "create", "sections", `section:new:${lower(name)}`, sectionsFile.filename, row.row, fieldsFromObject({}, section as unknown as Record<string, unknown>, ["name", "sortOrder"]));
-        rowStatus.set(statusKey, "changed");
-        continue;
+        newSections.set(section.key!, section);
+        sectionRows.set(section.key!, { row, action: "create", candidate: section, fields: allCreateFields(section as unknown as Record<string, unknown>, ["name", "sortOrder"]) });
+        rowStatus.set(key, "changed");
+        return;
       }
-
       const existing = sections.get(id);
-      if (!existing) { validationError(sectionsFile, row, errors, "section id does not exist"); rowStatus.set(statusKey, "error"); continue; }
-      const candidate = cloneSection(existing);
+      if (!existing || !existing.initial) { issues.add(sectionsFile, row.row, "section id does not exist"); rowStatus.set(key, "error"); return; }
+      const candidate: SectionEntry = { ...existing, row, action: "update" };
       if (present(sectionsFile, "name")) {
         const name = normaliseText(row.values.name);
-        if (name === "") validationError(sectionsFile, row, errors, "name is required");
-        else if (name.length > 64) validationError(sectionsFile, row, errors, "name must be at most 64 characters");
+        if (!name) issues.add(sectionsFile, row.row, "name is required");
+        else if (name.length > 64) issues.add(sectionsFile, row.row, "name must be at most 64 characters");
         else candidate.name = name;
       }
       if (present(sectionsFile, "sortOrder")) {
         const sortOrder = parseNonNegativeInteger(row.values.sortOrder);
-        if (sortOrder === null) validationError(sectionsFile, row, errors, "sortOrder must be an integer of 0 or more");
+        if (sortOrder === null) issues.add(sectionsFile, row.row, "sortOrder must be an integer of 0 or more");
         else candidate.sortOrder = sortOrder;
       }
-      const fields = fieldsFromObject(existing as unknown as Record<string, unknown>, candidate as unknown as Record<string, unknown>, ["name", "sortOrder"]);
-      if (rowHasError(errors, sectionsFile, row.row) || hasConflict(sectionsFile, row, existing, Object.keys(fields).length > 0, errors, conflicts)) {
-        rowStatus.set(statusKey, rowHasError(errors, sectionsFile, row.row) ? "error" : "conflict");
-        continue;
+      candidate.changedName = lower(candidate.name) !== lower(existing.initial.name);
+      const fields = changedFields(existing.initial as unknown as Record<string, unknown>, candidate as unknown as Record<string, unknown>, ["name", "sortOrder"]);
+      if (issues.has(sectionsFile, row.row) || checkConflict(sectionsFile, row, existing.initial, Object.keys(fields).length > 0, issues, conflicts, warnings, restoreMode)) {
+        rowStatus.set(key, issues.has(sectionsFile, row.row) ? "error" : "conflict");
+        return;
       }
-      const duplicate = Object.keys(fields).includes("name") && Array.from(sections.values()).some((section) => section.id !== id && lower(section.name) === lower(candidate.name));
-      if (duplicate) { validationError(sectionsFile, row, errors, "section name already exists"); rowStatus.set(statusKey, "error"); continue; }
       sections.set(id, candidate);
-      operation(operations, "update", "sections", sectionTarget(existing), sectionsFile.filename, row.row, fields);
-      rowStatus.set(statusKey, Object.keys(fields).length ? "changed" : "unchanged");
-    }
+      sectionRows.set(id, { row, action: "update", previous: existing.initial, candidate, fields });
+      rowStatus.set(key, Object.keys(fields).length ? "changed" : "unchanged");
+    });
+
+    const duplicateGroups = new Map<string, SectionEntry[]>();
+    allSections(sections, newSections).forEach((section) => {
+      const group = duplicateGroups.get(lower(section.name)) ?? [];
+      group.push(section);
+      duplicateGroups.set(lower(section.name), group);
+    });
+    Array.from(duplicateGroups.values()).forEach((group) => {
+      if (group.length < 2) return;
+      group.filter((section) => section.action === "create" || section.changedName).forEach((section) => {
+        const other = group.find((candidate) => candidate !== section)!;
+        issues.add(sectionsFile, section.row?.row ?? 1, `section name already exists: ${other.id ?? `row ${other.row?.row ?? "?"}`}`);
+        if (section.id !== undefined && section.initial) sections.set(section.id, {
+          ref: { existingId: section.id }, id: section.id, name: section.initial.name, sortOrder: section.initial.sortOrder,
+          initial: section.initial, changedName: false,
+        });
+        if (section.key) newSections.delete(section.key);
+        if (section.id !== undefined) sectionRows.delete(section.id);
+        if (section.key) sectionRows.delete(section.key);
+        if (section.row) rowStatus.set(statusKey(sectionsFile, section.row), "error");
+      });
+    });
   }
 
-  const categoriesFile = fileByType.get("categories");
-  if (categoriesFile && categoriesFile.errors.length === 0) {
-    for (const row of categoriesFile.rows) {
-      const statusKey = `${categoriesFile.filename}:${row.row}`;
-      const action = parseAction(categoriesFile, row, errors);
+  // Categories reference the final section state and have a matching final-state name pass.
+  const initialCategories = new Map(snapshot.categories.map((category) => [category.slug, copyCategory(category)]));
+  const categories = new Map<string, InternalCategory>(snapshot.categories.map((category) => [category.slug, {
+    id: category.id, slug: category.slug, name: category.name, powerDropName: category.powerDropName, emoji: category.emoji,
+    section: sectionRefForId(category.sectionId), visibility: category.visibility, sortOrder: category.sortOrder,
+    initial: copyCategory(category), changedName: false,
+  }]));
+  const deletedCategorySlugs = new Set<string>();
+  const categoryRows = new Map<string, { row: CsvRow; action: CatalogAction; previous?: InternalCategory; candidate?: InternalCategory; fields: ChangeFields; set: UpdateCategoryOperation["set"]; section?: SectionReference | null }>();
+  let nextCategorySort = Math.max(-1, ...snapshot.categories.map((category) => category.sortOrder)) + 1;
+  const categoriesFile = validFile("categories");
+
+  if (categoriesFile) {
+    categoriesFile.rows.forEach((row) => {
+      const key = statusKey(categoriesFile, row);
+      const deleteAction = parseAction(categoriesFile, row, issues);
       const slug = normaliseText(row.values.slug);
-      if (!slug) validationError(categoriesFile, row, errors, "slug is required");
-      if (rowHasError(errors, categoriesFile, row.row)) { rowStatus.set(statusKey, "error"); continue; }
+      if (!slug) issues.add(categoriesFile, row.row, "slug is required");
+      if (issues.has(categoriesFile, row.row)) { rowStatus.set(key, "error"); return; }
       const existing = categories.get(slug);
-      if (action === "delete") {
-        if (!existing) { validationError(categoriesFile, row, errors, "category slug does not exist"); rowStatus.set(statusKey, "error"); continue; }
+      if (deleteAction === "delete") {
+        if (!existing) { issues.add(categoriesFile, row.row, "category slug does not exist"); rowStatus.set(key, "error"); return; }
         categories.delete(slug);
-        deletedCategories.add(slug);
-        operation(operations, "delete", "categories", categoryTarget(existing), categoriesFile.filename, row.row, {});
-        rowStatus.set(statusKey, "changed");
-        continue;
+        deletedCategorySlugs.add(slug);
+        categoryRows.set(slug, { row, action: "delete", previous: existing, fields: { name: { oldValue: existing.name, newValue: "DELETE" } }, set: {} });
+        rowStatus.set(key, "changed");
+        return;
       }
       if (!existing) {
-        if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) || slug === "all" || slug.length > 64) validationError(categoriesFile, row, errors, "slug must match ^[a-z0-9]+(-[a-z0-9]+)*$, be at most 64 characters, and not be all");
-        if (!present(categoriesFile, "name") || normaliseText(row.values.name) === "") validationError(categoriesFile, row, errors, "name is required for a new category");
+        if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) || slug === "all" || slug.length > 64) issues.add(categoriesFile, row.row, "slug must match ^[a-z0-9]+(-[a-z0-9]+)*$, be at most 64 characters, and not be all");
         const name = normaliseText(row.values.name);
-        if (name.length > 64) validationError(categoriesFile, row, errors, "name must be at most 64 characters");
+        if (!present(categoriesFile, "name") || !name) issues.add(categoriesFile, row.row, "name is required for a new category");
+        if (name.length > 64) issues.add(categoriesFile, row.row, "name must be at most 64 characters");
         const visibility = present(categoriesFile, "visibility") ? normaliseText(row.values.visibility) : "always";
-        if (!VISIBILITY_VALUES.has(visibility as VisibilityMode)) validationError(categoriesFile, row, errors, "visibility must be regular_only, always, or power_drop_only");
-        const sortOrder = !present(categoriesFile, "sortOrder") || normaliseText(row.values.sortOrder) === "" ? nextCategorySort++ : parseNonNegativeInteger(row.values.sortOrder);
-        if (sortOrder === null) validationError(categoriesFile, row, errors, "sortOrder must be an integer of 0 or more");
+        if (!VISIBILITY_VALUES.has(visibility as VisibilityMode)) issues.add(categoriesFile, row.row, "visibility must be regular_only, always, or power_drop_only");
         const powerDropName = present(categoriesFile, "powerDropName") ? nullableText(row.values.powerDropName) : null;
         const emoji = present(categoriesFile, "emoji") ? nullableText(row.values.emoji) : null;
-        if ((powerDropName?.length ?? 0) > 64) validationError(categoriesFile, row, errors, "powerDropName must be at most 64 characters");
-        if ((emoji?.length ?? 0) > 16) validationError(categoriesFile, row, errors, "emoji must be at most 16 characters");
-        const sectionId = resolveSection(categoriesFile, row, null, sections, deletedSections, initialSections, errors);
-        if (rowHasError(errors, categoriesFile, row.row) || sectionId === undefined) { rowStatus.set(statusKey, "error"); continue; }
-        const duplicateName = Array.from(categories.values()).find((category) => lower(category.name) === lower(name));
-        if (duplicateName) { validationError(categoriesFile, row, errors, `category name already exists: ${duplicateName.slug}`); rowStatus.set(statusKey, "error"); continue; }
-        const category: CatalogCategorySnapshot = {
-          id: nextCategoryId++, slug, name, powerDropName, emoji, sectionId,
-          visibility: visibility as VisibilityMode, sortOrder: sortOrder!, updatedAt: new Date(0),
-        };
+        if ((powerDropName?.length ?? 0) > 64) issues.add(categoriesFile, row.row, "powerDropName must be at most 64 characters");
+        if ((emoji?.length ?? 0) > 16) issues.add(categoriesFile, row.row, "emoji must be at most 16 characters");
+        const sortOrder = !present(categoriesFile, "sortOrder") || normaliseText(row.values.sortOrder) === "" ? nextCategorySort++ : parseNonNegativeInteger(row.values.sortOrder);
+        if (sortOrder === null) issues.add(categoriesFile, row.row, "sortOrder must be an integer of 0 or more");
+        const section = resolveSectionReference(categoriesFile, row, null, null, sections, newSections, deletedSectionIds, initialSections, issues, warnings, warningKeys, slug, true);
+        if (issues.has(categoriesFile, row.row) || section === undefined) { rowStatus.set(key, "error"); return; }
+        const category: InternalCategory = { slug, name, powerDropName, emoji, section, visibility: visibility as VisibilityMode, sortOrder: sortOrder!, row, action: "create", changedName: true };
         categories.set(slug, category);
-        const createFields = fieldsFromObject({}, category as unknown as Record<string, unknown>, ["slug", "name", "powerDropName", "emoji", "sectionId", "visibility", "sortOrder"]);
-        if (createFields.sectionId) {
-          delete createFields.sectionId;
-          createFields.section = { oldValue: null, newValue: sectionNameById(sections, category.sectionId) || null };
-        }
-        operation(operations, "create", "categories", categoryTarget(category), categoriesFile.filename, row.row, createFields);
-        rowStatus.set(statusKey, "changed");
-        continue;
+        const values = { slug, name, powerDropName, emoji, section: referenceDisplay(section, sections, newSections), visibility: category.visibility, sortOrder: category.sortOrder };
+        categoryRows.set(slug, { row, action: "create", candidate: category, fields: allCreateFields(values, ["slug", "name", "powerDropName", "emoji", "section", "visibility", "sortOrder"]), set: {} });
+        rowStatus.set(key, "changed");
+        return;
       }
 
-      const candidate = cloneCategory(existing);
+      const candidate: InternalCategory = { ...existing, row, action: "update" };
       if (present(categoriesFile, "name")) {
         const name = normaliseText(row.values.name);
-        if (!name) validationError(categoriesFile, row, errors, "name is required");
-        else if (name.length > 64) validationError(categoriesFile, row, errors, "name must be at most 64 characters");
+        if (!name) issues.add(categoriesFile, row.row, "name is required");
+        else if (name.length > 64) issues.add(categoriesFile, row.row, "name must be at most 64 characters");
         else candidate.name = name;
       }
       if (present(categoriesFile, "powerDropName")) {
         candidate.powerDropName = nullableText(row.values.powerDropName);
-        if ((candidate.powerDropName?.length ?? 0) > 64) validationError(categoriesFile, row, errors, "powerDropName must be at most 64 characters");
+        if ((candidate.powerDropName?.length ?? 0) > 64) issues.add(categoriesFile, row.row, "powerDropName must be at most 64 characters");
       }
       if (present(categoriesFile, "emoji")) {
         candidate.emoji = nullableText(row.values.emoji);
-        if ((candidate.emoji?.length ?? 0) > 16) validationError(categoriesFile, row, errors, "emoji must be at most 16 characters");
+        if ((candidate.emoji?.length ?? 0) > 16) issues.add(categoriesFile, row.row, "emoji must be at most 16 characters");
       }
       if (present(categoriesFile, "visibility")) {
         const visibility = normaliseText(row.values.visibility);
-        if (!VISIBILITY_VALUES.has(visibility as VisibilityMode)) validationError(categoriesFile, row, errors, "visibility must be regular_only, always, or power_drop_only");
+        if (!VISIBILITY_VALUES.has(visibility as VisibilityMode)) issues.add(categoriesFile, row.row, "visibility must be regular_only, always, or power_drop_only");
         else candidate.visibility = visibility as VisibilityMode;
       }
       if (present(categoriesFile, "sortOrder")) {
         const sortOrder = parseNonNegativeInteger(row.values.sortOrder);
-        if (sortOrder === null) validationError(categoriesFile, row, errors, "sortOrder must be an integer of 0 or more");
+        if (sortOrder === null) issues.add(categoriesFile, row.row, "sortOrder must be an integer of 0 or more");
         else candidate.sortOrder = sortOrder;
       }
-      const resolvedSection = resolveSection(categoriesFile, row, existing.sectionId, sections, deletedSections, initialSections, errors);
-      if (resolvedSection !== undefined) candidate.sectionId = resolvedSection;
-      const fields = fieldsFromObject(existing as unknown as Record<string, unknown>, candidate as unknown as Record<string, unknown>, ["name", "powerDropName", "emoji", "sectionId", "visibility", "sortOrder"]);
-      if (fields.sectionId) {
-        delete fields.sectionId;
-        fields.section = {
-          oldValue: sectionNameById(initialSections, existing.sectionId) || null,
-          newValue: sectionNameById(sections, candidate.sectionId) || null,
-        };
+      const section = resolveSectionReference(categoriesFile, row, candidate.section, sectionRefForId(existing.initial?.sectionId ?? null), sections, newSections, deletedSectionIds, initialSections, issues, warnings, warningKeys, slug, false);
+      if (section !== undefined) candidate.section = section;
+      candidate.changedName = lower(candidate.name) !== lower(existing.name);
+      const before = {
+        name: existing.name, powerDropName: existing.powerDropName, emoji: existing.emoji,
+        section: referenceDisplay(existing.section, sections, newSections), visibility: existing.visibility, sortOrder: existing.sortOrder,
+      };
+      const after = {
+        name: candidate.name, powerDropName: candidate.powerDropName, emoji: candidate.emoji,
+        section: referenceDisplay(candidate.section, sections, newSections), visibility: candidate.visibility, sortOrder: candidate.sortOrder,
+      };
+      const fields = changedFields(before, after, ["name", "powerDropName", "emoji", "section", "visibility", "sortOrder"]);
+      const set: UpdateCategoryOperation["set"] = {};
+      (["name", "powerDropName", "emoji", "visibility", "sortOrder"] as const).forEach((field) => {
+        if (fields[field]) (set as Record<string, unknown>)[field] = candidate[field];
+      });
+      if (issues.has(categoriesFile, row.row) || (existing.initial && checkConflict(categoriesFile, row, existing.initial, Object.keys(fields).length > 0, issues, conflicts, warnings, restoreMode))) {
+        rowStatus.set(key, issues.has(categoriesFile, row.row) ? "error" : "conflict");
+        return;
       }
-      if (rowHasError(errors, categoriesFile, row.row) || hasConflict(categoriesFile, row, existing, Object.keys(fields).length > 0, errors, conflicts)) {
-        rowStatus.set(statusKey, rowHasError(errors, categoriesFile, row.row) ? "error" : "conflict");
-        continue;
-      }
-      const duplicateName = Object.keys(fields).includes("name") && Array.from(categories.values()).some((category) => category.slug !== slug && lower(category.name) === lower(candidate.name));
-      if (duplicateName) { validationError(categoriesFile, row, errors, "category name already exists"); rowStatus.set(statusKey, "error"); continue; }
       categories.set(slug, candidate);
-      operation(operations, "update", "categories", categoryTarget(existing), categoriesFile.filename, row.row, fields);
-      if (fields.visibility) warnings.push(`category visibility change: ${slug} affects all ${Array.from(products.values()).filter((product) => product.category === slug).length} products in this category`);
-      rowStatus.set(statusKey, Object.keys(fields).length ? "changed" : "unchanged");
-    }
-  }
+      categoryRows.set(slug, { row, action: "update", previous: existing, candidate, fields, set, ...(fields.section ? { section: candidate.section } : {}) });
+      rowStatus.set(key, Object.keys(fields).length ? "changed" : "unchanged");
+    });
 
-  // Deleting a section unassigns every surviving category that points to it.
-  for (const [slug, category] of Array.from(categories.entries())) {
-    if (category.sectionId == null || !deletedSections.has(category.sectionId)) continue;
-    const oldSection = sectionNameById(initialSections, category.sectionId);
-    const updated = { ...category, sectionId: null };
-    categories.set(slug, updated);
-    operation(operations, "update", "categories", categoryTarget(category), sectionsFile?.filename ?? "sections.csv", 0, {
-      section: { oldValue: oldSection || category.sectionId, newValue: null },
+    const duplicateGroups = new Map<string, InternalCategory[]>();
+    Array.from(categories.values()).forEach((category) => {
+      const group = duplicateGroups.get(lower(category.name)) ?? [];
+      group.push(category);
+      duplicateGroups.set(lower(category.name), group);
+    });
+    Array.from(duplicateGroups.values()).forEach((group) => {
+      if (group.length < 2) return;
+      group.filter((category) => category.action === "create" || category.changedName).forEach((category) => {
+        const other = group.find((candidate) => candidate !== category)!;
+        const otherLabel = other.action === "create" ? `row ${other.row?.row ?? "?"}` : other.slug;
+        issues.add(categoriesFile, category.row?.row ?? 1, `category name already exists: ${otherLabel}`);
+        if (category.action === "create") categories.delete(category.slug);
+        else if (category.initial) categories.set(category.slug, { ...category, name: category.initial.name, powerDropName: category.initial.powerDropName, emoji: category.initial.emoji, section: sectionRefForId(category.initial.sectionId), visibility: category.initial.visibility, sortOrder: category.initial.sortOrder, action: undefined, row: undefined, changedName: false });
+        categoryRows.delete(category.slug);
+        if (category.row) rowStatus.set(statusKey(categoriesFile, category.row), "error");
+      });
     });
   }
 
-  const productsFile = fileByType.get("products");
-  if (productsFile && productsFile.errors.length === 0) {
+  // Products use the final category state and an incrementally maintained tuple index.
+  const products = new Map<number, ProductEntry>(snapshot.products.map((product) => [product.id, { product: copyProduct(product) }]));
+  const tupleIndex = new Map<string, Set<string>>();
+  snapshot.products.forEach((product) => tupleAdd(tupleIndex, productTuple(product), String(product.id)));
+  const productRows = new Map<number | string, { row: CsvRow; action: CatalogAction; previous?: CatalogProductSnapshot; candidate?: CatalogProductSnapshot; fields: ChangeFields }>();
+  let nextProductSort = Math.max(-1, ...snapshot.products.map((product) => product.sortOrder)) + 1;
+  const productsFile = validFile("products");
+  const orderedProductIds = snapshot.orderedProductIds instanceof Set ? snapshot.orderedProductIds : new Set(snapshot.orderedProductIds);
+
+  if (productsFile) {
     const existingRows = productsFile.rows.filter((row) => normaliseText(row.values.id) !== "");
     const newRows = productsFile.rows.filter((row) => normaliseText(row.values.id) === "");
-    for (const row of [...existingRows, ...newRows]) {
-      const statusKey = `${productsFile.filename}:${row.row}`;
-      const action = parseAction(productsFile, row, errors);
+    [...existingRows, ...newRows].forEach((row) => {
+      const key = statusKey(productsFile, row);
+      const deleteAction = parseAction(productsFile, row, issues);
       const rawId = normaliseText(row.values.id);
       const id = rawId === "" ? null : parsePositiveInteger(rawId);
-      if (rawId !== "" && id === null) validationError(productsFile, row, errors, "id must be a positive integer");
-      if (rowHasError(errors, productsFile, row.row)) { rowStatus.set(statusKey, "error"); continue; }
+      if (rawId !== "" && id === null) issues.add(productsFile, row.row, "id must be a positive integer");
+      if (issues.has(productsFile, row.row)) { rowStatus.set(key, "error"); return; }
       const existing = id === null ? undefined : products.get(id);
-      if (action === "delete") {
-        if (!existing) { validationError(productsFile, row, errors, "product id does not exist"); rowStatus.set(statusKey, "error"); continue; }
-        if ((snapshot.unreadableOrderCount ?? 0) > 0) { validationError(productsFile, row, errors, `order data unreadable (${snapshot.unreadableOrderCount} orders)`); rowStatus.set(statusKey, "error"); continue; }
-        const ordered = snapshot.orderedProductIds instanceof Set ? snapshot.orderedProductIds : new Set(snapshot.orderedProductIds);
-        if (ordered.has(existing.id)) {
-          validationError(productsFile, row, errors, "This product has orders, so it can't be deleted. Set available to FALSE (it stays visible as SOLD OUT) instead.");
-          rowStatus.set(statusKey, "error");
-          continue;
-        }
-        products.delete(existing.id);
-        deletedProducts.add(existing.id);
-        operation(operations, "delete", "products", productTarget(existing), productsFile.filename, row.row, {});
-        rowStatus.set(statusKey, "changed");
-        continue;
+      if (deleteAction === "delete") {
+        if (!existing || id === null) { issues.add(productsFile, row.row, "product id does not exist"); rowStatus.set(key, "error"); return; }
+        if ((snapshot.unreadableOrderCount ?? 0) > 0) { issues.add(productsFile, row.row, `order data unreadable (${snapshot.unreadableOrderCount} orders)`); rowStatus.set(key, "error"); return; }
+        if (orderedProductIds.has(id)) { issues.add(productsFile, row.row, "This product has orders, so it can't be deleted. Set available to FALSE (it stays visible as SOLD OUT) instead."); rowStatus.set(key, "error"); return; }
+        products.delete(id);
+        tupleRemove(tupleIndex, productTuple(existing.product), String(id));
+        productRows.set(id, { row, action: "delete", previous: existing.product, fields: { name: { oldValue: existing.product.name, newValue: "DELETE" } } });
+        rowStatus.set(key, "changed");
+        return;
       }
-      if (!existing && id !== null) { validationError(productsFile, row, errors, "product id does not exist"); rowStatus.set(statusKey, "error"); continue; }
+      if (!existing && id !== null) { issues.add(productsFile, row.row, "product id does not exist"); rowStatus.set(key, "error"); return; }
       if (!existing) {
         const required = ["name", "category", "price", "unit", "available", "visibility"];
-        for (const field of required) if (!present(productsFile, field) || normaliseText(row.values[field]) === "") validationError(productsFile, row, errors, `${field} is required for a new product`);
+        required.forEach((field) => { if (!present(productsFile, field) || normaliseText(row.values[field]) === "") issues.add(productsFile, row.row, `${field} is required for a new product`); });
         const name = normaliseText(row.values.name);
         const cut = present(productsFile, "cut") ? normaliseText(row.values.cut) : "";
         const category = normaliseText(row.values.category);
         const price = parseDecimal(row.values.price, 99_999_999.99, 2);
-        const unit = normaliseText(row.values.unit);
-        const available = parseBoolean(row.values.available);
-        const visibility = normaliseText(row.values.visibility);
         const powerDropPrice = present(productsFile, "powerDropPrice") ? nullableText(row.values.powerDropPrice) : null;
         const retailPrice = present(productsFile, "retailPrice") ? nullableText(row.values.retailPrice) : null;
-        const stockLimit = present(productsFile, "stockLimit") ? nullableText(row.values.stockLimit) : null;
+        const unit = normaliseText(row.values.unit);
         const badge = present(productsFile, "badge") ? nullableText(row.values.badge) : null;
-        const description = present(productsFile, "description") ? nullableText(row.values.description) : null;
-        const img = present(productsFile, "img") ? nullableText(row.values.img) : null;
-        if (name.length > 255) validationError(productsFile, row, errors, "name must be at most 255 characters");
-        if (cut.length > 255) validationError(productsFile, row, errors, "cut must be at most 255 characters");
-        if (unit.length > 64) validationError(productsFile, row, errors, "unit must be at most 64 characters");
-        if (!price) validationError(productsFile, row, errors, "price must be a valid decimal number up to 99999999.99");
-        if (powerDropPrice !== null && !parseDecimal(powerDropPrice, 99_999_999.99, 2)) validationError(productsFile, row, errors, "powerDropPrice must be a valid decimal number up to 99999999.99");
-        if (retailPrice !== null && !parseDecimal(retailPrice, 99_999_999.99, 2)) validationError(productsFile, row, errors, "retailPrice must be a valid decimal number up to 99999999.99");
-        if (stockLimit !== null && !parseDecimal(stockLimit, 9_999_999.999, 3)) validationError(productsFile, row, errors, "stockLimit must be a valid decimal number up to 9999999.999");
-        if (badge !== null && !BADGE_VALUES.has(badge)) validationError(productsFile, row, errors, "badge must be LIMITED, POPULAR, NEW, or SOLD OUT");
-        if (available === null) validationError(productsFile, row, errors, "available must be TRUE or FALSE");
-        if (!VISIBILITY_VALUES.has(visibility as VisibilityMode)) validationError(productsFile, row, errors, "visibility must be regular_only, always, or power_drop_only");
-        if (!categories.has(category) || deletedCategories.has(category)) validationError(productsFile, row, errors, "category must be an existing, non-deleted category slug");
+        const available = parseBoolean(row.values.available);
+        const visibility = normaliseText(row.values.visibility);
+        const stockLimit = present(productsFile, "stockLimit") ? nullableText(row.values.stockLimit) : null;
         const sortOrder = !present(productsFile, "sortOrder") || normaliseText(row.values.sortOrder) === "" ? nextProductSort++ : parseNonNegativeInteger(row.values.sortOrder);
-        if (sortOrder === null) validationError(productsFile, row, errors, "sortOrder must be an integer of 0 or more");
-        if (rowHasError(errors, productsFile, row.row)) { rowStatus.set(statusKey, "error"); continue; }
+        const img = present(productsFile, "img") ? nullableText(row.values.img) : null;
+        const description = present(productsFile, "description") ? nullableText(row.values.description) : null;
+        if (name.length > 255) issues.add(productsFile, row.row, "name must be at most 255 characters");
+        if (cut.length > 255) issues.add(productsFile, row.row, "cut must be at most 255 characters");
+        if (unit.length > 64) issues.add(productsFile, row.row, "unit must be at most 64 characters");
+        if (!price) issues.add(productsFile, row.row, "price must be a valid decimal number up to 99999999.99");
+        if (powerDropPrice !== null && !parseDecimal(powerDropPrice, 99_999_999.99, 2)) issues.add(productsFile, row.row, "powerDropPrice must be a valid decimal number up to 99999999.99");
+        if (retailPrice !== null && !parseDecimal(retailPrice, 99_999_999.99, 2)) issues.add(productsFile, row.row, "retailPrice must be a valid decimal number up to 99999999.99");
+        if (stockLimit !== null && !parseDecimal(stockLimit, 9_999_999.999, 3)) issues.add(productsFile, row.row, "stockLimit must be a valid decimal number up to 9999999.999");
+        if (badge !== null && !BADGE_VALUES.has(badge)) issues.add(productsFile, row.row, "badge must be LIMITED, POPULAR, NEW, or SOLD OUT");
+        if (available === null) issues.add(productsFile, row.row, "available must be TRUE or FALSE");
+        if (!VISIBILITY_VALUES.has(visibility as VisibilityMode)) issues.add(productsFile, row.row, "visibility must be regular_only, always, or power_drop_only");
+        if (!categories.has(category) || deletedCategorySlugs.has(category)) issues.add(productsFile, row.row, "category must be an existing, non-deleted category slug");
+        if (sortOrder === null) issues.add(productsFile, row.row, "sortOrder must be an integer of 0 or more");
+        if (issues.has(productsFile, row.row)) { rowStatus.set(key, "error"); return; }
         const candidate: CatalogProductSnapshot = {
-          id: nextProductId++, name, cut, category, description, price: price!, powerDropPrice, retailPrice, unit,
+          id: -row.row, name, cut, category, description, price: price!, powerDropPrice, retailPrice, unit,
           badge: badge as CatalogProductSnapshot["badge"], available: available!, visibility: visibility as VisibilityMode,
           stockLimit, sortOrder: sortOrder!, img, updatedAt: new Date(0),
         };
-        const duplicate = Array.from(products.values()).find((product) => productTuple(product) === productTuple(candidate));
-        if (duplicate) { validationError(productsFile, row, errors, `product already exists: ${duplicate.id}`); rowStatus.set(statusKey, "error"); continue; }
-        products.set(candidate.id, candidate);
-        operation(operations, "create", "products", `product:new:${row.row}`, productsFile.filename, row.row, fieldsFromObject({}, candidate as unknown as Record<string, unknown>, ["name", "cut", "category", "description", "price", "powerDropPrice", "retailPrice", "unit", "badge", "available", "visibility", "stockLimit", "sortOrder", "img"]));
-        rowStatus.set(statusKey, "changed");
-        continue;
-      }
-
-      const candidate = cloneProduct(existing);
-      for (const field of Array.from(PRODUCT_TEXT_FIELDS)) {
-        if (!present(productsFile, field)) continue;
-        const raw = normaliseText(row.values[field]);
-        if (["description", "powerDropPrice", "retailPrice", "badge", "stockLimit", "img"].includes(field)) {
-          (candidate as unknown as Record<string, unknown>)[field] = raw === "" ? null : raw;
-        } else {
-          (candidate as unknown as Record<string, unknown>)[field] = raw;
+        const tuple = productTuple(candidate);
+        const duplicate = tupleIndex.get(tuple);
+        if (duplicate && duplicate.size > 0) {
+          const other = Array.from(duplicate.values())[0];
+          issues.add(productsFile, row.row, `product already exists: ${other.startsWith("new:") ? `row ${other.slice(4)}` : other}`);
+          rowStatus.set(key, "error");
+          return;
         }
+        products.set(candidate.id, { product: candidate, row, action: "create" });
+        tupleAdd(tupleIndex, tuple, `new:${row.row}`);
+        productRows.set(`new:${row.row}`, { row, action: "create", candidate, fields: allCreateFields(candidate as unknown as Record<string, unknown>, PRODUCT_FIELDS) });
+        rowStatus.set(key, "changed");
+        return;
       }
-      for (const field of ["price", "powerDropPrice", "retailPrice", "stockLimit"]) {
-        if (!present(productsFile, field)) continue;
+
+      const previous = existing.product;
+      const candidate = copyProduct(previous);
+      PRODUCT_FIELDS.forEach((field) => {
+        if (!present(productsFile, field)) return;
         const raw = normaliseText(row.values[field]);
-        (candidate as unknown as Record<string, unknown>)[field] = field === "price" || raw !== "" ? raw : null;
-      }
-      if (present(productsFile, "available")) {
-        const available = parseBoolean(row.values.available);
-        if (available === null) validationError(productsFile, row, errors, "available must be TRUE or FALSE");
-        else candidate.available = available;
-      }
-      if (present(productsFile, "visibility")) candidate.visibility = normaliseText(row.values.visibility) as VisibilityMode;
-      if (present(productsFile, "sortOrder")) {
-        const rawSort = normaliseText(row.values.sortOrder);
-        candidate.sortOrder = rawSort === "" ? 0 : (parseNonNegativeInteger(rawSort) ?? -1);
-      }
-      const changedFields = fieldsFromObject(existing as unknown as Record<string, unknown>, candidate as unknown as Record<string, unknown>, ["name", "cut", "category", "description", "price", "powerDropPrice", "retailPrice", "unit", "badge", "available", "visibility", "stockLimit", "sortOrder", "img"]);
-      for (const field of Object.keys(changedFields)) {
+        if (PRODUCT_NULLABLE.has(field as NullableProductField)) (candidate as unknown as Record<string, unknown>)[field] = raw === "" ? null : raw;
+        else if (field === "available") {
+          const parsed = parseBoolean(raw);
+          if (parsed === null) issues.add(productsFile, row.row, "available must be TRUE or FALSE");
+          else candidate.available = parsed;
+        } else if (field === "visibility") candidate.visibility = raw as VisibilityMode;
+        else if (field === "sortOrder") candidate.sortOrder = raw === "" ? 0 : (parseNonNegativeInteger(raw) ?? -1);
+        else (candidate as unknown as Record<string, unknown>)[field] = raw;
+      });
+      const fields = changedFields(previous as unknown as Record<string, unknown>, candidate as unknown as Record<string, unknown>, PRODUCT_FIELDS);
+      Object.keys(fields).forEach((field) => {
         const value = (candidate as unknown as Record<string, unknown>)[field];
-        if (field === "name" && (normaliseText(value) === "" || normaliseText(value).length > 255)) validationError(productsFile, row, errors, "name is required and must be at most 255 characters");
-        if (field === "cut" && normaliseText(value).length > 255) validationError(productsFile, row, errors, "cut must be at most 255 characters");
-        if (field === "unit" && (normaliseText(value) === "" || normaliseText(value).length > 64)) validationError(productsFile, row, errors, "unit is required and must be at most 64 characters");
-        if (field === "category" && (!normaliseText(value) || !categories.has(normaliseText(value)) || deletedCategories.has(normaliseText(value)))) validationError(productsFile, row, errors, "category must be an existing, non-deleted category slug");
-        if (field === "price" && !parseDecimal(String(value), 99_999_999.99, 2)) validationError(productsFile, row, errors, "price must be a valid decimal number up to 99999999.99");
-        if (["powerDropPrice", "retailPrice"].includes(field) && value !== null && !parseDecimal(String(value), 99_999_999.99, 2)) validationError(productsFile, row, errors, `${field} must be a valid decimal number up to 99999999.99`);
-        if (field === "stockLimit" && value !== null && !parseDecimal(String(value), 9_999_999.999, 3)) validationError(productsFile, row, errors, "stockLimit must be a valid decimal number up to 9999999.999");
-        if (field === "badge" && value !== null && !BADGE_VALUES.has(String(value))) validationError(productsFile, row, errors, "badge must be LIMITED, POPULAR, NEW, or SOLD OUT");
-        if (field === "visibility" && !VISIBILITY_VALUES.has(value as VisibilityMode)) validationError(productsFile, row, errors, "visibility must be regular_only, always, or power_drop_only");
-        if (field === "sortOrder" && (!Number.isInteger(value) || Number(value) < 0)) validationError(productsFile, row, errors, "sortOrder must be an integer of 0 or more");
+        if (field === "name" && (!normaliseText(value) || normaliseText(value).length > 255)) issues.add(productsFile, row.row, "name is required and must be at most 255 characters");
+        if (field === "cut" && normaliseText(value).length > 255) issues.add(productsFile, row.row, "cut must be at most 255 characters");
+        if (field === "unit" && (!normaliseText(value) || normaliseText(value).length > 64)) issues.add(productsFile, row.row, "unit is required and must be at most 64 characters");
+        if (field === "category" && (!normaliseText(value) || !categories.has(normaliseText(value)) || deletedCategorySlugs.has(normaliseText(value)))) issues.add(productsFile, row.row, "category must be an existing, non-deleted category slug");
+        if (field === "price" && !parseDecimal(String(value), 99_999_999.99, 2)) issues.add(productsFile, row.row, "price must be a valid decimal number up to 99999999.99");
+        if (["powerDropPrice", "retailPrice"].includes(field) && value !== null && !parseDecimal(String(value), 99_999_999.99, 2)) issues.add(productsFile, row.row, `${field} must be a valid decimal number up to 99999999.99`);
+        if (field === "stockLimit" && value !== null && !parseDecimal(String(value), 9_999_999.999, 3)) issues.add(productsFile, row.row, "stockLimit must be a valid decimal number up to 9999999.999");
+        if (field === "badge" && value !== null && !BADGE_VALUES.has(String(value))) issues.add(productsFile, row.row, "badge must be LIMITED, POPULAR, NEW, or SOLD OUT");
+        if (field === "visibility" && !VISIBILITY_VALUES.has(value as VisibilityMode)) issues.add(productsFile, row.row, "visibility must be regular_only, always, or power_drop_only");
+        if (field === "sortOrder" && (!Number.isInteger(value) || Number(value) < 0)) issues.add(productsFile, row.row, "sortOrder must be an integer of 0 or more");
+      });
+      if (issues.has(productsFile, row.row) || checkConflict(productsFile, row, previous, Object.keys(fields).length > 0, issues, conflicts, warnings, restoreMode)) {
+        rowStatus.set(key, issues.has(productsFile, row.row) ? "error" : "conflict");
+        return;
       }
-      if (rowHasError(errors, productsFile, row.row) || hasConflict(productsFile, row, existing, Object.keys(changedFields).length > 0, errors, conflicts)) {
-        rowStatus.set(statusKey, rowHasError(errors, productsFile, row.row) ? "error" : "conflict");
-        continue;
+      const previousTuple = productTuple(previous);
+      const nextTuple = productTuple(candidate);
+      if (previousTuple !== nextTuple) {
+        tupleRemove(tupleIndex, previousTuple, String(previous.id));
+        const duplicate = tupleIndex.get(nextTuple);
+        if (duplicate && duplicate.size > 0) {
+          tupleAdd(tupleIndex, previousTuple, String(previous.id));
+          const other = Array.from(duplicate.values())[0];
+          issues.add(productsFile, row.row, `product name + cut + category already exists: ${other.startsWith("new:") ? `row ${other.slice(4)}` : other}`);
+          rowStatus.set(key, "error");
+          return;
+        }
+        tupleAdd(tupleIndex, nextTuple, String(previous.id));
       }
-      const duplicate = (changedFields.name || changedFields.cut || changedFields.category) && Array.from(products.values()).some((product) => product.id !== existing.id && productTuple(product) === productTuple(candidate));
-      if (duplicate) { validationError(productsFile, row, errors, "product name + cut + category already exists"); rowStatus.set(statusKey, "error"); continue; }
-      products.set(existing.id, candidate);
-      operation(operations, "update", "products", productTarget(existing), productsFile.filename, row.row, changedFields);
-      if (changedFields.name) warnings.push(`product name change: ${existing.id} (${existing.name} → ${candidate.name}) — historic analytics look up category by product name`);
-      for (const field of ["stockLimit", "img", "powerDropPrice", "retailPrice"]) if (changedFields[field] && changedFields[field].newValue === null) warnings.push(`cleared ${field}: product ${existing.id}`);
-      rowStatus.set(statusKey, Object.keys(changedFields).length ? "changed" : "unchanged");
-    }
+      products.set(previous.id, { product: candidate, row, action: "update" });
+      productRows.set(previous.id, { row, action: "update", previous, candidate, fields });
+      rowStatus.set(key, Object.keys(fields).length ? "changed" : "unchanged");
+    });
   }
 
-  for (const categorySlug of Array.from(deletedCategories)) {
-    const used = Array.from(products.values()).some((product) => product.category === categorySlug);
-    if (used) {
-      const category = snapshot.categories.find((candidate) => candidate.slug === categorySlug);
-      const deleteOperation = operations.find((candidate) => candidate.action === "delete" && candidate.entity === "categories" && candidate.target === `category:${categorySlug}`);
-      if (deleteOperation) errors.push({ file: deleteOperation.file, row: deleteOperation.row, message: `category cannot be deleted while products use ${categorySlug}` });
-      if (category) categories.set(categorySlug, cloneCategory(category));
+  // A category delete only survives when no final product still references it.
+  Array.from(deletedCategorySlugs).forEach((slug) => {
+    const used = Array.from(products.values()).some((entry) => entry.product.category === slug);
+    if (!used) return;
+    const attempted = categoryRows.get(slug);
+    if (attempted && categoriesFile) {
+      issues.add(categoriesFile, attempted.row.row, `category cannot be deleted while products use ${slug}`);
+      rowStatus.set(statusKey(categoriesFile, attempted.row), "error");
     }
-  }
+    const initial = initialCategories.get(slug);
+    if (initial) categories.set(slug, {
+      id: initial.id, slug: initial.slug, name: initial.name, powerDropName: initial.powerDropName, emoji: initial.emoji,
+      section: sectionRefForId(initial.sectionId), visibility: initial.visibility, sortOrder: initial.sortOrder, initial: copyCategory(initial), changedName: false,
+    });
+    deletedCategorySlugs.delete(slug);
+    categoryRows.delete(slug);
+  });
 
-  const changedUnavailable = operations
-    .filter((entry) => entry.entity === "products" && entry.action === "update" && entry.fields.available?.oldValue === true && entry.fields.available?.newValue === false)
-    .length;
+  // A section delete unassigns categories that still point at that deleted id. This merges with any ordinary category edit.
+  Array.from(categories.values()).forEach((category) => {
+    if (!category.section || !("existingId" in category.section) || !deletedSectionIds.has(category.section.existingId)) return;
+    const previousSection = category.section;
+    category.section = null;
+    const existingRow = categoryRows.get(category.slug);
+    const sectionChange: ChangeFields = { section: { oldValue: referenceDisplay(previousSection, initialSectionsToEntries(initialSections), new Map()), newValue: null } };
+    if (existingRow && existingRow.action === "update") {
+      existingRow.fields = { ...existingRow.fields, ...sectionChange };
+      existingRow.section = null;
+      existingRow.candidate = category;
+    } else {
+      categoryRows.set(category.slug, { row: { row: 0, values: {} }, action: "update", previous: category, candidate: category, fields: sectionChange, set: {}, section: null });
+    }
+  });
+
+  // Convert accepted section rows into operation drafts.
+  Array.from(sectionRows.entries()).forEach(([identifier, entry]) => {
+    if (typeof identifier === "number" && !sections.has(identifier) && entry.action !== "delete") return;
+    if (entry.action === "delete") {
+      const previous = entry.previous!;
+      addDraft(drafts, { action: "delete", target: sectionTarget(previous.id), file: sectionsFile?.filename ?? "sections.csv", row: entry.row.row, fields: entry.fields, operation: { kind: "deleteSection", target: sectionTarget(previous.id), id: previous.id } });
+      return;
+    }
+    if (entry.action === "create" && entry.candidate?.key) {
+      const section = entry.candidate;
+      const key = section.key;
+      if (!key) return;
+      addDraft(drafts, { action: "create", target: newSectionTarget(key), file: sectionsFile!.filename, row: entry.row.row, fields: entry.fields, operation: { kind: "createSection", target: newSectionTarget(key), key, name: section.name, sortOrder: section.sortOrder } });
+      return;
+    }
+    if (entry.action === "update" && entry.previous && entry.candidate && Object.keys(entry.fields).length > 0) {
+      const set: UpdateSectionOperation["set"] = {};
+      if (entry.fields.name) set.name = entry.candidate.name;
+      if (entry.fields.sortOrder) set.sortOrder = entry.candidate.sortOrder;
+      addDraft(drafts, { action: "update", target: sectionTarget(entry.previous.id), file: sectionsFile!.filename, row: entry.row.row, fields: entry.fields, operation: { kind: "updateSection", target: sectionTarget(entry.previous.id), id: entry.previous.id, set } });
+    }
+  });
+
+  // Convert category rows and automatic unassignments into merged operation drafts.
+  Array.from(categoryRows.entries()).forEach(([slug, entry]) => {
+    if (entry.action === "delete") {
+      if (deletedCategorySlugs.has(slug) && entry.previous) addDraft(drafts, { action: "delete", target: categoryTarget(slug), file: categoriesFile!.filename, row: entry.row.row, fields: entry.fields, operation: { kind: "deleteCategory", target: categoryTarget(slug), slug } });
+      return;
+    }
+    const category = categories.get(slug);
+    if (!category) return;
+    if (entry.action === "create") {
+      const fields = entry.fields;
+      addDraft(drafts, {
+        action: "create", target: categoryTarget(slug), file: categoriesFile!.filename, row: entry.row.row, fields,
+        operation: { kind: "createCategory", target: categoryTarget(slug), slug, name: category.name, powerDropName: category.powerDropName, emoji: category.emoji, visibility: category.visibility, sortOrder: category.sortOrder, section: category.section },
+      });
+      return;
+    }
+    if (Object.keys(entry.fields).length > 0) mergeCategoryUpdateDraft(drafts, category, entry.row.row ? categoriesFile?.filename ?? "categories.csv" : sectionsFile?.filename ?? "sections.csv", entry.row.row, entry.fields, entry.set, entry.section);
+  });
+
+  // Convert products after final category validation.
+  Array.from(productRows.entries()).forEach(([identifier, entry]) => {
+    if (entry.action === "delete" && entry.previous) {
+      addDraft(drafts, { action: "delete", target: productTarget(entry.previous.id), file: productsFile!.filename, row: entry.row.row, fields: entry.fields, operation: { kind: "deleteProduct", target: productTarget(entry.previous.id), id: entry.previous.id } });
+      return;
+    }
+    if (entry.action === "create" && entry.candidate) {
+      const product = entry.candidate;
+      const target = newProductTarget(entry.row.row);
+      addDraft(drafts, { action: "create", target, file: productsFile!.filename, row: entry.row.row, fields: entry.fields, operation: { kind: "createProduct", target, name: product.name, cut: product.cut, category: product.category, description: product.description, price: product.price, powerDropPrice: product.powerDropPrice, retailPrice: product.retailPrice, unit: product.unit, badge: product.badge, available: product.available, visibility: product.visibility, stockLimit: product.stockLimit, sortOrder: product.sortOrder, img: product.img } });
+      return;
+    }
+    if (entry.action === "update" && entry.previous && entry.candidate && Object.keys(entry.fields).length > 0) {
+      const set: UpdateProductOperation["set"] = {};
+      PRODUCT_FIELDS.forEach((field) => { if (entry.fields[field]) (set as Record<string, unknown>)[field] = entry.candidate![field]; });
+      addDraft(drafts, { action: "update", target: productTarget(entry.previous.id), file: productsFile!.filename, row: entry.row.row, fields: entry.fields, operation: { kind: "updateProduct", target: productTarget(entry.previous.id), id: entry.previous.id, set } });
+    }
+  });
+
+  // Warnings that depend on final product category assignments happen only after product planning.
+  Array.from(drafts.values()).forEach((draft) => {
+    const operation = draft.operation;
+    if (operation.kind !== "updateCategory" || !operation.set.visibility) return;
+    const count = Array.from(products.values()).filter((entry) => entry.product.category === operation.slug).length;
+    warnings.push(`category visibility change: ${operation.slug} affects all ${count} products in this category`);
+  });
+  const changedUnavailable = Array.from(drafts.values()).filter((draft) => draft.operation.kind === "updateProduct" && draft.operation.set.available === false && draft.fields.available?.oldValue === true).length;
   if (changedUnavailable > 20) warnings.push(`${changedUnavailable} products made unavailable`);
+  Array.from(drafts.values()).forEach((draft) => {
+    const operation = draft.operation;
+    if (operation.kind !== "updateProduct") return;
+    (["stockLimit", "img", "powerDropPrice", "retailPrice"] as const).forEach((field) => {
+      if (draft.fields[field]?.newValue === null) warnings.push(`cleared ${field}: product ${operation.id}`);
+    });
+    if (draft.fields.name) warnings.push(`product name change: ${operation.id} (${draft.fields.name.oldValue} → ${draft.fields.name.newValue}) — historic analytics look up category by product name`);
+  });
 
   const beforeVisible = countVisibleAvailable(snapshot.products, snapshot.categories);
-  const afterVisible = countVisibleAvailable(products.values(), categories.values());
+  const afterVisible = countVisibleAvailable(Array.from(products.values()).map((entry) => entry.product), categories.values());
   if (afterVisible === 0) blockers.push("Storefront safety blocker: zero available products would be visible in Regular mode");
 
-  const changes: CatalogChange[] = operations.flatMap((entry) => Object.entries(entry.fields).map(([field, value]) => ({
-    item: entry.target,
-    file: entry.file,
-    row: entry.row,
-    field,
-    oldValue: value.oldValue,
-    newValue: value.newValue,
+  const operationDrafts = Array.from(drafts.values()).sort((left, right) => left.target.localeCompare(right.target));
+  const operations = operationDrafts.map((draft) => draft.operation);
+  const changes = operationDrafts.flatMap((draft) => Object.entries(draft.fields).map(([field, value]) => ({
+    action: draft.action, item: draft.target, file: draft.file, row: draft.row, field, oldValue: value.oldValue, newValue: value.newValue,
   })));
-  const createTargets = new Set(operations.filter((entry) => entry.action === "create").map((entry) => entry.target));
-  const updateTargets = new Set(operations.filter((entry) => entry.action === "update").map((entry) => entry.target));
-  const deleteTargets = new Set(operations.filter((entry) => entry.action === "delete").map((entry) => entry.target));
   const unchanged = Array.from(rowStatus.values()).filter((status) => status === "unchanged").length;
-  const canonical = operations
-    .filter((entry) => entry.action !== "update" || Object.keys(entry.fields).length > 0)
-    .map((entry) => ({ action: entry.action, entity: entry.entity, target: entry.target, fields: Object.fromEntries(Object.entries(entry.fields).sort(([a], [b]) => a.localeCompare(b)).map(([field, value]) => [field, value.newValue])) }))
-    .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
-  const planHash = createHash("sha256").update(JSON.stringify(canonical)).digest("hex");
+  const canonical = { operations: operations.map(stableJson).sort((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right))), restoreMode };
+  const planHash = createHash("sha256").update(JSON.stringify(stableJson(canonical))).digest("hex");
+  const creates = operationDrafts.filter((draft) => draft.action === "create").length;
+  const updates = operationDrafts.filter((draft) => draft.action === "update").length;
+  const deletes = operationDrafts.filter((draft) => draft.action === "delete").length;
 
-  return {
-    creates: createTargets.size,
-    updates: updateTargets.size,
-    deletes: deleteTargets.size,
-    unchanged,
-    conflicts,
-    errors,
-    warnings,
-    blockers,
-    changes,
-    safety: { visibleAvailableBefore: beforeVisible, visibleAvailableAfter: afterVisible },
-    planHash,
-  };
+  return { creates, updates, deletes, unchanged, conflicts, errors: issues.errors, warnings, blockers, changes, operations, safety: { visibleAvailableBefore: beforeVisible, visibleAvailableAfter: afterVisible }, planHash };
+}
+
+function initialSectionsToEntries(initial: Map<number, CatalogSectionSnapshot>): Map<number, SectionEntry> {
+  return new Map(Array.from(initial.entries()).map(([id, section]) => [id, {
+    ref: { existingId: id }, id, name: section.name, sortOrder: section.sortOrder, initial: section, changedName: false,
+  }]));
 }
