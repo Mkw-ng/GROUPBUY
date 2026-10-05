@@ -633,3 +633,10 @@
 - [x] Preview fixes include strict CSV quote errors, UTC timestamp parsing, numeric duplicate IDs, final-state section/category naming and swaps, renamed-section category retention warnings, safe rejected-delete removal, final-state visibility counts, and scalable row/tuple indexes.
 - [x] Catalog dialog shows actions (deletes first/red), validates preview responses, reports Nothing to apply, and offers the preview-only restore-mode conflict override with explanatory copy.
 - [x] Tests include pure planner operations, order parsing, restore mode, final-state dependencies, and Melbourne-timezone UTC parsing. The only revised original Run 1 test is the approved section delete/create-name reuse expectation.
+
+## Catalog CSV (run 3: apply)
+- [x] Catalog apply is admin-only, same-origin/header guarded, multipart-validated, and runs inside one database transaction. It re-locks and re-plans the live catalog before writing, then verifies the preview hash so it applies exactly the reviewed plan or rolls back.
+- [x] The pure apply engine executes dependency-ordered writes with per-row section IDs, strict no-undefined/no-unresolved-reference checks, `where` clauses for every update/delete, and a post-write locked category-delete race guard. Admin edits should not be made while an apply is running.
+- [x] Planner safeguards reject INT-overflow sort orders, oversized UTF-8 product text/image content, and deletion of a product that is still available or appears in orders.
+- [x] Catalog CSV now requires downloading a ZIP backup for the current plan before Apply is enabled, provides delete/restore-aware confirmation, locks controls during requests, handles all documented server outcomes cautiously, and refreshes catalog queries after every apply attempt reaching the network.
+- [x] Run 3 unit and route tests use only fakes/mocks; live verification stopped at the unavailable admin login and never applied, previewed edited data, or changed catalog records.

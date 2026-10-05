@@ -190,7 +190,7 @@ describe("catalog CSV parser and planner", () => {
   });
 
   it("allows deletion only for a product that has never appeared in an order", () => {
-    const data = snapshot();
+    const data = snapshot({ products: snapshot().products.map((product) => product.id === 1 ? { ...product, available: false } : product) });
     const allowed = plan([{ filename: "products.csv", text: csv(["id", "action"], [["1", "DELETE"]]) }], data);
     expect(allowed).toMatchObject({ deletes: 1, errors: [] });
     const blocked = plan([{ filename: "products.csv", text: csv(["id", "action"], [["2", "delete"]]) }], data);
@@ -225,7 +225,8 @@ describe("catalog CSV parser and planner", () => {
   it("validates new category slugs and accepts DELETE actions", () => {
     const invalid = plan([{ filename: "categories.csv", text: csv(CATEGORY_HEADERS, [["all", "All", "", "", "", "always", "0", "", ""]]) }]);
     expect(invalid.errors.some((error) => /slug must match/.test(error.message))).toBe(true);
-    const deleteAction = plan([{ filename: "products.csv", text: csv(["id", "action"], [["1", "DELETE"]]) }]);
+    const deleteData = snapshot({ products: snapshot().products.map((product) => product.id === 1 ? { ...product, available: false } : product) });
+    const deleteAction = plan([{ filename: "products.csv", text: csv(["id", "action"], [["1", "DELETE"]]) }], deleteData);
     expect(deleteAction.errors).toEqual([]);
   });
 
@@ -290,7 +291,8 @@ describe("catalog CSV run 2 operations and preview fixes", () => {
   });
 
   it("shows accepted deletes as red-display-ready change rows with matching operations", () => {
-    const result = planWithOptions([{ filename: "products.csv", text: csv(["id", "action"], [["1", "delete"]]) }]);
+    const data = snapshot({ products: snapshot().products.map((product) => product.id === 1 ? { ...product, available: false } : product) });
+    const result = planWithOptions([{ filename: "products.csv", text: csv(["id", "action"], [["1", "delete"]]) }], data);
     expect(result.operations).toContainEqual({ kind: "deleteProduct", target: "product:1", id: 1 });
     expect(result.changes).toContainEqual(expect.objectContaining({ action: "delete", item: "product:1", field: "name", oldValue: "Ribeye", newValue: "DELETE" }));
   });
@@ -470,5 +472,38 @@ describe("catalog CSV run 2 operations and preview fixes", () => {
     ]);
     expect(parsed.orderedProductIds).toEqual(new Set([42]));
     expect(parsed.unreadableOrderCount).toBe(6);
+  });
+});
+
+
+describe("catalog CSV run 3 apply safeguards", () => {
+  it("rejects typed and automatic sortOrder values beyond the database INT maximum", () => {
+    const maximum = "2147483647";
+    const tooLarge = "2147483648";
+    const section = plan([{ filename: "sections.csv", text: csv(SECTION_HEADERS, [["1", "Protein", tooLarge, UPDATED_AT.toISOString(), ""]]) }]);
+    const category = plan([{ filename: "categories.csv", text: csv(CATEGORY_HEADERS, [["beef", "Beef", "", "", "Protein", "always", tooLarge, UPDATED_AT.toISOString(), ""]]) }]);
+    const product = plan([{ filename: "products.csv", text: csv(["id", "sortOrder", "updatedAt"], [["1", tooLarge, UPDATED_AT.toISOString()]]) }]);
+    const automatic = plan([{ filename: "sections.csv", text: csv(["id", "name"], [["", "Overflow"]]) }], snapshot({
+      sections: [{ id: 1, name: "Protein", sortOrder: Number(maximum), updatedAt: UPDATED_AT }],
+    }));
+    [section, category, product, automatic].forEach((result) => expect(result.errors.some((error) => /sortOrder.*2147483647/.test(error.message))).toBe(true));
+  });
+
+  it("rejects oversized UTF-8 product description and image values on create and update", () => {
+    const oversized = "é".repeat(32_768);
+    const createValues: Record<string, unknown> = { id: "", name: "New Cut", cut: "", category: "beef", description: oversized, price: "9.00", powerDropPrice: "", retailPrice: "", unit: "/ kg", badge: "", available: "FALSE", visibility: "regular_only", stockLimit: "", sortOrder: "0", img: "", updatedAt: "", action: "" };
+    const create = plan([{ filename: "products.csv", text: csv(PRODUCT_HEADERS, [PRODUCT_HEADERS.map((header) => createValues[header] ?? "")]) }]);
+    const update = plan([{ filename: "products.csv", text: csv(["id", "img", "updatedAt"], [["1", oversized, UPDATED_AT.toISOString()]]) }]);
+    expect(create.errors.some((error) => /description must be at most 65535 bytes/.test(error.message))).toBe(true);
+    expect(update.errors.some((error) => /img must be at most 65535 bytes/.test(error.message))).toBe(true);
+  });
+
+  it("requires a never-ordered product to already be unavailable before deletion", () => {
+    const available = plan([{ filename: "products.csv", text: csv(["id", "action"], [["1", "delete"]]) }]);
+    const unavailable = plan([{ filename: "products.csv", text: csv(["id", "action"], [["1", "delete"]]) }], snapshot({
+      products: snapshot().products.map((product) => product.id === 1 ? { ...product, available: false } : product),
+    }));
+    expect(available.errors.some((error) => error.message === "Set available to FALSE in an earlier upload (or in admin) before deleting.")).toBe(true);
+    expect(unavailable.errors).toEqual([]);
   });
 });

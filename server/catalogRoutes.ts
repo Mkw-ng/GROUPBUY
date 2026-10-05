@@ -13,6 +13,7 @@ import {
   validateAndPlan,
   type CatalogSnapshot,
 } from "./catalogCsv";
+import { CatalogApplyError, runApply } from "./catalogApply";
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -20,28 +21,33 @@ const upload = multer({
 });
 
 type ReadExecutor = { select: (...args: unknown[]) => any };
+type AuthenticatedAdmin = { openId: string; role: string };
 
-async function requireAdmin(req: Request, res: Response): Promise<boolean> {
+async function requireAdmin(req: Request, res: Response): Promise<AuthenticatedAdmin | null> {
   try {
     const user = await sdk.authenticateRequest(req as any);
     if (!user || user.role !== "admin") {
       res.status(403).json({ error: "Forbidden" });
-      return false;
+      return null;
     }
-    return true;
+    return user as AuthenticatedAdmin;
   } catch {
     res.status(401).json({ error: "Unauthorized" });
-    return false;
+    return null;
   }
 }
 
+function withLock<T>(query: T, lock: boolean): T {
+  return lock ? (query as any).for("update") : query;
+}
+
 /** Reads the catalog only, in the exact ordering used by the current db.ts helpers. */
-export async function readCatalogSnapshot(executor: ReadExecutor): Promise<CatalogSnapshot> {
-  const [sections, catalogCategories, catalogProducts] = await Promise.all([
-    executor.select().from(categorySections).orderBy(asc(categorySections.sortOrder)),
-    executor.select().from(categories).orderBy(asc(categories.sortOrder)),
-    executor.select().from(products).orderBy(products.sortOrder, products.createdAt),
-  ]);
+export async function readCatalogSnapshot(executor: ReadExecutor, options: { lock?: boolean } = {}): Promise<CatalogSnapshot> {
+  const lock = options.lock === true;
+  const sectionQuery = withLock(executor.select().from(categorySections).orderBy(asc(categorySections.sortOrder)), lock);
+  const categoryQuery = withLock(executor.select().from(categories).orderBy(asc(categories.sortOrder)), lock);
+  const productQuery = withLock(executor.select().from(products).orderBy(products.sortOrder, products.createdAt), lock);
+  const [sections, catalogCategories, catalogProducts] = await Promise.all([sectionQuery, categoryQuery, productQuery]);
   return {
     sections,
     categories: catalogCategories,
@@ -96,7 +102,22 @@ function parseRestoreMode(value: unknown): boolean | null {
   return null;
 }
 
-/** Registers export and preview-only catalog CSV routes. This module contains no apply/write route. */
+function applyMulter(req: Request, res: Response): Promise<boolean> {
+  return new Promise((resolve) => {
+    upload.array("files", 3)(req, res, (error) => {
+      if (handleMulterError(error, res)) { resolve(false); return; }
+      if (error) { res.status(400).json({ error: "Unable to read uploaded files" }); resolve(false); return; }
+      resolve(true);
+    });
+  });
+}
+
+function logApply500(error: unknown): void {
+  const details = error as { name?: unknown; cause?: { code?: unknown } };
+  console.error("[catalog-apply] failed", { name: typeof details?.name === "string" ? details.name : "Error", code: details?.cause?.code ?? null });
+}
+
+/** Registers protected catalog CSV export, preview, and transactional apply routes. */
 export function registerCatalogRoutes(app: Application): void {
   const router = Router();
 
@@ -142,17 +163,9 @@ export function registerCatalogRoutes(app: Application): void {
     }
   });
 
-  router.post("/api/admin/catalog/preview", async (req, res, next) => {
+  router.post("/api/admin/catalog/preview", async (req, res) => {
     if (!(await requireAdmin(req, res))) return;
-    upload.array("files", 3)(req, res, (error) => {
-      if (handleMulterError(error, res)) return;
-      if (error) {
-        res.status(400).json({ error: "Unable to read uploaded files" });
-        return;
-      }
-      next();
-    });
-  }, async (req, res) => {
+    if (!(await applyMulter(req, res))) return;
     try {
       const restoreMode = parseRestoreMode(req.body?.restoreMode);
       if (restoreMode === null) {
@@ -165,10 +178,7 @@ export function registerCatalogRoutes(app: Application): void {
         return;
       }
       const executor = await getReadExecutor();
-      const [snapshot, orderInfo] = await Promise.all([
-        readCatalogSnapshot(executor),
-        readOrderedProductIds(executor),
-      ]);
+      const [snapshot, orderInfo] = await Promise.all([readCatalogSnapshot(executor), readOrderedProductIds(executor)]);
       snapshot.orderedProductIds = orderInfo.orderedProductIds;
       snapshot.unreadableOrderCount = orderInfo.unreadableOrderCount;
       const parsed = parseCatalogFiles(files.map((file) => ({ filename: file.originalname, text: file.buffer.toString("utf8") })));
@@ -176,6 +186,64 @@ export function registerCatalogRoutes(app: Application): void {
     } catch (error) {
       console.error("[catalog-preview] error", error);
       res.status(500).json({ error: "Failed to preview catalog changes" });
+    }
+  });
+
+  router.post("/api/admin/catalog/apply", async (req, res) => {
+    const user = await requireAdmin(req, res);
+    if (!user) return;
+    if (req.get("X-Catalog-Apply") !== "1" || (req.get("Sec-Fetch-Site") && req.get("Sec-Fetch-Site") !== "same-origin")) {
+      res.status(403).json({ error: "Forbidden" });
+      return;
+    }
+    if (!(await applyMulter(req, res))) return;
+
+    const planHash = typeof req.body?.planHash === "string" ? req.body.planHash : "";
+    if (!/^[0-9a-f]{64}$/.test(planHash)) {
+      res.status(400).json({ error: "planHash must be a 64-character lowercase hex string" });
+      return;
+    }
+    const restoreMode = parseRestoreMode(req.body?.restoreMode);
+    if (restoreMode === null) {
+      res.status(400).json({ error: "restoreMode must be true or false" });
+      return;
+    }
+    const files = (req.files as Express.Multer.File[] | undefined) ?? [];
+    if (files.length === 0) {
+      res.status(400).json({ error: "Choose one to three CSV files" });
+      return;
+    }
+    const parsed = parseCatalogFiles(files.map((file) => ({ filename: file.originalname, text: file.buffer.toString("utf8") })));
+    const db = await getDb();
+    if (!db) {
+      res.status(500).json({ error: "Database unavailable" });
+      return;
+    }
+
+    let callbackDone = false;
+    try {
+      const counts = await (db as any).transaction(async (tx: unknown) => {
+        const result = await runApply(tx, parsed, planHash, restoreMode, {
+          readSnapshot: (executor) => readCatalogSnapshot(executor as ReadExecutor, { lock: true }),
+          readOrderedIds: (executor) => readOrderedProductIds(executor as ReadExecutor),
+        });
+        callbackDone = true;
+        return result;
+      });
+      console.info("[catalog-apply] success", { openId: user.openId, ...counts });
+      res.json(counts);
+    } catch (error) {
+      if (res.headersSent) return;
+      if (error instanceof CatalogApplyError) {
+        res.status(error.status).json(error.body);
+        return;
+      }
+      logApply500(error);
+      if (callbackDone) {
+        res.status(500).json({ error: "Result unknown: run Preview again", unknown: true });
+      } else {
+        res.status(500).json({ error: "Apply failed, nothing was changed" });
+      }
     }
   });
 

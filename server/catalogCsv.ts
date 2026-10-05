@@ -233,6 +233,8 @@ const BADGE_VALUES = new Set(["LIMITED", "POPULAR", "NEW", "SOLD OUT"]);
 const PRODUCT_FIELDS = ["name", "cut", "category", "description", "price", "powerDropPrice", "retailPrice", "unit", "badge", "available", "visibility", "stockLimit", "sortOrder", "img"] as const;
 const PRODUCT_NULLABLE = new Set<NullableProductField>(["description", "powerDropPrice", "retailPrice", "badge", "stockLimit", "img"]);
 const PRODUCT_DECIMALS = new Set(["price", "powerDropPrice", "retailPrice", "stockLimit"]);
+const MAX_SORT_ORDER = 2_147_483_647;
+const MAX_TEXT_BYTES = 65_535;
 
 function headersFor(type: CatalogFileType): readonly string[] {
   if (type === "sections") return SECTION_HEADERS;
@@ -520,7 +522,15 @@ function parseNonNegativeInteger(value: string): number | null {
   const text = normaliseText(value);
   if (!/^\d+(?:\.0+)?$/.test(text)) return null;
   const number = Number(text);
-  return Number.isSafeInteger(number) && number >= 0 ? number : null;
+  return Number.isSafeInteger(number) && number >= 0 && number <= MAX_SORT_ORDER ? number : null;
+}
+
+function sortOrderError(issues: Issues, file: ParsedCatalogFile, row: number): void {
+  issues.add(file, row, `sortOrder must be an integer from 0 to ${MAX_SORT_ORDER}`);
+}
+
+function exceedsTextBytes(value: string | null): boolean {
+  return value !== null && Buffer.byteLength(value, "utf8") > MAX_TEXT_BYTES;
 }
 
 function parseBoolean(value: string): boolean | null {
@@ -845,7 +855,7 @@ export function validateAndPlan(parsedFiles: ParsedCatalogFile[], snapshot: Cata
         if (!present(sectionsFile, "name") || !name) issues.add(sectionsFile, row.row, "name is required for a new section");
         if (name.length > 64) issues.add(sectionsFile, row.row, "name must be at most 64 characters");
         const sortOrder = !present(sectionsFile, "sortOrder") || normaliseText(row.values.sortOrder) === "" ? nextSectionSort++ : parseNonNegativeInteger(row.values.sortOrder);
-        if (sortOrder === null) issues.add(sectionsFile, row.row, "sortOrder must be an integer of 0 or more");
+        if (sortOrder === null || sortOrder > MAX_SORT_ORDER) sortOrderError(issues, sectionsFile, row.row);
         if (issues.has(sectionsFile, row.row)) { rowStatus.set(key, "error"); return; }
         const section: SectionEntry = { ref: { newSectionKey: sectionKey(name) }, key: sectionKey(name), name, sortOrder: sortOrder!, row, action: "create", changedName: true };
         const sameNewSection = newSections.get(section.key!);
@@ -870,7 +880,7 @@ export function validateAndPlan(parsedFiles: ParsedCatalogFile[], snapshot: Cata
       }
       if (present(sectionsFile, "sortOrder")) {
         const sortOrder = parseNonNegativeInteger(row.values.sortOrder);
-        if (sortOrder === null) issues.add(sectionsFile, row.row, "sortOrder must be an integer of 0 or more");
+        if (sortOrder === null) sortOrderError(issues, sectionsFile, row.row);
         else candidate.sortOrder = sortOrder;
       }
       candidate.changedName = lower(candidate.name) !== lower(existing.initial.name);
@@ -947,7 +957,7 @@ export function validateAndPlan(parsedFiles: ParsedCatalogFile[], snapshot: Cata
         if ((powerDropName?.length ?? 0) > 64) issues.add(categoriesFile, row.row, "powerDropName must be at most 64 characters");
         if ((emoji?.length ?? 0) > 16) issues.add(categoriesFile, row.row, "emoji must be at most 16 characters");
         const sortOrder = !present(categoriesFile, "sortOrder") || normaliseText(row.values.sortOrder) === "" ? nextCategorySort++ : parseNonNegativeInteger(row.values.sortOrder);
-        if (sortOrder === null) issues.add(categoriesFile, row.row, "sortOrder must be an integer of 0 or more");
+        if (sortOrder === null || sortOrder > MAX_SORT_ORDER) sortOrderError(issues, categoriesFile, row.row);
         const section = resolveSectionReference(categoriesFile, row, null, null, sections, newSections, deletedSectionIds, initialSections, issues, warnings, warningKeys, slug, true);
         if (issues.has(categoriesFile, row.row) || section === undefined) { rowStatus.set(key, "error"); return; }
         const category: InternalCategory = { slug, name, powerDropName, emoji, section, visibility: visibility as VisibilityMode, sortOrder: sortOrder!, row, action: "create", changedName: true };
@@ -980,7 +990,7 @@ export function validateAndPlan(parsedFiles: ParsedCatalogFile[], snapshot: Cata
       }
       if (present(categoriesFile, "sortOrder")) {
         const sortOrder = parseNonNegativeInteger(row.values.sortOrder);
-        if (sortOrder === null) issues.add(categoriesFile, row.row, "sortOrder must be an integer of 0 or more");
+        if (sortOrder === null) sortOrderError(issues, categoriesFile, row.row);
         else candidate.sortOrder = sortOrder;
       }
       const section = resolveSectionReference(categoriesFile, row, candidate.section, sectionRefForId(existing.initial?.sectionId ?? null), sections, newSections, deletedSectionIds, initialSections, issues, warnings, warningKeys, slug, false);
@@ -1052,6 +1062,7 @@ export function validateAndPlan(parsedFiles: ParsedCatalogFile[], snapshot: Cata
         if (!existing || id === null) { issues.add(productsFile, row.row, "product id does not exist"); rowStatus.set(key, "error"); return; }
         if ((snapshot.unreadableOrderCount ?? 0) > 0) { issues.add(productsFile, row.row, `order data unreadable (${snapshot.unreadableOrderCount} orders)`); rowStatus.set(key, "error"); return; }
         if (orderedProductIds.has(id)) { issues.add(productsFile, row.row, "This product has orders, so it can't be deleted. Set available to FALSE (it stays visible as SOLD OUT) instead."); rowStatus.set(key, "error"); return; }
+        if (existing.product.available) { issues.add(productsFile, row.row, "Set available to FALSE in an earlier upload (or in admin) before deleting."); rowStatus.set(key, "error"); return; }
         products.delete(id);
         tupleRemove(tupleIndex, productTuple(existing.product), String(id));
         productRows.set(id, { row, action: "delete", previous: existing.product, fields: { name: { oldValue: existing.product.name, newValue: "DELETE" } } });
@@ -1087,7 +1098,9 @@ export function validateAndPlan(parsedFiles: ParsedCatalogFile[], snapshot: Cata
         if (available === null) issues.add(productsFile, row.row, "available must be TRUE or FALSE");
         if (!VISIBILITY_VALUES.has(visibility as VisibilityMode)) issues.add(productsFile, row.row, "visibility must be regular_only, always, or power_drop_only");
         if (!categories.has(category) || deletedCategorySlugs.has(category)) issues.add(productsFile, row.row, "category must be an existing, non-deleted category slug");
-        if (sortOrder === null) issues.add(productsFile, row.row, "sortOrder must be an integer of 0 or more");
+        if (sortOrder === null || sortOrder > MAX_SORT_ORDER) sortOrderError(issues, productsFile, row.row);
+        if (exceedsTextBytes(description)) issues.add(productsFile, row.row, "description must be at most 65535 bytes in UTF-8");
+        if (exceedsTextBytes(img)) issues.add(productsFile, row.row, "img must be at most 65535 bytes in UTF-8");
         if (issues.has(productsFile, row.row)) { rowStatus.set(key, "error"); return; }
         const candidate: CatalogProductSnapshot = {
           id: -row.row, name, cut, category, description, price: price!, powerDropPrice, retailPrice, unit,
@@ -1135,7 +1148,9 @@ export function validateAndPlan(parsedFiles: ParsedCatalogFile[], snapshot: Cata
         if (field === "stockLimit" && value !== null && !parseDecimal(String(value), 9_999_999.999, 3)) issues.add(productsFile, row.row, "stockLimit must be a valid decimal number up to 9999999.999");
         if (field === "badge" && value !== null && !BADGE_VALUES.has(String(value))) issues.add(productsFile, row.row, "badge must be LIMITED, POPULAR, NEW, or SOLD OUT");
         if (field === "visibility" && !VISIBILITY_VALUES.has(value as VisibilityMode)) issues.add(productsFile, row.row, "visibility must be regular_only, always, or power_drop_only");
-        if (field === "sortOrder" && (!Number.isInteger(value) || Number(value) < 0)) issues.add(productsFile, row.row, "sortOrder must be an integer of 0 or more");
+        if (field === "sortOrder" && (!Number.isInteger(value) || Number(value) < 0 || Number(value) > MAX_SORT_ORDER)) sortOrderError(issues, productsFile, row.row);
+        if (field === "description" && exceedsTextBytes(value as string | null)) issues.add(productsFile, row.row, "description must be at most 65535 bytes in UTF-8");
+        if (field === "img" && exceedsTextBytes(value as string | null)) issues.add(productsFile, row.row, "img must be at most 65535 bytes in UTF-8");
       });
       if (issues.has(productsFile, row.row) || checkConflict(productsFile, row, previous, Object.keys(fields).length > 0, issues, conflicts, warnings, restoreMode)) {
         rowStatus.set(key, issues.has(productsFile, row.row) ? "error" : "conflict");
